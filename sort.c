@@ -152,8 +152,14 @@ static void writeSortedTags (
 		 *  pattern) if this is not an xref file.
 		 */
 		if (i == 0  ||  Option.xref  ||  strcmp (table [i], table [i-1]) != 0)
+		{
+			char *q = table[i];
+			char *p = strchr(q, '\t');
+			strcpy(p+1, p+2);
+
 			if (fputs (table [i], fp) == EOF)
 				failedSort (fp, NULL);
+		}
 	}
 	if (toStdout)
 		fflush (fp);
@@ -199,13 +205,26 @@ extern void internalSortTags (const boolean toStdout)
 			;  /* ignore blank lines */
 		else
 		{
-			const size_t stringSize = strlen (line) + 1;
+			size_t stringSize = strlen (line) + 1;
+
+			char *delim = strstr(line, ";\"\t");
+			if (delim) stringSize += 1;
 
 			table [i] = (char *) malloc (stringSize);
 			if (table [i] == NULL)
 				failedSort (fp, "out of memory");
 			DebugStatement ( mallocSize += stringSize; )
-			strcpy (table [i], line);
+
+			if (delim) {
+				const char *p = strchr(line,'\t');
+				int n = p - line + 1;
+				char *q = table[i];
+				strncpy(q, line, n);
+				q[n] = delim[3];
+				strcpy(&q[n+1], p+1);
+				/* printf(q); */
+			}
+			else strcpy (table [i], line);
 			++i;
 		}
 	}
