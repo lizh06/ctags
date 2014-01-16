@@ -11,32 +11,22 @@ SOURCES = \
 	args.c \
 	ant.c \
 	asm.c \
-	asp.c \
 	awk.c \
 	basic.c \
-	beta.c \
 	c.c \
 	css.c \
-	cobol.c \
 	dosbatch.c \
-	eiffel.c \
 	entry.c \
-	erlang.c \
-	falcon.c \
 	flex.c \
 	fortran.c \
 	get.c \
-	go.c \
 	html.c \
 	jscript.c \
 	keyword.c \
-	lisp.c \
 	lregex.c \
 	lua.c \
 	main.c \
 	make.c \
-	objc.c \
-	ocaml.c \
 	options.c \
 	parse.c \
 	pascal.c \
@@ -44,20 +34,13 @@ SOURCES = \
 	php.c \
 	python.c \
 	read.c \
-	rexx.c \
 	routines.c \
 	ruby.c \
-	scheme.c \
 	sh.c \
-	slang.c \
-	sml.c \
 	sort.c \
-	sql.c \
 	strlist.c \
 	tcl.c \
 	tex.c \
-	verilog.c \
-	vhdl.c \
 	vim.c \
 	yacc.c \
 	vstring.c
@@ -76,32 +59,23 @@ OBJECTS = \
 	args.$(OBJEXT) \
 	ant.$(OBJEXT) \
 	asm.$(OBJEXT) \
-	asp.$(OBJEXT) \
 	awk.$(OBJEXT) \
 	basic.$(OBJEXT) \
-	beta.$(OBJEXT) \
 	c.$(OBJEXT) \
 	css.$(OBJEXT) \
 	cobol.$(OBJEXT) \
 	dosbatch.$(OBJEXT) \
-	eiffel.$(OBJEXT) \
 	entry.$(OBJEXT) \
-	erlang.$(OBJEXT) \
-	falcon.$(OBJEXT) \
 	flex.$(OBJEXT) \
 	fortran.$(OBJEXT) \
 	get.$(OBJEXT) \
-	go.$(OBJEXT) \
 	html.$(OBJEXT) \
 	jscript.$(OBJEXT) \
 	keyword.$(OBJEXT) \
-	lisp.$(OBJEXT) \
 	lregex.$(OBJEXT) \
 	lua.$(OBJEXT) \
 	main.$(OBJEXT) \
 	make.$(OBJEXT) \
-	objc.$(OBJEXT) \
-	ocaml.$(OBJEXT) \
 	options.$(OBJEXT) \
 	parse.$(OBJEXT) \
 	pascal.$(OBJEXT) \
@@ -109,20 +83,13 @@ OBJECTS = \
 	php.$(OBJEXT) \
 	python.$(OBJEXT) \
 	read.$(OBJEXT) \
-	rexx.$(OBJEXT) \
 	routines.$(OBJEXT) \
 	ruby.$(OBJEXT) \
-	scheme.$(OBJEXT) \
 	sh.$(OBJEXT) \
-	slang.$(OBJEXT) \
-	sml.$(OBJEXT) \
 	sort.$(OBJEXT) \
-	sql.$(OBJEXT) \
 	strlist.$(OBJEXT) \
 	tcl.$(OBJEXT) \
 	tex.$(OBJEXT) \
-	verilog.$(OBJEXT) \
-	vhdl.$(OBJEXT) \
 	vim.$(OBJEXT) \
 	yacc.$(OBJEXT) \
 	vstring.$(OBJEXT)

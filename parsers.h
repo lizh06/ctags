@@ -18,46 +18,28 @@
 #define PARSER_LIST \
 	AntParser, \
 	AsmParser, \
-	AspParser, \
 	AwkParser, \
 	BasicParser, \
-	BetaParser, \
 	CParser, \
 	CppParser, \
 	CssParser, \
 	CsharpParser, \
-	CobolParser, \
 	DosBatchParser, \
-	EiffelParser, \
-	ErlangParser, \
-	FalconParser, \
 	FlexParser, \
 	FortranParser, \
-	GoParser, \
 	HtmlParser, \
 	JavaParser, \
 	JavaScriptParser, \
-	LispParser, \
 	LuaParser, \
 	MakefileParser, \
-	ObjcParser, \
-	OcamlParser, \
 	PascalParser, \
 	PerlParser, \
 	PhpParser, \
 	PythonParser, \
-	RexxParser, \
 	RubyParser, \
-	SchemeParser, \
 	ShParser, \
-	SlangParser, \
-	SmlParser, \
-	SqlParser, \
 	TclParser, \
 	TexParser, \
-	VeraParser, \
-	VerilogParser, \
-	VhdlParser, \
 	VimParser, \
 	YaccParser
 
