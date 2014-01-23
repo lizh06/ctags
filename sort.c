@@ -154,8 +154,10 @@ static void writeSortedTags (
 		if (i == 0  ||  Option.xref  ||  strcmp (table [i], table [i-1]) != 0)
 		{
 			char *q = table[i];
-			char *p = strchr(q, '\t');
-			strcpy(p+1, p+2);
+			if (*q != '!') {
+				char *p = strchr(q, '\t');
+				strcpy(p+1, p+2);
+			}
 
 			if (fputs (table [i], fp) == EOF)
 				failedSort (fp, NULL);
@@ -215,16 +217,17 @@ extern void internalSortTags (const boolean toStdout)
 				failedSort (fp, "out of memory");
 			DebugStatement ( mallocSize += stringSize; )
 
-			if (delim) {
+			if (*line == '!' || !delim)
+				strcpy (table [i], line);
+
+			else {
 				const char *p = strchr(line,'\t');
 				int n = p - line + 1;
 				char *q = table[i];
 				strncpy(q, line, n);
 				q[n] = delim[3];
 				strcpy(&q[n+1], p+1);
-				/* printf(q); */
 			}
-			else strcpy (table [i], line);
 			++i;
 		}
 	}
