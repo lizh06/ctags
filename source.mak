@@ -27,6 +27,8 @@ SOURCES = \
 	lua.c \
 	main.c \
 	make.c \
+	objc.c \
+	ocaml.c \
 	options.c \
 	parse.c \
 	pascal.c \
@@ -38,6 +40,7 @@ SOURCES = \
 	ruby.c \
 	sh.c \
 	sort.c \
+	sql.c \
 	strlist.c \
 	tcl.c \
 	tex.c \
@@ -76,6 +79,8 @@ OBJECTS = \
 	lua.$(OBJEXT) \
 	main.$(OBJEXT) \
 	make.$(OBJEXT) \
+	objc.$(OBJEXT) \
+	ocaml.$(OBJEXT) \
 	options.$(OBJEXT) \
 	parse.$(OBJEXT) \
 	pascal.$(OBJEXT) \
@@ -87,6 +92,7 @@ OBJECTS = \
 	ruby.$(OBJEXT) \
 	sh.$(OBJEXT) \
 	sort.$(OBJEXT) \
+	sql.$(OBJEXT) \
 	strlist.$(OBJEXT) \
 	tcl.$(OBJEXT) \
 	tex.$(OBJEXT) \

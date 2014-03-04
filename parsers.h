@@ -32,12 +32,15 @@
 	JavaScriptParser, \
 	LuaParser, \
 	MakefileParser, \
+	ObjcParser, \
+	OcamlParser, \
 	PascalParser, \
 	PerlParser, \
 	PhpParser, \
 	PythonParser, \
 	RubyParser, \
 	ShParser, \
+	SqlParser, \
 	TclParser, \
 	TexParser, \
 	VimParser, \
