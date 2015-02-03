@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 2000-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -100,10 +98,14 @@ extern parserDefinition* SchemeParser (void)
 	static const char *const extensions [] = {
 		"SCM", "SM", "sch", "scheme", "scm", "sm", NULL
 	};
+	static const char *const aliases [] = {
+		"gosh", "guile", NULL
+	};
 	parserDefinition* def = parserNew ("Scheme");
 	def->kinds      = SchemeKinds;
 	def->kindCount  = KIND_COUNT (SchemeKinds);
 	def->extensions = extensions;
+	def->aliases    = aliases;
 	def->parser     = findSchemeTags;
 	return def;
 }

@@ -401,17 +401,17 @@ Include an entry for the base file name of every source file (e.g.
 .I q
 Include an extra class-qualified tag entry for each tag which is a member
 of a class (for languages for which this information is extracted; currently
-C++, Eiffel, and Java). The actual form of the qualified tag depends upon the
-language from which the tag was derived (using a form that is most natural for
-how qualified calls are specified in the language). For C++, it is in the form
-"class::member"; for Eiffel and Java, it is in the form "class.member". This
-may allow easier location of a specific tags when multiple occurrences of a
-tag name occur in the tag file. Note, however, that this could potentially
-more than double the size of the tag file.
+C++, Eiffel, Java, and Perl). The actual form of the qualified tag depends
+upon the language from which the tag was derived (using a form that is most
+natural for how qualified calls are specified in the language). For C++ and
+Perl, it is in the form "class::member"; for Eiffel and Java, it is in the
+form "class.member". This may allow easier location of a specific tags when
+multiple occurrences of a tag name occur in the tag file. Note, however,
+that this could potentially more than double the size of the tag file.  .RE
 .RE
 
 .TP 5
-\fB\-\-fields\fP=\fI[+|\-]flags\fP
+\fB\-\-fields\fP=\fI[+|\-]flags\fP|\fi*\fP
 Specifies the available extension fields which are to be included in the
 entries of the tag file (see \fBTAG FILE FORMAT\fP, below, for more
 information). The parameter \fIflags\fP is a set of one-letter flags, each
@@ -464,7 +464,8 @@ Type and name of a variable or typedef as "typeref:" field [enabled]
 Each letter or group of letters may be preceded by either '+' to add it to the
 default set, or '\-' to exclude it. In the absence of any preceding '+' or '\-'
 sign, only those kinds explicitly listed in \fIflags\fP will be included in
-the output (i.e. overriding the default set). This option is ignored if the
+the output (i.e. overriding the default set). All fields are included if '*'
+is given. This option is ignored if the
 option \fB\-\-format\fP=\fI1\fP has been specified. The default value 
 of this option is \fIfkst\fP.
 .RE
@@ -525,7 +526,7 @@ conditionals are too complex follows all branches of a conditional. This
 option is disabled by default.
 
 .TP 5
-\fB\-\-<LANG>\-kinds\fP=\fI[+|\-]kinds\fP
+\fB\-\-<LANG>\-kinds\fP=\fI[+|\-]kinds\fP|\fi*\fP
 Specifies a list of language-specific kinds of tags (or kinds) to include in
 the output file for a particular language, where \fB<LANG>\fP is
 case-insensitive and is one of the built-in language names (see the
@@ -538,6 +539,10 @@ preceded by either '+' to add it to, or '\-' to remove it from, the default
 set. In the absence of any preceding '+' or '\-' sign, only those kinds
 explicitly listed in \fIkinds\fP will be included in the output (i.e.
 overriding the default for the specified language).
+
+Specifies '*' as the parameter \fIkinds\fP to include all kinds implemented
+in <LANG> in the output. Further more if '*' is given as <LANG>, specification
+of the parameter \fIkinds\fP affects all languages defined in ctags.
 
 As an example for the C language, in order to add prototypes and external
 variable declarations to the default set of tag kinds, but exclude macros,
@@ -685,6 +690,10 @@ As a special case, if
 \fB\-\-options\fP=\fINONE\fP is specified as the first option on the command
 line, it will disable the automatic reading of any configuration options from
 either a file or the environment (see \fBFILES\fP).
+
+.TP 5
+\fB\-\-quiet\fP[=\fIyes\fP|\fIno\fP]
+Write fewer messages(default is \fIno\fP).
 
 .TP 5
 \fB\-\-recurse\fP[=\fIyes\fP|\fIno\fP]
@@ -1111,15 +1120,9 @@ ignored.
 .br
 .I /etc/ctags.conf
 .br
-.I /etc/ctags.conf.d/*.{ctags,conf} (not on MSDOS, MSWindows)
-.br
 .I /usr/local/etc/ctags.conf
 .br
-.I /usr/local/etc/ctags.conf.d/*.{ctags,conf} (not on MSDOS, MSWindows)
-.br
 .I $HOME/.ctags
-.br
-.I $HOME/.ctags.d/*.{ctags,conf} (not on MSDOS, MSWindows)
 .br
 .I $HOME/ctags.cnf (on MSDOS, MSWindows only)
 .br

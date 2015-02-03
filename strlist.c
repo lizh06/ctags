@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1999-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -195,6 +193,22 @@ extern boolean stringListHas (
 	return result;
 }
 
+static vString* stringListFinds (
+		const stringList *const current, const char *const string,
+		boolean (*test)(const char *s, vString *const vs))
+{
+	int i;
+
+	Assert (current != NULL);
+	Assert (string != NULL);
+
+	i = stringListIndex (current, string, test);
+	if (i == -1)
+		return NULL;
+	else
+		return stringListItem(current, i);
+}
+
 extern boolean stringListHasInsensitive (
 		const stringList *const current, const char *const string)
 {
@@ -247,6 +261,16 @@ extern boolean stringListExtensionMatched (
 #endif
 }
 
+extern vString* stringListExtensionFinds (
+		const stringList* const current, const char* const extension)
+{
+#ifdef CASE_INSENSITIVE_FILENAMES
+	return stringListFinds (current, extension, compareStringInsensitive);
+#else
+	return stringListFinds (current, extension, compareString);
+#endif
+}
+
 static boolean fileNameMatched (
 		const vString* const vpattern, const char* const fileName)
 {
@@ -261,21 +285,45 @@ static boolean fileNameMatched (
 }
 
 extern boolean stringListFileMatched (
-		const stringList* const current, const char* const fileName)
+			const stringList* const current, const char* const fileName)
 {
-	boolean result = FALSE;
-	unsigned int i;
-	for (i = 0  ;  ! result  &&  i < stringListCount (current)  ;  ++i)
-		result = fileNameMatched (stringListItem (current, i), fileName);
-	return result;
+	return stringListFileFinds (current, fileName)? TRUE: FALSE;
 }
 
-extern void stringListPrint (const stringList *const current)
+extern vString* stringListFileFinds (
+		const stringList* const current, const char* const fileName)
+{
+	vString* vstr = NULL;
+	boolean matched = FALSE;
+	unsigned int i;
+	for (i = 0  ;  ! matched  &&  i < stringListCount (current)  ;  ++i)
+	{
+		vstr = stringListItem (current, i);
+		matched = fileNameMatched (vstr, fileName);
+	}
+	return matched? vstr: NULL;
+}
+
+extern void stringListPrint (const stringList *const current, FILE *fp)
 {
 	unsigned int i;
 	Assert (current != NULL);
 	for (i = 0  ;  i < current->count  ;  ++i)
-		printf ("%s%s", (i > 0) ? ", " : "", vStringValue (current->list [i]));
+		fprintf (fp, "%s%s", (i > 0) ? ", " : "", vStringValue (current->list [i]));
+}
+
+extern void stringListReverse (const stringList *const current)
+{
+	unsigned int i, j;
+	vString *tmp;
+
+	Assert (current != NULL);
+	for (i = 0, j = current->count - 1 ; i <  (current->count / 2); ++i, --j)
+	{
+		tmp = current->list[i];
+		current->list[i] = current->list[j];
+		current->list[j] = tmp;
+	}
 }
 
 /* vi:set tabstop=4 shiftwidth=4: */

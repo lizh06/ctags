@@ -1,7 +1,4 @@
-# $Id$
-#
 # Makefile for UNIX-like platforms.
-#
 
 # These are the names of the installed programs, in case you wish to change
 # them.
@@ -24,12 +21,19 @@ srcdir	= @srcdir@
 libdir	= @libdir@
 incdir	= @includedir@
 mandir	= @mandir@
+datadir = @datarootdir@/@PACKAGE_NAME@
+sysconfdir=@sysconfdir@
+pkgconfdir=@sysconfdir@/@PACKAGE_NAME@
+libexecdir=@libexecdir@
+pkglibexecdir=@libexecdir@/@PACKAGE_NAME@
 SLINK	= @LN_S@
 STRIP	= @STRIP@
 CC	= @CC@
 DEFS	= @DEFS@
+CPPFLAGS = @CPPFLAGS@
 CFLAGS	= @CFLAGS@
 LDFLAGS	= @LDFLAGS@
+LIBOBJS = @LIBOBJS@
 LIBS	= @LIBS@
 EXEEXT	= @EXEEXT@
 OBJEXT	= @OBJEXT@
@@ -49,6 +53,12 @@ OBJEXT	= @OBJEXT@
 #CFLAGS	= -O
 #LDFLAGS=
 
+ALL_CFLAGS = $(CFLAGS) -Wall
+ALL_CPPFLAGS = $(CPPFLAGS)			\
+	-DDATADIR=\"$(datadir)\"		\
+	-DPKGCONFDIR=\"$(pkgconfdir)\"		\
+	-DPKGLIBEXECDIR=\"$(pkglibexecdir)\"
+
 include $(srcdir)/source.mak
 
 #
@@ -58,9 +68,10 @@ include $(srcdir)/source.mak
 .SUFFIXES:
 .SUFFIXES: .c .$(OBJEXT)
 
-VPATH	= $(srcdir)
+VPATH	= $(srcdir) $(srcdir)/data/corpora $(srcdir)/data/optlib \
+	$(srcdir)/gnu_regex $(srcdir)/fnmatch
 
-INSTALL		= cp
+INSTALL		= cp -p
 INSTALL_PROG	= $(INSTALL)
 INSTALL_DATA	= $(INSTALL)
 
@@ -81,12 +92,49 @@ CMAN	= $(CTAGS_PROG).$(manext)
 EMAN	= $(ETAGS_PROG).$(manext)
 
 #
+# corpora files
+#
+corporadir = $(datadir)/corpora
+pkgconf_corporadir = $(pkgconfdir)/corpora
+CORPORA    = ctags.ctags RFC1213-MIB.txt
+
+#
+# preload
+#
+preloaddir = $(datadir)/preload
+pkgconf_preloaddir = $(pkgconfdir)/preload
+PRELOAD_OPTLIB =				\
+	\
+	coffee.ctags				\
+	ctags.ctags				\
+	mib.ctags				\
+	\
+	$(NULL)
+DEFAULT_PRELOAD_FILE=default.ctags
+
+#
+# config files
+#
+optlibdir = $(datadir)/optlib
+pkgconf_optlibdir = $(pkgconfdir)/optlib
+OPTLIB    = $(PRELOAD_OPTLIB)
+
+#
+# drivers
+#
+driversdir = $(pkglibexecdir)/drivers
+DRIVERS = coffeetags
+
+
+#
 # destinations for installed files
 #
 CTAGS_EXEC	= $(CTAGS_PROG)$(EXEEXT)
 ETAGS_EXEC	= $(ETAGS_PROG)$(EXEEXT)
+READ_CMD	= readtags$(EXEEXT)
 DEST_CTAGS	= $(bindir)/$(CTAGS_EXEC)
 DEST_ETAGS	= $(bindir)/$(ETAGS_EXEC)
+DEST_READ_CMD	= $(bindir)/$(READ_CMD)
 DEST_READ_LIB	= $(libdir)/$(READ_LIB)
 DEST_READ_INC	= $(incdir)/$(READ_INC)
 DEST_CMAN	= $(man1dir)/$(CMAN)
@@ -95,25 +143,32 @@ DEST_EMAN	= $(man1dir)/$(EMAN)
 #
 # primary rules
 #
-all: $(CTAGS_EXEC) $(READ_LIB)
+all: $(CTAGS_EXEC) $(READ_LIB) $(READ_CMD)
 
 $(CTAGS_EXEC): $(OBJECTS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LIBS)
 
 dctags$(EXEEXT): debug.c $(SOURCES) $(HEADERS)
-	$(CC) -I. -I$(srcdir) $(DEFS) -DDEBUG -g $(LDFLAGS) -o $@ debug.c $(SOURCES)
+	$(CC) -I. -I$(srcdir) $(DEFS) $(ALL_CPPFLAGS) -DDEBUG -g $(LDFLAGS) -o $@ debug.c $(SOURCES)
 
-readtags$(EXEEXT): readtags.c readtags.h
-	$(CC) -DREADTAGS_MAIN -I. -I$(srcdir) $(DEFS) $(CFLAGS) $(LDFLAGS) -o $@ readtags.c
+$(READ_CMD): readtags.c readtags.h
+	$(CC) -DREADTAGS_MAIN -I. -I$(srcdir) $(DEFS) $(ALL_CPPFLAGS)  $(ALL_CFLAGS) $(LDFLAGS) -o $@ $(srcdir)/readtags.c
 
 ETYPEREF_OBJS = etyperef.o keyword.o routines.o strlist.o vstring.o
 etyperef$(EXEEXT): $(ETYPEREF_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(ETYPEREF_OBJS)
 
 etyperef.o: eiffel.c
-	$(CC) -DTYPE_REFERENCE_TOOL -I. -I$(srcdir) $(DEFS) $(CFLAGS) -o $@ -c eiffel.c
+	$(CC) -DTYPE_REFERENCE_TOOL -I. -I$(srcdir) $(DEFS) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ -c $(srcdir)/eiffel.c
 
-$(OBJECTS): $(HEADERS) config.h
+$(OBJECTS): $(HEADERS) config.h Makefile
+
+# Regenerate the Makefile whenever this file (it's source) changed.  Any target
+# should trigger this as it may affect their rules.  This implementation only
+# works with GNU make but should be harmless for other implementations.
+%: Makefile
+Makefile: Makefile.in config.status
+	./config.status --file $@
 
 #
 # generic install rules
@@ -125,7 +180,11 @@ install-strip: install
 install-ctags: install-cbin install-cman
 install-etags: install-ebin install-eman
 
-$(bindir) $(man1dir) $(libdir) $(incdir):
+INSTALLDIRS = $(bindir) $(man1dir) $(libdir) $(incdir) \
+	$(corporadir) $(optlibdir) $(preloaddir) $(driversdir) \
+	$(pkgconf_corporadir) $(pkgconf_optlibdir) $(pkgconf_preloaddir)
+
+$(addprefix $(DESTDIR),$(INSTALLDIRS)):
 	$(srcdir)/mkinstalldirs $@
 
 FORCE:
@@ -133,17 +192,18 @@ FORCE:
 #
 # install the executables
 #
-install-bin: install-cbin install-ebin install-lib
+install-bin: install-cbin install-ebin install-lib install-cmd
 install-cbin: $(DEST_CTAGS)
 install-ebin: $(DEST_ETAGS)
 install-lib: $(DEST_READ_LIB) $(DEST_READ_INC)
+install-cmd: $(DEST_READ_CMD)
 
-$(DEST_CTAGS): $(CTAGS_EXEC) $(bindir) FORCE
-	$(INSTALL_PROG) $(CTAGS_EXEC) $@  &&  chmod 755 $@
+$(DEST_CTAGS): $(CTAGS_EXEC) $(DESTDIR)$(bindir) FORCE
+	$(INSTALL_PROG) $(CTAGS_EXEC) $(DESTDIR)$@  &&  chmod 755 $(DESTDIR)$@
 
 $(DEST_ETAGS):
-	- if [ -x $(DEST_CTAGS) ]; then \
-	    cd $(bindir) && $(SLINK) $(CTAGS_EXEC) $(ETAGS_EXEC); \
+	- if [ -x $(DESTDIR)$(DEST_CTAGS) ]; then \
+	    cd $(DESTDIR)$(bindir) && $(SLINK) $(CTAGS_EXEC) $(ETAGS_EXEC); \
 	fi
 
 #
@@ -153,34 +213,70 @@ install-man: install-cman install-eman
 install-cman: $(DEST_CMAN)
 install-eman: $(DEST_EMAN)
 
-$(DEST_CMAN): $(man1dir) $(MANPAGE) FORCE
-	- $(INSTALL_DATA) $(srcdir)/$(MANPAGE) $@  &&  chmod 644 $@
+$(DEST_CMAN): $(DESTDIR)$(man1dir) $(MANPAGE) FORCE
+	- $(INSTALL_DATA) $(srcdir)/$(MANPAGE) $(DESTDIR)$@  &&  chmod 644 $(DESTDIR)$@
 
 $(DEST_EMAN):
-	- if [ -f $(DEST_CMAN) ]; then \
-	    cd $(man1dir) && $(SLINK) $(CMAN) $(EMAN); \
+	- if [ -f $(DESTDIR)$(DEST_CMAN) ]; then \
+	    cd $(DESTDIR)$(man1dir) && $(SLINK) $(CMAN) $(EMAN); \
 	fi
 
 #
 # install the library
 #
-$(DEST_READ_LIB): $(READ_LIB) $(libdir) FORCE
-	$(INSTALL_PROG) $(READ_LIB) $@  &&  chmod 644 $@
+$(DEST_READ_LIB): $(READ_LIB) $(DESTDIR)$(libdir) FORCE
+	$(INSTALL_PROG) $(READ_LIB) $(DESTDIR)$@  &&  chmod 644 $(DESTDIR)$@
 
-$(DEST_READ_INC): $(READ_INC) $(incdir) FORCE
-	$(INSTALL_PROG) $(READ_INC) $@  &&  chmod 644 $@
+$(DEST_READ_INC): $(READ_INC) $(DESTDIR)$(incdir) FORCE
+	$(INSTALL_PROG) $(READ_INC) $(DESTDIR)$@  &&  chmod 644 $(DESTDIR)$@
 
+#
+# install the readtags command
+#
+$(DEST_READ_CMD): $(READ_CMD) $(DESTDIR)$(bindir) FORCE
+	$(INSTALL_PROG) $(READ_CMD) $(DESTDIR)$@  &&  chmod 755 $(DESTDIR)$@
+
+#
+# install data
+#
+install-data: @install_data_targets@
+install-data-corpora: $(addprefix data/corpora/,$(CORPORA)) $(DESTDIR)$(corporadir) $(DESTDIR)$(pkgconf_corporadir) FORCE
+	for c in $(CORPORA); do \
+		$(INSTALL_DATA) $(srcdir)/data/corpora/$$c $(DESTDIR)$(corporadir)/$$c && chmod 644 $(DESTDIR)$(corporadir)/$$c; \
+	done
+install-data-optlib: $(addprefix data/optlib/,$(OPTLIB))  $(DESTDIR)$(optlibdir) $(DESTDIR)$(pkgconf_optlibdir) FORCE
+	for c in $(OPTLIB); do \
+		$(INSTALL_DATA) $(srcdir)/data/optlib/$$c $(DESTDIR)$(optlibdir)/$$c && chmod 644 $(DESTDIR)$(optlibdir)/$$c; \
+	done
+install-data-preload: $(DESTDIR)$(preloaddir) $(DESTDIR)$(pkgconf_preloaddir) FORCE
+	echo > $(DESTDIR)$(preloaddir)/$(DEFAULT_PRELOAD_FILE)
+	for c in $(PRELOAD_OPTLIB); do \
+		echo "--options=$$(basename $$c .ctags)" >> $(DESTDIR)$(preloaddir)/$(DEFAULT_PRELOAD_FILE); \
+	done
+	chmod 644 $(DESTDIR)$(preloaddir)/$(DEFAULT_PRELOAD_FILE)
+
+#
+# install libexec
+#
+install-libexec: @install_libexec_targets@
+install-libexec-drivers: $(addprefix libexec/drivers/,$(DRIVERS)) $(DESTDIR)$(driversdir) FORCE
+	for x in $(DRIVERS); do \
+		$(INSTALL_PROG) $(srcdir)/libexec/drivers/$$x $(DESTDIR)$(driversdir)/$$x && chmod 755 $(DESTDIR)$(driversdir)/$$x; \
+	done
 
 #
 # rules for uninstalling
 #
-uninstall: uninstall-bin uninstall-lib uninstall-man
+uninstall: uninstall-bin uninstall-lib uninstall-cmd uninstall-man uninstall-data uninstall-libexec
 
 uninstall-bin:
 	- rm -f $(DEST_CTAGS) $(DEST_ETAGS)
 
 uninstall-lib:
 	- rm -f $(DEST_READ_LIB) $(DEST_READ_INC)
+
+uninstall-cmd:
+	- rm -f $(DEST_READ_CMD)
 
 uninstall-man:
 	- rm -f $(DEST_CMAN) $(DEST_EMAN)
@@ -191,6 +287,30 @@ uninstall-ctags:
 uninstall-etags:
 	- rm -f $(DEST_ETAGS) $(DEST_EMAN)
 
+uninstall-data: uninstall-corpora uninstall-optlib uninstall-preload
+	- rmdir $(datadir)
+	- rmdir $(pkgconfdir)
+
+uninstall-corpora:
+	- rm -f $(addprefix $(corporadir)/,$(CORPORA))
+	- rmdir $(corporadir)
+	- rmdir $(pkgconf_corporadir)
+uninstall-optlib:
+	- rm -f $(addprefix $(optlibdir)/,$(OPTLIB))
+	- rmdir $(optlibdir)
+	- rmdir $(pkgconf_optlibdir)
+uninstall-preload:
+	- rm -f $(preloaddir)/$(DEFAULT_PRELOAD_FILE)
+	- rmdir $(preloaddir)
+	- rmdir $(pkgconf_preloaddir)
+
+uninstall-libexec: uninstall-drivers
+	- rmdir $(pkglibexecdir)
+
+uninstall-drivers:
+	- rm -f $(addprefix $(driversdir)/,$(DRIVERS))
+	- rmdir $(driversdir)
+
 #
 # miscellaneous rules
 #
@@ -200,9 +320,9 @@ tags: $(CTAGS_EXEC)
 TAGS: $(CTAGS_EXEC)
 	./$(CTAGS_EXEC) -e $(srcdir)/*
 
-clean:
+clean: clean-units
 	rm -f $(OBJECTS) $(CTAGS_EXEC) tags TAGS $(READ_LIB) 
-	rm -f dctags$(EXEEXT) readtags$(EXEEXT)
+	rm -f dctags$(EXEEXT) $(READ_CMD)
 	rm -f etyperef$(EXEEXT) etyperef.$(OBJEXT)
 
 mostlyclean: clean
@@ -217,6 +337,63 @@ maintainerclean: distclean
 # implicit rules
 #
 .c.$(OBJEXT):
-	$(CC) -I. -I$(srcdir) $(DEFS) $(CFLAGS) -c $<
+	$(CC) -I. -I$(srcdir) $(DEFS) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -c $<
+$(addsuffix .$(OBJEXT),$(basename $(notdir $(REGEX_SOURCES)))): ALL_CPPFLAGS += \
+	-D_GNU_SOURCE -D__USE_GNU -Dbool=int -Dfalse=0 -Dtrue=1
+
+#
+# check
+#
+CTAGS_TEST = ./$(CTAGS_EXEC)
+ifdef VG
+VALGRIND=--with-valgrind
+endif
+ifdef SHRINK
+RUN_SHRINK=--run-shrink
+endif
+TIMEOUT=
+LANGUAGES=
+CATEGORIES=
+UNITS=
+ifdef TRAVIS
+SHOW_DIFF_OUTPUT=--show-diff-output
+endif
+
+.PHONY: check units fuzz  clean-units
+check: units
+
+#
+# FUZZ Target
+#
+# SHELL must be dash or bash.
+#
+fuzz: TIMEOUT := 1
+fuzz: $(CTAGS_TEST)
+	@ \
+	c="misc/units fuzz \
+		--ctags=$(CTAGS_TEST) \
+		--languages=$(LANGUAGES) \
+		$(VALGRIND) $(RUN_SHRINK) \
+		--with-timeout=$(TIMEOUT)"; \
+	$(SHELL) $${c} Units
+
+#
+# UNITS Target
+#
+units: TIMEOUT := 5
+units: $(CTAGS_TEST)
+	@ \
+	c="misc/units run \
+		--ctags=$(CTAGS_TEST) \
+		--languages=$(LANGUAGES) \
+		--categories=$(CATEGORIES) \
+		--units=$(UNITS) \
+		$(VALGRIND) $(RUN_SHRINK) \
+		--with-timeout=$(TIMEOUT) \
+		$(SHOW_DIFF_OUTPUT)"; \
+	 $(SHELL) $${c} Units
+
+clean-units:
+	$(SHELL) misc/units clean Units
 
 # vi:set tabstop=8:

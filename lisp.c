@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 2000-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -128,10 +126,15 @@ extern parserDefinition* LispParser (void)
 	static const char *const extensions [] = {
 		"cl", "clisp", "el", "l", "lisp", "lsp", NULL
 	};
+	static const char *const aliases [] = {
+		"clisp", "emacs-lisp", NULL
+	};
+
 	parserDefinition* def = parserNew ("Lisp");
 	def->kinds      = LispKinds;
 	def->kindCount  = KIND_COUNT (LispKinds);
 	def->extensions = extensions;
+	def->aliases = aliases;
 	def->parser     = findLispTags;
 	return def;
 }

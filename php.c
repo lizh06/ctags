@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 2013, Colomban Wendling <ban@herbesfolles.org>
 *
 *   This source code is released for free distribution under the terms of the
@@ -54,6 +52,7 @@ typedef enum {
 	KEYWORD_endwhile,
 	KEYWORD_extends,
 	KEYWORD_final,
+	KEYWORD_finally,
 	KEYWORD_for,
 	KEYWORD_foreach,
 	KEYWORD_function,
@@ -84,7 +83,8 @@ typedef enum {
 	KEYWORD_use,
 	KEYWORD_var,
 	KEYWORD_while,
-	KEYWORD_xor
+	KEYWORD_xor,
+	KEYWORD_yield
 } keywordId;
 
 typedef enum {
@@ -158,6 +158,7 @@ static const keywordDesc PhpKeywordTable[] = {
 	{ "endwhile",		KEYWORD_endwhile		},
 	{ "extends",		KEYWORD_extends			},
 	{ "final",			KEYWORD_final			},
+	{ "finally",		KEYWORD_finally			},
 	{ "for",			KEYWORD_for				},
 	{ "foreach",		KEYWORD_foreach			},
 	{ "function",		KEYWORD_function		},
@@ -188,7 +189,8 @@ static const keywordDesc PhpKeywordTable[] = {
 	{ "use",			KEYWORD_use				},
 	{ "var",			KEYWORD_var				},
 	{ "while",			KEYWORD_while			},
-	{ "xor",			KEYWORD_xor				}
+	{ "xor",			KEYWORD_xor				},
+	{ "yield",			KEYWORD_yield			}
 };
 
 
@@ -226,27 +228,31 @@ typedef struct {
 } tokenInfo;
 
 static langType Lang_php;
+static langType Lang_zephir;
 
 static boolean InPhp = FALSE; /* whether we are between <? ?> */
 
 /* current statement details */
-struct {
+static struct {
 	accessType access;
 	implType impl;
 } CurrentStatement;
 
 /* Current namespace */
-vString *CurrentNamesapce;
+static vString *CurrentNamesapce;
+/* Cache variable to build the tag's scope.  It has no real meaning outside
+ * of initPhpEntry()'s scope. */
+static vString *FullScope;
 
 
-static void buildPhpKeywordHash (void)
+static void buildPhpKeywordHash (const langType language)
 {
 	const size_t count = sizeof (PhpKeywordTable) / sizeof (PhpKeywordTable[0]);
 	size_t i;
 	for (i = 0; i < count ; i++)
 	{
 		const keywordDesc* const p = &PhpKeywordTable[i];
-		addKeyword (p->name, Lang_php, (int) p->id);
+		addKeyword (p->name, language, (int) p->id);
 	}
 }
 
@@ -279,17 +285,13 @@ static const char *implToString (const implType impl)
 static void initPhpEntry (tagEntryInfo *const e, const tokenInfo *const token,
 						  const phpKind kind, const accessType access)
 {
-	static vString *fullScope = NULL;
 	int parentKind = -1;
 
-	if (fullScope == NULL)
-		fullScope = vStringNew ();
-	else
-		vStringClear (fullScope);
+	vStringClear (FullScope);
 
 	if (vStringLength (CurrentNamesapce) > 0)
 	{
-		vStringCopy (fullScope, CurrentNamesapce);
+		vStringCopy (FullScope, CurrentNamesapce);
 		parentKind = K_NAMESPACE;
 	}
 
@@ -305,17 +307,17 @@ static void initPhpEntry (tagEntryInfo *const e, const tokenInfo *const token,
 	if (vStringLength (token->scope) > 0)
 	{
 		parentKind = token->parentKind;
-		if (vStringLength (fullScope) > 0)
-			vStringCatS (fullScope, SCOPE_SEPARATOR);
-		vStringCat (fullScope, token->scope);
+		if (vStringLength (FullScope) > 0)
+			vStringCatS (FullScope, SCOPE_SEPARATOR);
+		vStringCat (FullScope, token->scope);
 	}
-	if (vStringLength (fullScope) > 0)
+	if (vStringLength (FullScope) > 0)
 	{
 		Assert (parentKind >= 0);
 
-		vStringTerminate (fullScope);
+		vStringTerminate (FullScope);
 		e->extensionFields.scope[0] = PhpKinds[parentKind].name;
-		e->extensionFields.scope[1] = vStringValue (fullScope);
+		e->extensionFields.scope[1] = vStringValue (FullScope);
 	}
 }
 
@@ -497,7 +499,7 @@ static void addToScope (tokenInfo *const token, const vString *const extra)
 
 static boolean isIdentChar (const int c)
 {
-	return (isalnum (c) || c == '_' || c & 0x80);
+	return (isalnum (c) || c == '_' || c >= 0x80);
 }
 
 static int skipToCharacter (const int c)
@@ -661,19 +663,90 @@ static void parseIdentifier (vString *const string, const int firstChar)
 	vStringTerminate (string);
 }
 
+static boolean isSpace (int c)
+{
+	return (c == '\t' || c == ' ' || c == '\v' ||
+			c == '\n' || c == '\r' || c == '\f');
+}
+
+static int skipWhitespaces (int c)
+{
+	while (isSpace (c))
+		c = fileGetc ();
+	return c;
+}
+
+/* <script[:white:]+language[:white:]*=[:white:]*(php|'php'|"php")[:white:]*>
+ * 
+ * This is ugly, but the whole "<script language=php>" tag is and we can't
+ * really do better without adding a lot of code only for this */
+static boolean isOpenScriptLanguagePhp (int c)
+{
+	int quote = 0;
+
+	/* <script[:white:]+language[:white:]*= */
+	if (c                                   != '<' ||
+		tolower ((c = fileGetc ()))         != 's' ||
+		tolower ((c = fileGetc ()))         != 'c' ||
+		tolower ((c = fileGetc ()))         != 'r' ||
+		tolower ((c = fileGetc ()))         != 'i' ||
+		tolower ((c = fileGetc ()))         != 'p' ||
+		tolower ((c = fileGetc ()))         != 't' ||
+		! isSpace ((c = fileGetc ()))              ||
+		tolower ((c = skipWhitespaces (c))) != 'l' ||
+		tolower ((c = fileGetc ()))         != 'a' ||
+		tolower ((c = fileGetc ()))         != 'n' ||
+		tolower ((c = fileGetc ()))         != 'g' ||
+		tolower ((c = fileGetc ()))         != 'u' ||
+		tolower ((c = fileGetc ()))         != 'a' ||
+		tolower ((c = fileGetc ()))         != 'g' ||
+		tolower ((c = fileGetc ()))         != 'e' ||
+		(c = skipWhitespaces (fileGetc ())) != '=')
+		return FALSE;
+
+	/* (php|'php'|"php")> */
+	c = skipWhitespaces (fileGetc ());
+	if (c == '"' || c == '\'')
+	{
+		quote = c;
+		c = fileGetc ();
+	}
+	if (tolower (c)                         != 'p' ||
+		tolower ((c = fileGetc ()))         != 'h' ||
+		tolower ((c = fileGetc ()))         != 'p' ||
+		(quote != 0 && (c = fileGetc ()) != quote) ||
+		(c = skipWhitespaces (fileGetc ())) != '>')
+		return FALSE;
+
+	return TRUE;
+}
+
 static int findPhpStart (void)
 {
 	int c;
 	do
 	{
-		if ((c = fileGetc ()) == '<' &&
-			(c = fileGetc ()) == '?' &&
-			/* don't enter PHP mode on "<?xml", yet still support short open tags (<?) */
-			(tolower ((c = fileGetc ())) != 'x' ||
-			 tolower ((c = fileGetc ())) != 'm' ||
-			 tolower ((c = fileGetc ())) != 'l'))
+		if ((c = fileGetc ()) == '<')
 		{
-			break;
+			c = fileGetc ();
+			/* <? and <?php, but not <?xml */
+			if (c == '?')
+			{
+				/* don't enter PHP mode on "<?xml", yet still support short open tags (<?) */
+				if (tolower ((c = fileGetc ())) != 'x' ||
+					tolower ((c = fileGetc ())) != 'm' ||
+					tolower ((c = fileGetc ())) != 'l')
+				{
+					break;
+				}
+			}
+			/* <script language="php"> */
+			else
+			{
+				fileUngetc (c);
+				if (isOpenScriptLanguagePhp ('<'))
+					break;
+			}
 		}
 	}
 	while (c != EOF);
@@ -727,10 +800,7 @@ getNextChar:
 	else
 		c = fileGetc ();
 
-	while (c == '\t' || c == ' ' || c == '\n' || c == '\r')
-	{
-		c = fileGetc ();
-	}
+	c = skipWhitespaces (c);
 
 	token->lineNumber   = getSourceLineNumber ();
 	token->filePosition = getInputFilePosition ();
@@ -773,17 +843,36 @@ getNextChar:
 
 		case '<':
 		{
-			int d;
-			if ((d = fileGetc ()) != '<' ||
-				(d = fileGetc ()) != '<')
+			int d = fileGetc ();
+			if (d == '/')
 			{
-				fileUngetc (d);
-				token->type = TOKEN_UNDEFINED;
+				/* </script[:white:]*> */
+				if (tolower ((d = fileGetc ())) == 's' &&
+					tolower ((d = fileGetc ())) == 'c' &&
+					tolower ((d = fileGetc ())) == 'r' &&
+					tolower ((d = fileGetc ())) == 'i' &&
+					tolower ((d = fileGetc ())) == 'p' &&
+					tolower ((d = fileGetc ())) == 't' &&
+					(d = skipWhitespaces (fileGetc ())) == '>')
+				{
+					InPhp = FALSE;
+					goto getNextChar;
+				}
+				else
+				{
+					fileUngetc (d);
+					token->type = TOKEN_UNDEFINED;
+				}
 			}
-			else
+			else if (d == '<' && (d = fileGetc ()) == '<')
 			{
 				token->type = TOKEN_STRING;
 				parseHeredoc (token->string);
+			}
+			else
+			{
+				fileUngetc (d);
+				token->type = TOKEN_UNDEFINED;
 			}
 			break;
 		}
@@ -876,7 +965,7 @@ getNextChar:
 			else
 			{
 				parseIdentifier (token->string, c);
-				token->keyword = analyzeToken (token->string, Lang_php);
+				token->keyword = analyzeToken (token->string, getSourceLanguage ());
 				if (token->keyword == KEYWORD_NONE)
 					token->type = TOKEN_IDENTIFIER;
 				else
@@ -986,7 +1075,9 @@ static boolean parseTrait (tokenInfo *const token)
  * 	function &myfunc($foo, $bar) {}
  *
  * if @name is not NULL, parses an anonymous function with name @name
- * 	$foo = function($foo, $bar) {} */
+ * 	$foo = function($foo, $bar) {}
+ * 	$foo = function&($foo, $bar) {}
+ * 	$foo = function($foo, $bar) use ($x, &$y) {} */
 static boolean parseFunction (tokenInfo *const token, const tokenInfo *name)
 {
 	boolean readNext = TRUE;
@@ -994,20 +1085,21 @@ static boolean parseFunction (tokenInfo *const token, const tokenInfo *name)
 	implType impl = CurrentStatement.impl;
 	tokenInfo *nameFree = NULL;
 
+	readToken (token);
+	/* skip a possible leading ampersand (return by reference) */
+	if (token->type == TOKEN_AMPERSAND)
+		readToken (token);
+
 	if (! name)
 	{
-		readToken (token);
-		/* skip a possible leading ampersand (return by reference) */
-		if (token->type == TOKEN_AMPERSAND)
-			readToken (token);
 		if (token->type != TOKEN_IDENTIFIER)
 			return FALSE;
 
 		name = nameFree = newToken ();
 		copyToken (nameFree, token, TRUE);
+		readToken (token);
 	}
 
-	readToken (token);
 	if (token->type == TOKEN_OPEN_PAREN)
 	{
 		vString *arglist = vStringNew ();
@@ -1082,8 +1174,44 @@ static boolean parseFunction (tokenInfo *const token, const tokenInfo *name)
 		makeFunctionTag (name, arglist, access, impl);
 		vStringDelete (arglist);
 
-		readToken (token); /* normally it's an open brace or a semicolon */
+		readToken (token); /* normally it's an open brace or "use" keyword */
 	}
+
+	/* if parsing Zephir, skip function return type hint */
+	if (getSourceLanguage () == Lang_zephir && token->type == TOKEN_OPERATOR)
+	{
+		do
+			readToken (token);
+		while (token->type != TOKEN_EOF &&
+			   token->type != TOKEN_OPEN_CURLY &&
+			   token->type != TOKEN_CLOSE_CURLY &&
+			   token->type != TOKEN_SEMICOLON);
+	}
+
+	/* skip use(...) */
+	if (token->type == TOKEN_KEYWORD && token->keyword == KEYWORD_use)
+	{
+		readToken (token);
+		if (token->type == TOKEN_OPEN_PAREN)
+		{
+			int depth = 1;
+
+			do
+			{
+				readToken (token);
+				switch (token->type)
+				{
+					case TOKEN_OPEN_PAREN:  depth++; break;
+					case TOKEN_CLOSE_PAREN: depth--; break;
+					default: break;
+				}
+			}
+			while (token->type != TOKEN_EOF && depth > 0);
+
+			readToken (token);
+		}
+	}
+
 	if (token->type == TOKEN_OPEN_CURLY)
 		enterScope (token, name->string, K_FUNCTION);
 	else
@@ -1315,14 +1443,15 @@ static void enterScope (tokenInfo *const parentToken,
 	deleteToken (token);
 }
 
-static void findPhpTags (void)
+static void findTags (boolean startsInPhpMode)
 {
 	tokenInfo *const token = newToken ();
 
-	InPhp = FALSE;
+	InPhp = startsInPhpMode;
 	CurrentStatement.access = ACCESS_UNDEFINED;
 	CurrentStatement.impl = IMPL_UNDEFINED;
 	CurrentNamesapce = vStringNew ();
+	FullScope = vStringNew ();
 
 	do
 	{
@@ -1330,14 +1459,31 @@ static void findPhpTags (void)
 	}
 	while (token->type != TOKEN_EOF); /* keep going even with unmatched braces */
 
+	vStringDelete (FullScope);
 	vStringDelete (CurrentNamesapce);
 	deleteToken (token);
 }
 
-static void initialize (const langType language)
+static void findPhpTags (void)
+{
+	findTags (FALSE);
+}
+
+static void findZephirTags (void)
+{
+	findTags (TRUE);
+}
+
+static void initializePhpParser (const langType language)
 {
 	Lang_php = language;
-	buildPhpKeywordHash ();
+	buildPhpKeywordHash (language);
+}
+
+static void initializeZephirParser (const langType language)
+{
+	Lang_zephir = language;
+	buildPhpKeywordHash (language);
 }
 
 extern parserDefinition* PhpParser (void)
@@ -1348,7 +1494,19 @@ extern parserDefinition* PhpParser (void)
 	def->kindCount  = KIND_COUNT (PhpKinds);
 	def->extensions = extensions;
 	def->parser     = findPhpTags;
-	def->initialize = initialize;
+	def->initialize = initializePhpParser;
+	return def;
+}
+
+extern parserDefinition* ZephirParser (void)
+{
+	static const char *const extensions [] = { "zep", NULL };
+	parserDefinition* def = parserNew ("Zephir");
+	def->kinds      = PhpKinds;
+	def->kindCount  = KIND_COUNT (PhpKinds);
+	def->extensions = extensions;
+	def->parser     = findZephirTags;
+	def->initialize = initializeZephirParser;
 	return def;
 }
 

@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1998-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -37,7 +35,8 @@
 */
 extern boolean isBraceFormat (void);
 extern unsigned int getDirectiveNestLevel (void);
-extern void cppInit (const boolean state, const boolean hasAtLiteralStrings);
+extern void cppInit (const boolean state, const boolean hasAtLiteralStrings,
+		     const boolean hasSingleQuoteLiteralNumbers);
 extern void cppTerminate (void);
 extern void cppBeginStatement (void);
 extern void cppEndStatement (void);

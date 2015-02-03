@@ -1,0 +1,2 @@
+foo	input.cpp	/^int foo (int i)$/;"	f
+main	input.cpp	/^int main (int argc, char **argv)$/;"	f

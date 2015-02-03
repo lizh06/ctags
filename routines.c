@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 2002-2003, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -47,9 +45,6 @@
 # endif
 #endif
 
-#ifdef HAVE_DOS_H
-# include <dos.h>  /* to declare MAXPATH */
-#endif
 #ifdef HAVE_DIRECT_H
 # include <direct.h>  /* to _getcwd */
 #endif
@@ -72,10 +67,8 @@
 /*  File type tests.
  */
 #ifndef S_ISREG
-# if defined (S_IFREG) && ! defined (AMIGA)
+# if defined (S_IFREG)
 #  define S_ISREG(mode)		((mode) & S_IFREG)
-# else
-#  define S_ISREG(mode)		TRUE  /* assume regular file */
 # endif
 #endif
 
@@ -128,11 +121,6 @@
 #  define getcwd  _getcwd
 #  define currentdrive() (_getdrive() + 'A' - 1)
 #  define PATH_MAX  _MAX_PATH
-# elif defined (__BORLANDC__)
-#  define PATH_MAX  MAXPATH
-#  define currentdrive() (getdisk() + 'A')
-# elif defined (DJGPP)
-#  define currentdrive() (getdisk() + 'A')
 # else
 #  define currentdrive() 'C'
 # endif
@@ -152,8 +140,6 @@
 */
 #if defined (MSDOS_STYLE_PATH)
 const char *const PathDelimiters = ":/\\";
-#elif defined (VMS)
-const char *const PathDelimiters = ":]>";
 #endif
 
 char *CurrentDirectory;
@@ -170,7 +156,7 @@ extern int stat (const char *, struct stat *);
 #ifdef NEED_PROTO_LSTAT
 extern int lstat (const char *, struct stat *);
 #endif
-#if defined (MSDOS) || defined (WIN32) || defined (VMS) || defined (__EMX__) || defined (AMIGA)
+#if defined (WIN32)
 # define lstat(fn,buf) stat(fn,buf)
 #endif
 
@@ -188,14 +174,6 @@ extern void setExecutableName (const char *const path)
 {
 	ExecutableProgram = path;
 	ExecutableName = baseFilename (path);
-#ifdef VAXC
-{
-	/* remove filetype from executable name */
-	char *p = strrchr (ExecutableName, '.');
-	if (p != NULL)
-		*p = '\0';
-}
-#endif
 }
 
 extern const char *getExecutableName (void)
@@ -308,20 +286,38 @@ extern int strnuppercmp (const char *s1, const char *s2, size_t n)
 extern char* strstr (const char *str, const char *substr)
 {
 	const size_t length = strlen (substr);
-	const char *match = NULL;
 	const char *p;
 
-	for (p = str  ;  *p != '\0'  &&  match == NULL  ;  ++p)
+	for (p = str  ;  *p != '\0'  ;  ++p)
 		if (strncmp (p, substr, length) == 0)
-			match = p;
-	return (char*) match;
+			return (char*) p;
+	return NULL;
 }
 #endif
+
+extern char* strrstr (const char *str, const char *substr)
+{
+	const size_t length = strlen (substr);
+	const char *p;
+
+	for (p = str + strlen(str) - length  ;  p >= str  ;  --p)
+		if (strncmp (p, substr, length) == 0)
+			return (char*) p;
+	return NULL;
+}
 
 extern char* eStrdup (const char* str)
 {
 	char* result = xMalloc (strlen (str) + 1, char);
 	strcpy (result, str);
+	return result;
+}
+
+extern char* eStrndup (const char* str, size_t len)
+{
+	char* result = xMalloc (len + 1, char);
+	memset(result, 0, len + 1);
+	strncpy (result, str, len);
 	return result;
 }
 
@@ -373,18 +369,12 @@ extern char* newUpperString (const char* str)
 
 extern void setCurrentDirectory (void)
 {
-#ifndef AMIGA
 	char* buf;
-#endif
 	if (CurrentDirectory == NULL)
 		CurrentDirectory = xMalloc ((size_t) (PATH_MAX + 1), char);
-#ifdef AMIGA
-	strcpy (CurrentDirectory, ".");
-#else
 	buf = getcwd (CurrentDirectory, PATH_MAX);
 	if (buf == NULL)
 		perror ("");
-#endif
 	if (CurrentDirectory [strlen (CurrentDirectory) - (size_t) 1] !=
 			PATH_SEPARATOR)
 	{
@@ -392,27 +382,6 @@ extern void setCurrentDirectory (void)
 				OUTPUT_PATH_SEPARATOR);
 	}
 }
-
-#ifdef AMIGA
-static boolean isAmigaDirectory (const char *const name)
-{
-	boolean result = FALSE;
-	struct FileInfoBlock *const fib = xMalloc (1, struct FileInfoBlock);
-	if (fib != NULL)
-	{
-		const BPTR flock = Lock ((UBYTE *) name, (long) ACCESS_READ);
-
-		if (flock != (BPTR) NULL)
-		{
-			if (Examine (flock, fib))
-				result = ((fib->fib_DirEntryType >= 0) ? TRUE : FALSE);
-			UnLock (flock);
-		}
-		eFree (fib);
-	}
-	return result;
-}
-#endif
 
 /* For caching of stat() calls */
 extern fileStatus *eStat (const char *const fileName)
@@ -433,11 +402,7 @@ extern fileStatus *eStat (const char *const fileName)
 			else
 			{
 				file.exists = TRUE;
-#ifdef AMIGA
-				file.isDirectory = isAmigaDirectory (file.name);
-#else
 				file.isDirectory = (boolean) S_ISDIR (status.st_mode);
-#endif
 				file.isNormalFile = (boolean) (S_ISREG (status.st_mode));
 				file.isExecutable = (boolean) ((status.st_mode &
 					(S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
@@ -462,6 +427,12 @@ extern boolean doesFileExist (const char *const fileName)
 {
 	fileStatus *status = eStat (fileName);
 	return status->exists;
+}
+
+extern boolean doesExecutableExist (const char *const fileName)
+{
+	fileStatus *status = eStat (fileName);
+	return status->exists && status->isExecutable;
 }
 
 extern boolean isRecursiveLink (const char* const dirName)
@@ -516,7 +487,7 @@ extern int fsetpos (FILE *stream, fpos_t const *pos)
 static boolean isPathSeparator (const int c)
 {
 	boolean result;
-#if defined (MSDOS_STYLE_PATH) || defined (VMS)
+#if defined (MSDOS_STYLE_PATH)
 	result = (boolean) (strchr (PathDelimiters, c) != NULL);
 #else
 	result = (boolean) (c == PATH_SEPARATOR);
@@ -566,7 +537,7 @@ extern boolean isSameFile (const char *const name1, const char *const name2)
 
 extern const char *baseFilename (const char *const filePath)
 {
-#if defined (MSDOS_STYLE_PATH) || defined (VMS)
+#if defined (MSDOS_STYLE_PATH)
 	const char *tail = NULL;
 	unsigned int i;
 
@@ -586,14 +557,6 @@ extern const char *baseFilename (const char *const filePath)
 		tail = filePath;
 	else
 		++tail;  /* step past last delimiter */
-#ifdef VAXC
-	{
-		/* remove version number from filename */
-		char *p = strrchr ((char *) tail, ';');
-		if (p != NULL)
-			*p = '\0';
-	}
-#endif
 
 	return tail;
 }
@@ -603,9 +566,6 @@ extern const char *fileExtension (const char *const fileName)
 	const char *extension;
 	const char *pDelimiter = NULL;
 	const char *const base = baseFilename (fileName);
-#ifdef QDOS
-	pDelimiter = strrchr (base, '_');
-#endif
 	if (pDelimiter == NULL)
 	    pDelimiter = strrchr (base, '.');
 
@@ -615,6 +575,24 @@ extern const char *fileExtension (const char *const fileName)
 		extension = pDelimiter + 1;  /* skip to first char of extension */
 
 	return extension;
+}
+
+extern char* baseFilenameSansExtensionNew (const char *const fileName,
+					   const char *const templateExt)
+{
+	const char *pDelimiter = NULL;
+	const char *const base = baseFilename (fileName);
+	char* shorten_base;
+
+	pDelimiter = strrchr (base, templateExt[0]);
+
+	if (pDelimiter && (strcmp (pDelimiter, templateExt) == 0))
+	{
+		shorten_base = eStrndup (base, pDelimiter - base);
+		return shorten_base;
+	}
+	else
+		return NULL;
 }
 
 extern boolean isAbsolutePath (const char *const path)
@@ -635,47 +613,16 @@ extern boolean isAbsolutePath (const char *const path)
 				"%s: relative file names with drive letters not supported",
 				path);
 	}
-#elif defined (VMS)
-	result = (boolean) (strchr (path, ':') != NULL);
 #else
 	result = isPathSeparator (path [0]);
 #endif
 	return result;
 }
 
-extern vString *combinePathAndFile (
+extern char *combinePathAndFile (
 	const char *const path, const char *const file)
 {
 	vString *const filePath = vStringNew ();
-#ifdef VMS
-	const char *const directoryId = strstr (file, ".DIR;1");
-
-	if (directoryId == NULL)
-	{
-		const char *const versionId = strchr (file, ';');
-
-		vStringCopyS (filePath, path);
-		if (versionId == NULL)
-			vStringCatS (filePath, file);
-		else
-			vStringNCatS (filePath, file, versionId - file);
-		vStringCopyToLower (filePath, filePath);
-	}
-	else
-	{
-		/*  File really is a directory; append it to the path.
-		 *  Gotcha: doesn't work with logical names.
-		 */
-		vStringNCopyS (filePath, path, strlen (path) - 1);
-		vStringPut (filePath, '.');
-		vStringNCatS (filePath, file, directoryId - file);
-		if (strchr (path, '[') != NULL)
-			vStringPut (filePath, ']');
-		else
-			vStringPut (filePath, '>');
-		vStringTerminate (filePath);
-	}
-#else
 	const int lastChar = path [strlen (path) - 1];
 	boolean terminated = isPathSeparator (lastChar);
 
@@ -686,9 +633,8 @@ extern vString *combinePathAndFile (
 		vStringTerminate (filePath);
 	}
 	vStringCatS (filePath, file);
-#endif
 
-	return filePath;
+	return vStringDeleteUnwrap (filePath);
 }
 
 /* Return a newly-allocated string whose contents concatenate those of
@@ -757,13 +703,13 @@ extern char* absoluteFilename (const char *file)
 				else if (cp [0] != PATH_SEPARATOR)
 					cp = slashp;
 #endif
-				strcpy (cp, slashp + 3);
+				memmove (cp, slashp + 3, strlen (slashp + 3) + 1);
 				slashp = cp;
 				continue;
 			}
 			else if (slashp [2] == PATH_SEPARATOR  ||  slashp [2] == '\0')
 			{
-				strcpy (slashp, slashp + 2);
+				memmove (slashp, slashp + 2, strlen (slashp + 2) + 1);
 				continue;
 			}
 		}

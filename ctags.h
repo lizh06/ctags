@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1996-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -18,7 +16,7 @@
 # define PROGRAM_VERSION "Development"
 #endif
 #define PROGRAM_NAME      "Exuberant Ctags"
-#define PROGRAM_URL       "http://ctags.sourceforge.net"
+#define PROGRAM_URL       "https://github.com/fishman/ctags"
 #define PROGRAM_COPYRIGHT "Copyright (C) 1996-2009"
 #define AUTHOR_NAME       "Darren Hiebert"
 #define AUTHOR_EMAIL      "dhiebert@users.sourceforge.net"

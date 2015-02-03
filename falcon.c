@@ -1,6 +1,4 @@
 /*
- * $Id$
- * 
  * Copyright (c) 2011, 2012 Steven Oliver <oliver.steven@gmail.com>
  * 
  * This source code is released for free distribution under the terms of the
@@ -49,7 +47,7 @@ static boolean isIdentifierChar (int c)
     return (boolean) (isalnum (c));
 }
 
-static const char *skipSpace (const char *cp)
+static const unsigned char *skipSpace (const unsigned char *cp)
 {
     while (isspace ((int) *cp))
         ++cp;

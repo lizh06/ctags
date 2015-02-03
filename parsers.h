@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 2000-2003, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -16,6 +14,7 @@
 
 /* Add the name of any new parser definition function here */
 #define PARSER_LIST \
+	AdaParser, \
 	AntParser, \
 	AsmParser, \
 	AspParser, \
@@ -27,6 +26,7 @@
 	CssParser, \
 	CsharpParser, \
 	CobolParser, \
+	DParser, \
 	DosBatchParser, \
 	EiffelParser, \
 	ErlangParser, \
@@ -37,9 +37,11 @@
 	HtmlParser, \
 	JavaParser, \
 	JavaScriptParser, \
+	JsonParser, \
 	LispParser, \
 	LuaParser, \
 	MakefileParser, \
+	MatLabParser, \
 	ObjcParser, \
 	OcamlParser, \
 	PascalParser, \
@@ -48,6 +50,7 @@
 	PythonParser, \
 	RexxParser, \
 	RubyParser, \
+	RustParser, \
 	SchemeParser, \
 	ShParser, \
 	SlangParser, \
@@ -57,9 +60,12 @@
 	TexParser, \
 	VeraParser, \
 	VerilogParser, \
+	SystemVerilogParser, \
 	VhdlParser, \
 	VimParser, \
-	YaccParser
+	WindResParser, \
+	YaccParser, \
+	ZephirParser
 
 #endif  /* _PARSERS_H */
 

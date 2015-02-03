@@ -1,5 +1,3 @@
-# $Id$
-
 #	Copyright (c) 2009, Darren Hiebert
 #
 #	This source code is released for free distribution under the terms
@@ -8,8 +6,16 @@
 #	Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.61])
-AC_INIT([ctags.h])
+AC_INIT([ctags],[exuberant])
 AC_CONFIG_HEADERS([config.h])
+if ! test -e "${srcdir}/config.h.in"; then
+   echo "---"
+   echo "--- ${srcdir}/config.h.in WAS NOT FOUND." 1>&2
+   echo "--- YOU MIGHT HAVE RUN autoconf ONLY" 1>&2
+   echo "--- BUT YOU MAY HAVE TO RUN autoreconf." 1>&2
+   echo "---"
+   exit 1
+fi
 
 AH_TEMPLATE([PACKAGE], [Package name.])
 AH_TEMPLATE([VERSION], [Package version.])
@@ -46,9 +52,6 @@ AH_VERBATIM([DEFAULT_FILE_FORMAT], [
  */
 #define DEFAULT_FILE_FORMAT	2
 ])
-AH_TEMPLATE([SYS_INTERPRETER],
-	[Define this label if your system supports starting scripts with a line of
-	the form "#! /bin/sh" to select the interpreter to use for the script.])
 AH_TEMPLATE([CASE_INSENSITIVE_FILENAMES],
 	[Define this label if your system uses case-insensitive file names])
 AH_VERBATIM([EXTERNAL_SORT], [
@@ -114,8 +117,8 @@ AH_TEMPLATE([NEED_PROTO_FTRUNCATE],
 
 # Report system info
 # ------------------
-program_name=[`grep 'PROGRAM_NAME  *"' ctags.h | sed -e 's/.*"\([^"]*\)".*/\1/'`]
-program_version=[`grep 'PROGRAM_VERSION  *"' ctags.h | sed -e 's/.*"\([^"]*\)".*/\1/'`]
+program_name=[`grep 'PROGRAM_NAME  *"' $srcdir/ctags.h | sed -e 's/.*"\([^"]*\)".*/\1/'`]
+program_version=[`grep 'PROGRAM_VERSION  *"' $srcdir/ctags.h | sed -e 's/.*"\([^"]*\)".*/\1/'`]
 echo "$program_name, version $program_version"
 uname -mrsv 2>/dev/null
 
@@ -140,45 +143,51 @@ AC_DEFUN([CHECK_HEADER_DEFINE], [
 # Checks for configuration options
 # --------------------------------
 
-AC_ARG_WITH(posix-regex,
-[  --with-posix-regex      use Posix regex interface, if available])
+AC_ARG_ENABLE(readlib,
+	[AS_HELP_STRING([--enable-readlib],
+		[include readtags library object during install])])
 
-AC_ARG_WITH(readlib,
-[  --with-readlib          include readtags library object during install])
+AC_ARG_ENABLE(readcmd,
+	[AS_HELP_STRING([--disable-readcmd],
+		[do not include readtags command during install])],
+	[], [enable_readcmd=yes])
 
 # AC_ARG_WITH(perl-regex,
-# [  --with-perl-regex       use Perl pcre interface, if available])
+# 	[AS_HELP_STRING([--with-perl-regex],
+# 	    [use Perl pcre interface, if available])])
 
 AC_ARG_ENABLE(etags,
-[  --enable-etags          enable the installation of links for etags])
+	[AS_HELP_STRING([--enable-etags],
+		[enable the installation of links for etags])])
 
 AC_ARG_ENABLE(extended-format,
-[  --disable-extended-format
-                          disable extension flags; use original ctags file
-                          format only],
+	[AS_HELP_STRING([--disable-extended-format],
+		[disable extension flags; use original ctags file format only])],
 	AC_DEFINE(DEFAULT_FILE_FORMAT, 1), AC_DEFINE(DEFAULT_FILE_FORMAT, 2))
 
 AC_ARG_ENABLE(external-sort,
-[  --disable-external-sort use internal sort algorithm instead of sort program])
+	[AS_HELP_STRING([--disable-external-sort],
+		[use internal sort algorithm instead of sort program])])
 
 AC_ARG_ENABLE(custom-config,
-[  --enable-custom-config=FILE
-                          enable custom config file for site-wide defaults])
+	[AS_HELP_STRING([--enable-custom-config=FILE],
+		[enable custom config file for site-wide defaults])])
 
 AC_ARG_ENABLE(macro-patterns,
-[  --enable-macro-patterns use patterns as default method to locate macros
-                          instead of line numbers])
+	[AS_HELP_STRING([--enable-macro-patterns],
+		[use patterns as default method to locate macros instead of line numbers])])
 
 AC_ARG_ENABLE(maintainer-mode,
-[  --enable-maintainer-mode
-                          use maintainer makefile])
+	[AS_HELP_STRING([--enable-maintainer-mode],
+		[use maintainer makefile])])
 
 AC_ARG_ENABLE(shell-globbing,
-[  --enable-shell-globbing=DIR
-                          does shell expand wildcards (yes|no)? [yes]])
+	[AS_HELP_STRING([--enable-shell-globbing=DIR],
+		[does shell expand wildcards (yes|no)? [yes]])])
 
 AC_ARG_ENABLE(tmpdir,
-[  --enable-tmpdir=DIR     default directory for temporary files [ARG=/tmp]],
+	[AS_HELP_STRING([--enable-tmpdir=DIR],
+		[default directory for temporary files [ARG=/tmp]])],
 	tmpdir_specified=yes)
 
 
@@ -189,7 +198,7 @@ if test "$enable_maintainer_mode" = yes ; then
 	AC_MSG_RESULT(enabling maintainer mode)
 fi
 
-install_targets="install-ctags"
+install_targets="install-ctags install-data install-libexec"
 AC_MSG_CHECKING(whether to install link to etags)
 if test yes = "$enable_etags"; then
 	AC_MSG_RESULT(yes)
@@ -198,11 +207,18 @@ else
 	AC_MSG_RESULT(no)
 fi
 AC_MSG_CHECKING(whether to install readtags object file)
-if test yes = "$with_readlib"; then
+if test yes = "$enable_readlib"; then
 	AC_MSG_RESULT(yes)
 	install_targets="$install_targets install-lib"
 else
 	AC_MSG_RESULT(no)
+fi
+AC_MSG_CHECKING(whether to install readtags command)
+if test no = "$enable_readcmd"; then
+	AC_MSG_RESULT(no)
+else
+	AC_MSG_RESULT(yes)
+	install_targets="$install_targets install-cmd"
 fi
 AC_SUBST(install_targets)
 
@@ -278,12 +294,6 @@ else
 	AC_MSG_ERROR($tmpdir does not exist)
 fi
 
-# Check whether system supports #! scripts
-AC_SYS_INTERPRETER
-if test yes = "$interpval"; then
-	AC_DEFINE(SYS_INTERPRETER)
-fi
-
 # Test for case-insensitive filenames
 AC_MSG_CHECKING(for case-insensitive filenames)
 touch conftest.cif
@@ -324,7 +334,7 @@ fi
 # Checks for header files
 # -----------------------
 
-AC_CHECK_HEADERS_ONCE([dirent.h fcntl.h fnmatch.h stat.h stdlib.h string.h])
+AC_CHECK_HEADERS_ONCE([dirent.h fcntl.h stat.h stdlib.h string.h])
 AC_CHECK_HEADERS_ONCE([time.h types.h unistd.h])
 AC_CHECK_HEADERS_ONCE([sys/dir.h sys/stat.h sys/times.h sys/types.h])
 
@@ -370,7 +380,8 @@ AC_OBJEXT
 AC_EXEEXT
 
 AC_MSG_CHECKING(if struct stat contains st_ino)
-AC_TRY_COMPILE([#include <sys/stat.h>], [
+AC_TRY_COMPILE([#include <sys/stat.h>
+				#include <stdlib.h>], [
 	struct stat st;
 	stat(".", &st);
 	if (st.st_ino > 0)
@@ -384,8 +395,13 @@ fi
 
 # Checks for library functions
 # ----------------------------
+AC_CHECK_FUNCS(fnmatch,[],[
+AC_LIBOBJ([fnmatch])
+CPPFLAGS="$CPPFLAGS -I${srcdir}/fnmatch"
+AC_DEFINE(HAVE_FNMATCH)
+])
+AC_CHECK_HEADERS(fnmatch.h)
 
-AC_CHECK_FUNCS(fnmatch)
 AC_CHECK_FUNCS(strstr)
 AC_CHECK_FUNCS(strcasecmp stricmp, break)
 AC_CHECK_FUNCS(strncasecmp strnicmp, break)
@@ -442,24 +458,40 @@ if test "$have_setenv" != yes ; then
 	fi
 fi
 
-#
-# if test yes = "$CYGWIN"; then with_posix_regex=no; fi
-if test no != "$with_posix_regex"; then
-	AC_CHECK_FUNCS(regcomp)
-	AC_MSG_CHECKING(if regcomp works)
-	AC_TRY_RUN([
+dnl
+dnl
+dnl Check regcomp
+dnl
+dnl If it is found but broken, define REGCOMP_BROKEN.
+dnl If it is found but cannot be test brokenness, define CHECK_REGCOMP.
+dnl If it is not found, use bundled implementation.
+dnl
+dnl If CHECK_REGCOMP is defined, ctags itself check the brokenness at runtime
+dnl (cross-compiling is assumed here).
+dnl
+dnl
+dnl The final result can be check with ./ctags --list-features.
+dnl
+dnl
+AC_CHECK_FUNCS(regcomp,[
+AC_MSG_CHECKING(if regcomp works)
+AC_TRY_RUN([
 #include <sys/types.h>
 #include <regex.h>
-main() {
+int main(void) {
 	regex_t patbuf;
-	exit (regcomp (&patbuf, "/hello/", 0) != 0);
+	return (regcomp (&patbuf, "/hello/", 0) != 0);
 }],regcomp_works=yes,regcomp_works=no,AC_DEFINE(CHECK_REGCOMP))
-	AC_MSG_RESULT($regcomp_works)
-	if test yes != "$regcomp_works"; then
-		AC_DEFINE(REGCOMP_BROKEN)
-	fi
+AC_MSG_RESULT($regcomp_works)
+if test yes != "$regcomp_works"; then
+	AC_DEFINE(REGCOMP_BROKEN)
 fi
-
+],[
+dnl Using bundled regex implementation
+AC_LIBOBJ([regex])
+CPPFLAGS="$CPPFLAGS -I${srcdir}/gnu_regex"
+AC_DEFINE(HAVE_REGCOMP)
+])
 # if test yes = "$with_perl_regex"; then
 # 	AC_MSG_CHECKING(for Perl regex library)
 # 	pcre_candidates="$with_perl_regex $HOME/local/lib* /usr*/local/lib* /usr/lib*"
@@ -482,13 +514,19 @@ fi
 # 	fi
 # fi
 
-AC_CHECK_FUNCS(scandir)
+install_data_targets="install-data-corpora"
+AC_CHECK_FUNCS(scandir,[install_data_targets="$install_data_targets install-data-optlib install-data-preload"])
+AC_SUBST(install_data_targets)
+
+install_libexec_targets=
+AC_CHECK_FUNCS(fork waitpid execv pipe,[install_libexec_targets="$install_libexec_targets install-libexec-drivers"])
+AC_SUBST(install_libexec_targets)
 
 # Checks for missing prototypes
 # -----------------------------
 AC_CHECKING(for new missing prototypes)
 
-AC_DEFUN(CHECK_PROTO, [
+AC_DEFUN([CHECK_PROTO], [
 	AC_EGREP_HEADER([[^A-Za-z0-9_]$1([ 	]+[A-Za-z0-9_]*)?[	 ]*\(],
 	$2,
 	,
@@ -516,6 +554,14 @@ if test "$have_ftruncate" = yes ; then
 	CHECK_PROTO(ftruncate, unistd.h)
 fi
 
+# Checks for declaration
+# ----------------------
+AC_CHECK_DECLS([__environ], [], [], [
+[#include <unistd.h>]
+])
+AC_CHECK_DECLS([_NSGetEnviron],[],[],[
+[#include <crt_externs.h>]
+])
 
 # Output files
 # ------------
