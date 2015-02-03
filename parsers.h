@@ -23,7 +23,6 @@
 	CppParser, \
 	CssParser, \
 	CsharpParser, \
-	CobolParser, \
 	DParser, \
 	DosBatchParser, \
 	FlexParser, \
@@ -33,7 +32,6 @@
 	JavaParser, \
 	JavaScriptParser, \
 	JsonParser, \
-	LispParser, \
 	LuaParser, \
 	MakefileParser, \
 	MatLabParser, \
