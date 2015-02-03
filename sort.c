@@ -218,7 +218,10 @@ extern void internalSortTags (const boolean toStdout)
 			if (*line == '!' || !delim)
 				strcpy (table [i], line);
 
-			else {
+			else
+			{
+				/* Make tag type to be sorted before regex expr */
+
 				const char *p = strchr(line,'\t');
 				int n = p - line + 1;
 				char *q = table[i];
