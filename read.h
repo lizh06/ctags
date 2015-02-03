@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1998-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -11,10 +9,12 @@
 #ifndef _READ_H
 #define _READ_H
 
-#if defined(FILE_WRITE) || defined(VAXC)
+#if defined(FILE_WRITE)
 # define CONST_FILE
 #else
-# define CONST_FILE const
+# define CONST_FILE /* const */
+/* TEMPORARY FIX 
+   `File' global variable should be file local. */
 #endif
 
 /*
@@ -60,8 +60,9 @@ enum eCharacters {
 	SINGLE_QUOTE  = '\'',
 	BACKSLASH     = '\\',
 
-	STRING_SYMBOL = ('S' + 0x80),
-	CHAR_SYMBOL   = ('C' + 0x80)
+	/* symbolic representations, above 0xFF not to conflict with any byte */
+	STRING_SYMBOL = ('S' + 0xff),
+	CHAR_SYMBOL   = ('C' + 0xff)
 };
 
 /*  Maintains the state of the current source file.
@@ -109,6 +110,8 @@ extern void fileUngetc (int c);
 extern const unsigned char *fileReadLine (void);
 extern char *readLine (vString *const vLine, FILE *const fp);
 extern char *readSourceLine (vString *const vLine, fpos_t location, long *const pSeekValue);
+
+extern char* readLineWithNoSeek (vString *const vline, FILE *const pp);
 
 #endif  /* _READ_H */
 

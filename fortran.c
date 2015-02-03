@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1998-2003, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -27,6 +25,7 @@
 #include "parse.h"
 #include "read.h"
 #include "routines.h"
+#include "trashbox.h"
 #include "vstring.h"
 
 /*
@@ -42,7 +41,10 @@
 /*
 *   DATA DECLARATIONS
 */
-
+static TrashBox* trash_box;
+#define P(new_object,destructor) trashBoxPut(trash_box, new_object, (TrashBoxDestroyItemProc)destructor)
+#define F(object) trashBoxFree(trash_box, object)
+#define B(object) (trashBoxTakeBack(trash_box, object));
 typedef enum eException {
 	ExceptionNone, ExceptionEOF, ExceptionFixedFormat, ExceptionLoop
 } exception_t;
@@ -409,7 +411,7 @@ static void buildFortranKeywordHash (void)
 /*
 *   Tag generation functions
 */
-
+static void deleteToken (tokenInfo *const token);
 static tokenInfo *newToken (void)
 {
 	tokenInfo *const token = xMalloc (1, tokenInfo);
@@ -422,16 +424,16 @@ static tokenInfo *newToken (void)
 	token->lineNumber   = getSourceLineNumber ();
 	token->filePosition = getInputFilePosition ();
 
-	return token;
+	return P (token, deleteToken);
 }
 
 static tokenInfo *newTokenFrom (tokenInfo *const token)
 {
-	tokenInfo *result = newToken ();
+	tokenInfo *result = xMalloc (1, tokenInfo);
 	*result = *token;
 	result->string = vStringNewCopy (token->string);
 	token->secondary = NULL;
-	return result;
+	return P (result, deleteToken);
 }
 
 static void deleteToken (tokenInfo *const token)
@@ -515,12 +517,12 @@ static void makeLabelTag (vString *const label)
 	token->type  = TOKEN_LABEL;
 	vStringCopy (token->string, label);
 	makeFortranTag (token, TAG_LABEL);
-	deleteToken (token);
+	F (token);
 }
 
 static lineType getLineType (void)
 {
-	vString *label = vStringNew ();
+	vString *label = P (vStringNew (), vStringDelete);
 	int column = 0;
 	lineType type = LTYPE_UNDETERMINED;
 
@@ -588,7 +590,7 @@ static lineType getLineType (void)
 		vStringTerminate (label);
 		makeLabelTag (label);
 	}
-	vStringDelete (label);
+	F (label);
 	return type;
 }
 
@@ -766,7 +768,7 @@ static void ungetChar (const int c)
  */
 static vString *parseInteger (int c)
 {
-	vString *string = vStringNew ();
+	vString *string = P (vStringNew (), vStringDelete);
 
 	if (c == '-')
 	{
@@ -795,10 +797,10 @@ static vString *parseInteger (int c)
 
 static vString *parseNumeric (int c)
 {
-	vString *string = vStringNew ();
+	vString *string = P (vStringNew (), vStringDelete);
 	vString *integer = parseInteger (c);
 	vStringCopy (string, integer);
-	vStringDelete (integer);
+	F (integer);
 
 	c = getChar ();
 	if (c == '.')
@@ -806,7 +808,7 @@ static vString *parseNumeric (int c)
 		integer = parseInteger ('\0');
 		vStringPut (string, c);
 		vStringCat (string, integer);
-		vStringDelete (integer);
+		F (integer);
 		c = getChar ();
 	}
 	if (tolower (c) == 'e')
@@ -814,7 +816,7 @@ static vString *parseNumeric (int c)
 		integer = parseInteger ('\0');
 		vStringPut (string, c);
 		vStringCat (string, integer);
-		vStringDelete (integer);
+		F (integer);
 	}
 	else
 		ungetChar (c);
@@ -888,7 +890,7 @@ static void checkForLabel (void)
 	{
 		vStringTerminate (token->string);
 		makeFortranTag (token, TAG_LABEL);
-		deleteToken (token);
+		F (token);
 	}
 	ungetChar (c);
 }
@@ -904,12 +906,13 @@ static void readIdentifier (tokenInfo *const token, const int c)
 		token->type = TOKEN_IDENTIFIER;
 		if (strncmp (vStringValue (token->string), "end", 3) == 0)
 		{
-			vString *const sub = vStringNewInit (vStringValue (token->string) + 3);
+			vString *const sub = P (vStringNewInit (vStringValue (token->string) + 3), vStringDelete);
 			const keywordId kw = analyzeToken (sub, Lang_fortran);
-			vStringDelete (sub);
+			F (sub);
 			if (kw != KEYWORD_NONE)
 			{
 				token->secondary = newToken ();
+				B (token->secondary);
 				token->secondary->type = TOKEN_KEYWORD;
 				token->secondary->keyword = kw;
 				token->keyword = KEYWORD_end;
@@ -1027,7 +1030,7 @@ getNextChar:
 			{
 				vString *numeric = parseNumeric (c);
 				vStringCat (token->string, numeric);
-				vStringDelete (numeric);
+				F (numeric);
 				token->type = TOKEN_NUMERIC;
 			}
 			else
@@ -1041,6 +1044,7 @@ static void readSubToken (tokenInfo *const token)
 	if (token->secondary == NULL)
 	{
 		token->secondary = newToken ();
+		B (token->secondary);
 		readToken (token->secondary);
 	}
 }
@@ -1546,7 +1550,7 @@ static void parseStructureStmt (tokenInfo *const token)
 	/* secondary token should be KEYWORD_structure token */
 	skipToNextStatement (token);
 	ancestorPop ();
-	deleteToken (name);
+	F (name);
 }
 
 /*  specification-stmt
@@ -1731,7 +1735,7 @@ static void parseInterfaceBlock (tokenInfo *const token)
 	/* secondary token should be KEYWORD_interface token */
 	skipToNextStatement (token);
 	ancestorPop ();
-	deleteToken (name);
+	F (name);
 }
 
 /*  entry-stmt is
@@ -2138,15 +2142,21 @@ static void parseProgramUnit (tokenInfo *const token)
 	} while (TRUE);
 }
 
-static rescanReason findFortranTags (const unsigned int passCount)
+static rescanReason findFortranTags (const unsigned int passCount,
+				     jmp_buf *jbuf __unused__,
+				     TrashBox *tbox)
 {
 	tokenInfo *token;
 	exception_t exception;
 	rescanReason rescan;
 
 	Assert (passCount < 3);
+
+	trash_box = tbox;
+
 	Parent = newToken ();
 	token = newToken ();
+
 	FreeSourceForm = (boolean) (passCount > 1);
 	Column = 0;
 	exception = (exception_t) setjmp (Exception);
@@ -2164,8 +2174,8 @@ static rescanReason findFortranTags (const unsigned int passCount)
 		rescan = RESCAN_NONE;
 	}
 	ancestorClear ();
-	deleteToken (token);
-	deleteToken (Parent);
+	F (token);
+	F (Parent);
 
 	return rescan;
 }
@@ -2189,7 +2199,7 @@ extern parserDefinition* FortranParser (void)
 	def->kinds      = FortranKinds;
 	def->kindCount  = KIND_COUNT (FortranKinds);
 	def->extensions = extensions;
-	def->parser2    = findFortranTags;
+	def->parser_with_gc = findFortranTags;
 	def->initialize = initialize;
 	return def;
 }

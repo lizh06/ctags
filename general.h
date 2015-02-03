@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1998-2003, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -16,25 +14,11 @@
 */
 #if defined (HAVE_CONFIG_H)
 # include <config.h>
-#elif defined (AMIGA)
-# include "e_amiga.h"
-#elif defined (DJGPP)
-# include "e_djgpp.h"
-#elif defined (macintosh)
-# include "e_mac.h"
-#elif defined (MSDOS) || defined (WIN32)
+#if (defined (HAVE_FORK) && defined (HAVE_WAITPID) && defined (HAVE_EXECV) && defined (HAVE_PIPE))
+#define HAVE_COPROC
+#endif
+#elif defined (WIN32)
 # include "e_msoft.h"
-#elif defined (OS2)
-# include "e_os2.h"
-#elif defined (QDOS)
-# include "e_qdos.h"
-#elif defined (RISCOS)
-# include "e_riscos.h"
-#elif defined (__vms) || defined (VMS)
-# include "e_vms.h"
-# ifndef VMS
-#  define VMS 1
-# endif
 #endif
 
 
@@ -53,11 +37,13 @@
 # define HAVE_REGEX 1
 #endif
 
-/*  This is a helpful internal feature of later versions (> 2.7) of GCC
- *  to prevent warnings about unused variables.
- */
-#if (__GNUC__ > 2  ||  (__GNUC__ == 2  &&  __GNUC_MINOR__ >= 7)) && !defined (__GNUG__)
-# define __unused__  __attribute__((unused))
+/*  Prevent warnings about unused variables in GCC. */
+#if defined (__GNUC__) && !defined (__GNUG__)
+# ifdef __MINGW32__
+#  define __unused__
+# else
+#  define __unused__ __attribute__((unused))
+# endif
 # define __printf__(s,f)  __attribute__((format (printf, s, f)))
 #else
 # define __unused__
@@ -89,17 +75,12 @@
 
 #undef FALSE
 #undef TRUE
-#ifdef VAXC
-typedef enum { FALSE, TRUE } booleanType;
-typedef int boolean;
-#else
-# ifdef __cplusplus
+#ifdef __cplusplus
 typedef bool boolean;
 #define FALSE false
 #define TRUE true
-# else
+#else
 typedef enum { FALSE, TRUE } boolean;
-# endif
 #endif
 
 #if ! defined (HAVE_FGETPOS) && ! defined (fpos_t)

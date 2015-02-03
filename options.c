@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1996-2003, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -37,6 +35,8 @@
 */
 #define INVOCATION  "Usage: %s [options] [file(s)]\n"
 
+#define CTAGS_DATA_PATH_ENVIRONMENT "CTAGS_DATA_PATH"
+#define CTAGS_LIBEXEC_PATH_ENVIRONMENT "CTAGS_LIBEXEC_PATH"
 #define CTAGS_ENVIRONMENT  "CTAGS"
 #define ETAGS_ENVIRONMENT  "ETAGS"
 
@@ -58,11 +58,16 @@
 # define DEFAULT_FILE_FORMAT  2
 #endif
 
-#if defined (HAVE_OPENDIR) || defined (HAVE_FINDFIRST) || defined (HAVE__FINDFIRST) || defined (AMIGA)
+#if defined (HAVE_OPENDIR) || defined (HAVE_FINDFIRST) || defined (HAVE__FINDFIRST)
 # define RECURSE_SUPPORTED
 #endif
 
 #define isCompoundOption(c)  (boolean) (strchr ("fohiILpDb", (c)) != NULL)
+
+#define SUBDIR_OPTLIB "optlib"
+#define SUBDIR_CORPORA "corpora"
+#define SUBDIR_PRELOAD "preload"
+#define SUBDIR_DRIVERS "drivers"
 
 /*
 *   Data declarations
@@ -98,6 +103,13 @@ typedef const struct {
 
 static boolean NonOptionEncountered;
 static stringList *OptionFiles;
+
+typedef stringList searchPathList;
+static searchPathList *OptlibPathList;
+static searchPathList *CorpusPathList;
+static searchPathList *PreloadPathList;
+static searchPathList *DriversPathList;
+
 static stringList* Excluded;
 static boolean FilesRequired = TRUE;
 static boolean SkipConfiguration;
@@ -154,6 +166,9 @@ optionValues Option = {
 	FALSE,      /* --tag-relative */
 	FALSE,      /* --totals */
 	FALSE,      /* --line-directives */
+	FALSE,	    /* --print-language */
+	FALSE,	    /* --guess-language-eagerly(-G) */
+	FALSE,	    /* --quiet */
 #ifdef DEBUG
 	0, 0        /* -D, -b */
 #endif
@@ -179,6 +194,7 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Write tags to specified file. Value of \"-\" writes tags to stdout"},
  {1,"       [\"tags\"; or \"TAGS\" when -e supplied]."},
  {0,"  -F   Use forward searching patterns (/.../) (default)."},
+ {1,"  -G   Equivalent to --guess-language-eagerly."},
  {1,"  -h <list>"},
  {1,"       Specify list of file extensions to be treated as include files."},
  {1,"       [\".h.H.hh.hpp.hxx.h++\"]."},
@@ -203,6 +219,8 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Should tags should be appended to existing tag file [no]?"},
  {1,"  --config-filename=fileName"},
  {1,"      Use 'fileName' instead of 'ctags' in option file names."},
+ {1,"  --data-dir=[+]DIR"},
+ {1,"      Add or set DIR to data directory search path."},
  {1,"  --etags-include=file"},
  {1,"      Include reference to 'file' in Emacs-style tag file (requires -e)."},
  {1,"  --exclude=pattern"},
@@ -226,6 +244,12 @@ static optionDescription LongOptionDescription [] = {
  {1,"  --filter-terminator=string"},
  {1,"       Specify string to print to stdout following the tags for each file"},
  {1,"       parsed when --filter is enabled."},
+ {1,"  --guess-language-eagerly"},
+ {1,"       Guess the language of input file more eagerly: "},
+ {1,"       (but taking longer time for guessing)"},
+ {1,"       o shebang even the input file is not executable,"},
+ {1,"       o emacs mode specification at the beginning and end of input file, and"},
+ {1,"       o vim syntax specification at the end of input file."},
  {0,"  --format=level"},
 #if DEFAULT_FILE_FORMAT == 1
  {0,"       Force output of specified tag file format [1]."},
@@ -236,8 +260,22 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Print this option summary."},
  {1,"  --if0=[yes|no]"},
  {1,"       Should C code within #if 0 conditional branches be parsed [no]?"},
+ {1,"  --<LANG>-alias=[+|-]aliasPattern"},
+ {1,"      Add a pattern detecting a name can be used as an alternative name for LANG."},
+ {1,"  --<LANG>-corpus=spec:corpusFile"},
+ {1,"      Add two gram data calculated from corpusFile to spec of LANG."},
  {1,"  --<LANG>-kinds=[+|-]kinds"},
  {1,"       Enable/disable tag kinds for language <LANG>."},
+ {1,"  --<LANG>-map=[+]map"},
+ {1,"       Simplified version of --langmap opton."},
+#ifdef HAVE_REGEX
+ {1,"  --<LANG>-regex=/line_pattern/name_pattern/[flags]"},
+ {1,"       Same as --regex-<LANG>=..."},
+#endif
+#ifdef HAVE_COPROC
+ {1,"  --<LANG>-xcmd=parser_command_path|parset_command_name"},
+ {1,"       Same as --xcmd-<LANG>=..."},
+#endif
  {1,"  --langdef=name"},
  {1,"       Define a new language to be parsed with regular expressions."},
  {1,"  --langmap=map(s)"},
@@ -248,12 +286,20 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Restrict files scanned for tags to those mapped to langauges"},
  {1,"       specified in the comma-separated 'list'. The list can contain any"},
  {1,"       built-in or user-defined language [all]."},
+ {1,"  --libexec-dir=[+]DIR"},
+ {1,"      Add or set DIR to libexec directory search path."},
  {1,"  --license"},
  {1,"       Print details of software license."},
  {0,"  --line-directives=[yes|no]"},
  {0,"       Should #line directives be processed [no]?"},
  {1,"  --links=[yes|no]"},
  {1,"       Indicate whether symbolic links should be followed [yes]."},
+ {1,"  --list-aliases=[language|all]"},
+ {1,"       Output list of alias patterns."},
+ {1,"  --list-corpora=[language[:spec]|all]"},
+ {1,"       Output list of language corpora."},
+ {1,"  --list-features"},
+ {1,"       Output list of features."},
  {1,"  --list-kinds=[language|all]"},
  {1,"       Output a list of all tag kinds for specified language or all."},
  {1,"  --list-languages"},
@@ -262,6 +308,10 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Output list of language mappings."},
  {1,"  --options=file"},
  {1,"       Specify file from which command line options should be read."},
+ {0,"  --print-language"},
+ {0,"       Don't make tags file but just print the guessed language name for input file."},
+ {1,"  --quiet=[yes|no]"},
+ {0,"       Don't print NOTICE class messages [no]."},
  {1,"  --recurse=[yes|no]"},
 #ifdef RECURSE_SUPPORTED
  {1,"       Recurse into directories supplied on command line [no]."},
@@ -282,6 +332,10 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Enable verbose messages describing actions on each source file."},
  {1,"  --version"},
  {1,"       Print version identifier to standard output."},
+#ifdef HAVE_COPROC
+ {1,"  --xcmd-<LANG>=parser_command_path|parset_command_name"},
+ {1,"       Define external parser command path or name for specific language."},
+#endif
  {1, NULL}
 };
 
@@ -308,22 +362,6 @@ static const char *const Features [] = {
 #ifdef WIN32
 	"win32",
 #endif
-#ifdef DJGPP
-	"msdos_32",
-#else
-# ifdef MSDOS
-	"msdos_16",
-# endif
-#endif
-#ifdef OS2
-	"os2",
-#endif
-#ifdef AMIGA
-	"amiga",
-#endif
-#ifdef VMS
-	"vms",
-#endif
 #ifdef HAVE_FNMATCH
 	"wildcards",
 #endif
@@ -336,11 +374,17 @@ static const char *const Features [] = {
 #ifdef CUSTOM_CONFIGURATION_FILE
 	"custom-conf",
 #endif
-#if (defined (MSDOS) || defined (WIN32) || defined (OS2)) && defined (UNIX_PATH_SEPARATOR)
+#if defined (WIN32) && defined (UNIX_PATH_SEPARATOR)
 	"unix-path-separator",
 #endif
 #ifdef DEBUG
 	"debug",
+#endif
+#ifdef HAVE_SCANDIR
+	"option-directory",
+#endif
+#ifdef HAVE_COPROC
+	"coproc",
 #endif
 	NULL
 };
@@ -349,13 +393,40 @@ static const char *const Features [] = {
 *   FUNCTION PROTOTYPES
 */
 static boolean parseFileOptions (const char *const fileName);
-static boolean parseAllConfigurationFilesOptionsInDirectory(const char *const fileName);
+static boolean parseAllConfigurationFilesOptionsInDirectory (const char *const fileName,
+							     stringList* const already_loaded_files);
 
 /*
 *   FUNCTION DEFINITIONS
 */
 
 
+static vString* getHome (void)
+{
+	const char* const home = getenv ("HOME");
+
+	if (home)
+		return vStringNewInit (home);
+	else
+	{
+#ifdef MSDOS_STYLE_PATH
+		/*
+		 * Windows users don't usually set HOME.
+		 * The OS sets HOMEDRIVE and HOMEPATH for them.
+		 */
+		const char* homeDrive = getenv ("HOMEDRIVE");
+		const char* homePath = getenv ("HOMEPATH");
+		if (homeDrive != NULL && homePath != NULL)
+		{
+			vString* const windowsHome = vStringNew ();
+			vStringCatS (windowsHome, homeDrive);
+			vStringCatS (windowsHome, homePath);
+			return windowsHome;
+		}
+#endif
+		return NULL;
+	}
+}
 
 #if defined(_WIN32)
 
@@ -409,53 +480,30 @@ int asprintf(char **strp, const char *fmt, ...)
 }
 #endif
 
-
-#if (defined (__SVR4) && defined (__sun))
-int vasprintf(char **ret, const char *format, va_list args)
-{
-	va_list copy;
-	va_copy(copy, args);
-
-	/* Make sure it is determinate, despite manuals indicating otherwise */
-	*ret = 0;
-
-	int count = vsnprintf(NULL, 0, format, args);
-	if (count >= 0) {
-		char* buffer = malloc(count + 1);
-		if (buffer != NULL) {
-			count = vsnprintf(buffer, count + 1, format, copy);
-			if (count < 0)
-				free(buffer);
-			else
-				*ret = buffer;
-		}
-	}
-	va_end(args);  // Each va_start() or va_copy() needs a va_end()
-
-	return count;
-}
-
-int asprintf(char **strp, const char *fmt, ...)
-{
-	s32 size;
-	va_list args;
-	va_start(args, fmt);
-	size = vasprintf(strp, fmt, args);
-	va_end(args);
-	return size;
-}
-#endif
-
 extern void verbose (const char *const format, ...)
 {
 	if (Option.verbose)
 	{
 		va_list ap;
 		va_start (ap, format);
-		vprintf (format, ap);
+		vfprintf (errout, format, ap);
 		va_end (ap);
 	}
 }
+
+extern void notice (const char *const format, ...)
+{
+	if (!Option.quiet)
+	{
+		va_list ap;
+		fprintf (errout, "%s: Notice: ", getExecutableName ());
+		va_start (ap, format);
+		vfprintf (errout, format, ap);
+		va_end (ap);
+		fputs ("\n", errout);
+	}
+}
+
 
 static char *stringCopy (const char *const string)
 {
@@ -589,15 +637,15 @@ static void parseLongOption (cookedArgs *const args, const char *item)
 	const char* const equal = strchr (item, '=');
 	if (equal == NULL)
 	{
-		args->item = eStrdup (item); /* FIXME: memory leak. */
+		args->item = eStrdup (item);
+		trashBoxPut (args->trash_box, args->item, (TrashBoxDestroyItemProc)eFree);
 		args->parameter = "";
 	}
 	else
 	{
 		const size_t length = equal - item;
-		args->item = xMalloc (length + 1, char); /* FIXME: memory leak. */
-		strncpy (args->item, item, length);
-		args->item [length] = '\0';
+		args->item = eStrndup (item, length);
+		trashBoxPut (args->trash_box, args->item, (TrashBoxDestroyItemProc)eFree);
 		args->parameter = equal + 1;
 	}
 	Assert (args->item != NULL);
@@ -644,6 +692,7 @@ extern cookedArgs* cArgNewFromString (const char* string)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromString (string);
+	result->trash_box = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -653,6 +702,7 @@ extern cookedArgs* cArgNewFromArgv (char* const* const argv)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromArgv (argv);
+	result->trash_box = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -662,6 +712,7 @@ extern cookedArgs* cArgNewFromFile (FILE* const fp)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromFile (fp);
+	result->trash_box = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -671,6 +722,7 @@ extern cookedArgs* cArgNewFromLineFile (FILE* const fp)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromLineFile (fp);
+	result->trash_box = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -679,6 +731,7 @@ extern void cArgDelete (cookedArgs* const current)
 {
 	Assert (current != NULL);
 	argDelete (current->args);
+	trashBoxDelete (current->trash_box);
 	memset (current, 0, sizeof (cookedArgs));
 	eFree (current);
 }
@@ -770,13 +823,13 @@ static void addExtensionList (
 		else
 			extension = separator + 1;
 	}
-	if (Option.verbose)
+	BEGIN_VERBOSE(vfp);
 	{
-		printf ("\n      now: ");
-		stringListPrint (slist);
-		putchar ('\n');
+		fprintf (vfp, "\n      now: ");
+		stringListPrint (slist, vfp);
+		putc ('\n', vfp);
 	}
-	eFree (extensionList);
+	END_VERBOSE();
 }
 
 static boolean isFalse (const char *parameter)
@@ -873,11 +926,6 @@ extern boolean isExcludedFile (const char* const name)
 		if (! result  &&  name != base)
 			result = stringListFileMatched (Excluded, name);
 	}
-#ifdef AMIGA
-	/* not a good solution, but the only one which works often */
-	if (! result)
-		result = (boolean) (strcmp (name, TagFile.name) == 0);
-#endif
 	return result;
 }
 
@@ -928,6 +976,12 @@ static void processExtraTagsOption (
 	}
 }
 
+static void resetFieldsOption (
+		struct sExtFields *field, boolean mode)
+{
+	memset(field, mode? ~0: 0, sizeof(*field));
+}
+
 static void processFieldsOption (
 		const char *const option, const char *const parameter)
 {
@@ -936,19 +990,16 @@ static void processFieldsOption (
 	boolean mode = TRUE;
 	int c;
 
-	if (*p != '+'  &&  *p != '-')
+
+	if (*p == '*')
 	{
-		field->access           = FALSE;
-		field->fileScope        = FALSE;
-		field->implementation   = FALSE;
-		field->inheritance      = FALSE;
-		field->kind             = FALSE;
-		field->kindKey          = FALSE;
-		field->kindLong         = FALSE;
-		field->language         = FALSE;
-		field->scope            = FALSE;
-		field->typeRef          = FALSE;
+		resetFieldsOption(field, TRUE);
+		p++;
 	}
+	else if (*p != '+'  &&  *p != '-')
+		resetFieldsOption(field, FALSE);
+
+
 	while ((c = *p++) != '\0') switch (c)
 	{
 		case '+': mode = TRUE;                  break;
@@ -1016,7 +1067,8 @@ static void printFeatureList (void)
 	{
 		if (i == 0)
 			printf ("  Optional compiled features: ");
-		printf ("%s+%s", (i>0 ? ", " : ""), Features [i]);
+		if (strcmp (Features [i], "regex") != 0 || checkRegex ())
+			printf ("%s+%s", (i>0 ? ", " : ""), Features [i]);
 #ifdef CUSTOM_CONFIGURATION_FILE
 		if (strcmp (Features [i], "custom-conf") == 0)
 			printf ("=%s", CUSTOM_CONFIGURATION_FILE);
@@ -1024,6 +1076,20 @@ static void printFeatureList (void)
 	}
 	if (i > 0)
 		putchar ('\n');
+}
+
+
+static void processListFeaturesOption(const char *const option __unused__,
+				      const char *const parameter __unused__)
+{
+	int i;
+
+	for (i = 0 ; Features [i] != NULL ; ++i)
+		if (strcmp (Features [i], "regex") != 0 || checkRegex ())
+			printf ("%s\n", Features [i]);
+	if (i == 0)
+		putchar ('\n');
+	exit (0);
 }
 
 static void printProgramIdentification (void)
@@ -1077,33 +1143,47 @@ static char* skipPastMap (char* p)
 /* Parses the mapping beginning at `map', adds it to the language map, and
  * returns first character past the map.
  */
-static char* addLanguageMap (const langType language, char* map)
+static char* extractMapFromParameter (const langType language,
+				      char* parameter,
+				      char** tail,
+				      boolean* pattern_p,
+				      char* (* skip) (char *))
 {
 	char* p = NULL;
-	const char first = *map;
+	const char first = *parameter;
+	char  tmp;
+	char* result;
+
 	if (first == EXTENSION_SEPARATOR)  /* extension map */
 	{
-		++map;
-		p = skipPastMap (map);
+		*pattern_p = FALSE;
+
+		++parameter;
+		p = (* skip) (parameter);
 		if (*p == '\0')
 		{
-			verbose (" .%s", map);
-			addLanguageExtensionMap (language, map);
-			p = map + strlen (map);
+			result = eStrdup (parameter);
+			verbose (" .%s", result);
+			*tail = parameter + strlen (parameter);
+			return result;
 		}
 		else
 		{
-			const char separator = *p;
+			tmp = *p;
 			*p = '\0';
-			verbose (" .%s", map);
-			addLanguageExtensionMap (language, map);
-			*p = separator;
+			result = eStrdup (parameter);
+			verbose (" .%s", result);
+			*p = tmp;
+			*tail = p;
+			return result;
 		}
 	}
 	else if (first == PATTERN_START)  /* pattern map */
 	{
-		++map;
-		for (p = map  ;  *p != PATTERN_STOP  &&  *p != '\0'  ;  ++p)
+		*pattern_p = TRUE;
+
+		++parameter;
+		for (p = parameter  ;  *p != PATTERN_STOP  &&  *p != '\0'  ;  ++p)
 		{
 			if (*p == '\\'  &&  *(p + 1) == PATTERN_STOP)
 				++p;
@@ -1113,14 +1193,36 @@ static char* addLanguageMap (const langType language, char* map)
 			   getLanguageName (language));
 		else
 		{
-			*p++ = '\0';
-			verbose (" (%s)", map);
-			addLanguagePatternMap (language, map);
+			tmp = *p;
+			*p = '\0';
+			result = eStrdup (parameter);
+			verbose (" (%s)", result);
+			*p = tmp;
+			*tail = p + 1;
+			return result;
 		}
 	}
+
+	return NULL;
+}
+
+static char* addLanguageMap (const langType language, char* map_parameter)
+{
+	char* p = NULL;
+	boolean pattern_p;
+	char* map;
+
+	map = extractMapFromParameter (language, map_parameter, &p, &pattern_p, skipPastMap);
+	if (map && pattern_p == FALSE)
+		addLanguageExtensionMap (language, map);
+	else if (map && pattern_p == TRUE)
+		addLanguagePatternMap (language, map);
 	else
 		error (FATAL, "Badly formed language map for %s language",
 				getLanguageName (language));
+
+	if (map)
+		eFree (map);
 	return p;
 }
 
@@ -1245,6 +1347,121 @@ static void processLanguagesOption (
 	eFree (langs);
 }
 
+extern boolean processMapOption (
+			const char *const option, const char *const parameter)
+{
+	const char* const dash = strchr (option, '-');
+	langType language;
+	vString* langName;
+	size_t len;
+	const char* spec;
+	char* map_parameter;
+	boolean clear = FALSE;
+
+	if (dash == NULL ||
+	    (strcmp (dash + 1, "map") != 0))
+		return FALSE;
+	len = dash - option;
+
+	langName = vStringNew ();
+	vStringNCopyS (langName, option, len);
+	language = getNamedLanguage (vStringValue (langName));
+	if (language == LANG_IGNORE)
+		error (FATAL, "Unknown language \"%s\" in \"%s\" option", vStringValue (langName), option);
+	vStringDelete(langName);
+
+	if (parameter == NULL || parameter [0] == '\0')
+		error (FATAL, "no parameter is given for %s", option);
+
+	spec = parameter;
+	if (*spec == '+')
+		spec++;
+	else
+		clear = TRUE;
+
+	if (clear)
+	{
+		verbose ("    Setting %s language map:", getLanguageName (language));
+		clearLanguageMap (language);
+	}
+	else
+		verbose ("    Adding to %s language map:", getLanguageName (language));
+	map_parameter = eStrdup (spec);
+	addLanguageMap (language, map_parameter);
+	eFree (map_parameter);
+	verbose ("\n");
+
+	return TRUE;
+}
+
+static char* skipTillColon (char* p)
+{
+	while (*p != ':'  && *p != '\0')
+		++p;
+	return p;
+}
+
+extern boolean processCorpusOption (
+		const char *const option, const char *const parameter)
+{
+	const char* const dash = strchr (option, '-');
+	langType language;
+	vString* langName;
+	char* parm;
+	char* colon;
+	size_t len;
+	const char* file_part;
+	vString* tg_file;
+	char* spec;
+	boolean pattern_p;
+
+	if (dash == NULL ||
+	    (strcmp (dash + 1, "corpus") != 0))
+		return FALSE;
+	len = dash - option;
+
+	langName = vStringNew ();
+	vStringNCopyS (langName, option, len);
+	language = getNamedLanguage (vStringValue (langName));
+	if (language == LANG_IGNORE)
+		error (FATAL, "Unknown language \"%s\" in \"%s\" option", vStringValue (langName), option);
+	vStringDelete(langName);
+
+	if (parameter == NULL || parameter [0] == '\0')
+		error (FATAL, "no parameter is given for %s", option);
+
+	parm = eStrdup (parameter);
+	spec = extractMapFromParameter (language, parm, &colon, &pattern_p, skipTillColon);
+	if (spec == NULL)
+		error (FATAL, "Badly formed language map specification for loading colon for %s language",
+		       getLanguageName (language));
+	else if (pattern_p && (*colon != ':'))
+		error (FATAL,
+		       "no colon(:) separator is found in parameter of %s: %s", option, parameter);
+	else if ((!pattern_p) && *colon == '\0')
+		error (FATAL,
+		       "no colon(:) separator is found in parameter of %s: %s", option, parameter);
+
+	file_part = colon + 1;
+	if (file_part[0] == '\0')
+		error (FATAL,
+		       "file part after colon it not given %s: %s", option, parameter);
+
+	if (file_part[0] != '/' && file_part[0] != '.')
+	{
+		tg_file = expandOnCorpusPathList (file_part);
+		tg_file = tg_file? tg_file: vStringNewInit (file_part);
+	}
+	else
+		tg_file = vStringNewInit (file_part);
+
+	addCorpusFile (language, spec, tg_file, pattern_p);
+
+	eFree (spec);
+	eFree (parm);
+	return TRUE;
+}
+
 static void processLicenseOption (
 		const char *const option __unused__,
 		const char *const parameter __unused__)
@@ -1253,6 +1470,22 @@ static void processLicenseOption (
 	puts ("");
 	puts (License1);
 	puts (License2);
+	exit (0);
+}
+
+static void processListAliasesOption (
+		const char *const option, const char *const parameter)
+{
+	if (parameter [0] == '\0' || strcasecmp (parameter, "all") == 0)
+		printLanguageAliases (LANG_AUTO);
+	else
+	{
+		langType language = getNamedLanguage (parameter);
+		if (language == LANG_IGNORE)
+			error (FATAL, "Unknown language \"%s\" in \"%s\" option", parameter, option);
+		else
+			printLanguageAliases (language);
+	}
 	exit (0);
 }
 
@@ -1289,6 +1522,33 @@ static void processListMapsOption (
 	exit (0);
 }
 
+static void processListCorporaOption (const char *const __unused__ option ,
+				      const char *const parameter)
+{
+	if (parameter [0] == '\0' || strcasecmp (parameter, "all") == 0)
+		printLanguageCorpus (LANG_AUTO, NULL);
+	else
+	{
+		char* const colon = strrchr (parameter, ':');
+		const char* spec  = NULL;
+		langType language;
+
+		if (colon)
+		{
+			*colon = '\0';
+			spec = colon + 1;
+		}
+
+		language = getNamedLanguage (parameter);
+
+		if (language == LANG_IGNORE)
+			error (FATAL, "Unknown language \"%s\" in \"%s\" option", parameter, option);
+		else
+			printLanguageCorpus (language, spec);
+	}
+	exit (0);
+}
+
 static void processListLanguagesOption (
 		const char *const option __unused__,
 		const char *const parameter __unused__)
@@ -1297,21 +1557,139 @@ static void processListLanguagesOption (
 	exit (0);
 }
 
+
+static void freeSearchPathList (searchPathList** pathList)
+{
+	stringListClear (*pathList);
+	stringListDelete (*pathList);
+	*pathList = NULL;
+}
+
+static void verboseSearchPathList (const searchPathList* pathList, const char *const varname)
+{
+	unsigned int i;
+
+	verbose ("Install %s:\n", varname);
+	for (i = 0; i < stringListCount (pathList); ++i)
+		verbose ("  %s\n", vStringValue (stringListItem (pathList, i)));
+}
+
+static vString* expandOnSearchPathList (searchPathList *pathList, const char* leaf,
+					boolean (* check) (const char *const))
+{
+	unsigned int i;
+
+	for (i = 0; i < stringListCount (pathList); ++i)
+	{
+		const char* const body = vStringValue (stringListItem (pathList, i));
+		char* tmp = combinePathAndFile (body, leaf);
+
+		if ((* check) (tmp))
+		{
+			vString *r = vStringNewOwn (tmp);
+			return r;
+		}
+		else
+			eFree (tmp);
+	}
+	return NULL;
+}
+
+static boolean isDirectory (const char *const dirName)
+{
+	fileStatus *status = eStat (dirName);
+	return status->exists && status->isDirectory;
+}
+
+static vString* expandOnOptlibPathList (const char* leaf)
+{
+	vString* r;
+	vString* leaf_with_suffix;
+
+	leaf_with_suffix = vStringNewInit (leaf);
+	vStringCatS (leaf_with_suffix, ".d");
+
+	r = expandOnSearchPathList (OptlibPathList, vStringValue (leaf_with_suffix),
+				    isDirectory);
+
+	if (!r)
+	{
+		vStringCopyS (leaf_with_suffix, leaf);
+		vStringCatS (leaf_with_suffix, ".conf");
+		r = expandOnSearchPathList (OptlibPathList, vStringValue (leaf_with_suffix),
+					    doesFileExist);
+	}
+
+	if (!r)
+	{
+		vStringCopyS (leaf_with_suffix, leaf);
+		vStringCatS (leaf_with_suffix, ".ctags");
+		r = expandOnSearchPathList (OptlibPathList, vStringValue (leaf_with_suffix),
+					    doesFileExist);
+	}
+
+#ifdef MSDOS_STYLE_PATH
+	if (!r)
+	{
+		vStringCopyS (leaf_with_suffix, leaf);
+		vStringCatS (leaf_with_suffix, ".cnf");
+		r = expandOnSearchPathList (OptlibPathList, vStringValue (leaf_with_suffix),
+					    doesFileExist);
+	}
+#endif
+
+	vStringDelete (leaf_with_suffix);
+
+	return r;
+}
+
+extern vString* expandOnCorpusPathList (const char* leaf)
+{
+  return expandOnSearchPathList (CorpusPathList, leaf, doesFileExist);
+}
+
+extern vString* expandOnDriversPathList (const char* leaf)
+{
+	return expandOnSearchPathList (DriversPathList, leaf, doesExecutableExist);
+}
+
 static void processOptionFile (
 		const char *const option, const char *const parameter)
 {
-	boolean opened_as_file, opened_as_dir;
+	const char* path;
+	vString* vpath = NULL;
+	fileStatus *status;
+
 	if (parameter [0] == '\0')
-		error (WARNING, "no option file supplied for \"%s\"", option);
+		error (FATAL, "no option file supplied for \"%s\"", option);
+
+	if (parameter [0] != '/' && parameter [0] != '.')
+	{
+		vpath = expandOnOptlibPathList (parameter);
+		path = vpath? vStringValue (vpath): parameter;
+	}
+	else
+		path = parameter;
+
+	status = eStat (path);
+	if (!status->exists)
+	{
+		error (FATAL | PERROR, "cannot stat \"%s\"", path);
+	}
+	else if (status->isDirectory)
+	{
+		if (!parseAllConfigurationFilesOptionsInDirectory (path, NULL))
+			error (FATAL | PERROR, "cannot open option directory \"%s\"", path);
+	}
 	else
 	{
-
-		opened_as_file = parseFileOptions (parameter);
-		opened_as_dir  = parseAllConfigurationFilesOptionsInDirectory (parameter);
-
-		if ((opened_as_file == FALSE) && (opened_as_dir == FALSE))
-			error (FATAL | PERROR, "cannot open option file \"%s\"", parameter);
+		if (!parseFileOptions (path))
+			error (FATAL | PERROR, "cannot open option file \"%s\"", path);
 	}
+
+	eStatFree (status);
+	if (vpath)
+		vStringDelete (vpath);
 }
 
 static void processSortOption (
@@ -1332,12 +1710,14 @@ static void processSortOption (
 static void installHeaderListDefaults (void)
 {
 	Option.headerExt = stringListNewFromArgv (HeaderExtensions);
-	if (Option.verbose)
+
+	BEGIN_VERBOSE(vfp);
 	{
-		printf ("    Setting default header extensions: ");
-		stringListPrint (Option.headerExt);
-		putchar ('\n');
+		fprintf (vfp, "    Setting default header extensions: ");
+		stringListPrint (Option.headerExt, vfp);
+		putc ('\n', vfp);
 	}
+	END_VERBOSE();
 }
 
 static void processHeaderListOption (const int option, const char *parameter)
@@ -1459,7 +1839,7 @@ static void processIgnoreOption (const char *const list)
 		const char* fileName = (*list == '@') ? list + 1 : list;
 		addIgnoreListFromFile (fileName);
 	}
-#if defined (MSDOS) || defined (WIN32) || defined (OS2)
+#if defined (WIN32)
 	else if (isalpha (list [0])  &&  list [1] == ':')
 		addIgnoreListFromFile (list);
 #endif
@@ -1480,12 +1860,133 @@ static void processVersionOption (
 	exit (0);
 }
 
+static void resetPathList (searchPathList** pathList, const char *const varname)
+{
+	freeSearchPathList (pathList);
+	verbose ("Reset %s\n", varname);
+	*pathList = stringListNew ();
+}
+
+static void resetDataPathList (void)
+{
+	resetPathList (&OptlibPathList, "OptlibPathList");
+	resetPathList (&CorpusPathList, "CorpusPathList");
+}
+
+static void resetLibexecPathList (void)
+{
+	resetPathList (&DriversPathList, "DriversPathList");
+}
+
+static void appendToPathList (const char *const dir, const char *const subdir, searchPathList* const pathList, const char *const varname,
+				   boolean report_in_verboe, const char* const action)
+{
+	char* path;
+
+	path = combinePathAndFile (dir, subdir);
+	if (report_in_verboe)
+		verbose ("%s %s to %s\n", action, path, varname);
+	stringListAdd (pathList, vStringNewOwn (path));
+}
+
+static void prependToPathList (const char *const dir, const char *const subdir, searchPathList* const pathList, const char *const varname,
+				    boolean report_in_verboe, const char* const action)
+{
+	stringListReverse (pathList);
+	appendToPathList(dir, subdir, pathList, varname, report_in_verboe, action);
+	stringListReverse (pathList);
+
+}
+
+static void appendToDataPathList (const char *const dir, boolean from_cmdline)
+{
+	appendToPathList (dir, SUBDIR_OPTLIB, OptlibPathList, "OptlibPathList",
+			       from_cmdline, from_cmdline? "Append": NULL);
+	appendToPathList (dir, SUBDIR_CORPORA, CorpusPathList, "CorpusPathList",
+			       from_cmdline, from_cmdline? "Append": NULL);
+
+	if (!from_cmdline)
+		appendToPathList (dir, SUBDIR_PRELOAD, PreloadPathList, "PreloadPathList",
+				       FALSE, NULL);
+}
+
+static void appendToLibexecPathList (const char *const dir, boolean from_cmdline)
+{
+	appendToPathList (dir, SUBDIR_DRIVERS, DriversPathList, "DriversPathList",
+			       from_cmdline, from_cmdline? "Append": NULL);
+}
+
+static void prependToDataPathList (const char *const dir, boolean from_cmdline)
+{
+	prependToPathList (dir, SUBDIR_OPTLIB, OptlibPathList, "OptlibPathList",
+				from_cmdline, from_cmdline? "Prepend": NULL);
+	prependToPathList (dir, SUBDIR_CORPORA, CorpusPathList, "CorpusPathList",
+				from_cmdline, from_cmdline? "Prepend": NULL);
+
+	if (!from_cmdline)
+		prependToPathList (dir, SUBDIR_PRELOAD, PreloadPathList, "PreloadPathList",
+					FALSE, NULL);
+}
+
+static void prependToLibexecPathList (const char *const dir, boolean from_cmdline)
+{
+	prependToPathList (dir, SUBDIR_DRIVERS, DriversPathList, "DriversPathList",
+			   from_cmdline, from_cmdline? "Prepend": NULL);
+}
+
+static void processDataDir (
+		const char *const option, const char *const parameter)
+{
+	const char* path;
+
+	if (parameter == NULL || parameter[0] == '\0')
+		error (FATAL, "Path for a directory is needed for \"%s\" option", option);
+
+	if (parameter[0] == '+')
+	{
+		path = parameter + 1;
+		prependToDataPathList (path, TRUE);
+	}
+	else if (!strcmp (parameter, "NONE"))
+		resetDataPathList ();
+	else
+	{
+		resetDataPathList ();
+		path = parameter;
+		appendToDataPathList (path, TRUE);
+	}
+}
+
+static void processLibexecDir (const char *const option,
+			       const char *const parameter)
+{
+	const char* path;
+
+	if (parameter == NULL || parameter[0] == '\0')
+		error (FATAL, "Path for a directory is needed for \"%s\" option", option);
+
+	if (parameter[0] == '+')
+	{
+		path = parameter + 1;
+		prependToLibexecPathList (path, TRUE);
+	}
+	else if (!strcmp (parameter, "NONE"))
+		resetLibexecPathList ();
+	else
+	{
+		resetLibexecPathList ();
+		path = parameter;
+		appendToLibexecPathList (path, TRUE);
+	}
+}
+
 /*
  *  Option tables
  */
 
 static parametricOption ParametricOptions [] = {
 	{ "config-filename",      	processConfigFilenameOption,  	TRUE    },
+	{ "data-dir",               processDataDir,                 FALSE   },
 	{ "etags-include",          processEtagsInclude,            FALSE   },
 	{ "exclude",                processExcludeOption,           FALSE   },
 	{ "excmd",                  processExcmdOption,             FALSE   },
@@ -1500,10 +2001,14 @@ static parametricOption ParametricOptions [] = {
 	{ "languages",              processLanguagesOption,         FALSE   },
 	{ "langdef",                processLanguageDefineOption,    FALSE   },
 	{ "langmap",                processLanguageMapOption,       FALSE   },
+	{ "libexec-dir",            processLibexecDir,              FALSE   },
 	{ "license",                processLicenseOption,           TRUE    },
+	{ "list-aliases",           processListAliasesOption,       TRUE    },
+	{ "list-corpora",           processListCorporaOption,       TRUE    },
+	{ "list-features",          processListFeaturesOption,      TRUE    },
 	{ "list-kinds",             processListKindsOption,         TRUE    },
-	{ "list-maps",              processListMapsOption,          TRUE    },
 	{ "list-languages",         processListLanguagesOption,     TRUE    },
+	{ "list-maps",              processListMapsOption,          TRUE    },
 	{ "options",                processOptionFile,              FALSE   },
 	{ "sort",                   processSortOption,              TRUE    },
 	{ "version",                processVersionOption,           TRUE    },
@@ -1514,10 +2019,13 @@ static booleanOption BooleanOptions [] = {
 	{ "file-scope",     &Option.include.fileScope,      FALSE   },
 	{ "file-tags",      &Option.include.fileNames,      FALSE   },
 	{ "filter",         &Option.filter,                 TRUE    },
+	{ "guess-language-eagerly", &Option.guessLanguageEagerly, TRUE },
 	{ "if0",            &Option.if0,                    FALSE   },
 	{ "kind-long",      &Option.kindLong,               TRUE    },
 	{ "line-directives",&Option.lineDirectives,         FALSE   },
 	{ "links",          &Option.followLinks,            FALSE   },
+	{ "print-language", &Option.printLanguage,          TRUE    },
+	{ "quiet",          &Option.quiet,                  FALSE   },
 #ifdef RECURSE_SUPPORTED
 	{ "recurse",        &Option.recurse,                FALSE   },
 #endif
@@ -1610,7 +2118,15 @@ static void processLongOption (
 		;
 	else if (processKindOption (option, parameter))
 		;
+	else if (processCorpusOption (option, parameter))
+		;
+	else if (processAliasOption (option, parameter))
+		;
 	else if (processRegexOption (option, parameter))
+		;
+	else if (processXcmdOption (option, parameter))
+		;
+	else if (processMapOption (option, parameter))
 		;
 #ifndef RECURSE_SUPPORTED
 	else if (strcmp (option, "recurse") == 0)
@@ -1675,6 +2191,9 @@ static void processShortOption (
 			break;
 		case 'F':
 			Option.backward = FALSE;
+			break;
+		case 'G':
+			Option.guessLanguageEagerly = TRUE;
 			break;
 		case 'h':
 			processHeaderListOption (*option, parameter);
@@ -1792,12 +2311,15 @@ extern void previewFirstOption (cookedArgs* const args)
 {
 	while (cArgIsOption (args))
 	{
-		if (strcmp (args->item, "V") == 0 || strcmp (args->item, "verbose") == 0 || strcmp (args->item, "config-filename") == 0 )
+		if (strcmp (args->item, "V") == 0
+		    || strcmp (args->item, "verbose") == 0
+		    || strcmp (args->item, "config-filename") == 0
+		    || strcmp (args->item, "quiet") == 0)
 			parseOption (args);
 		else if (strcmp (args->item, "options") == 0  &&
 				strcmp (args->parameter, "NONE") == 0)
 		{
-			fprintf (stderr, "No options will be read from files or environment\n");
+			notice ("No options will be read from files or environment\n");
 			SkipConfiguration = TRUE;
 			cArgForth (args);
 		}
@@ -1808,33 +2330,56 @@ extern void previewFirstOption (cookedArgs* const args)
 
 static void parseConfigurationFileOptionsInDirectoryWithLeafname (const char* directory, const char* leafname)
 {
-	vString* const pathname = combinePathAndFile (directory, leafname);
-	parseFileOptions (vStringValue (pathname));
-	vStringDelete (pathname);
+	char* pathname = combinePathAndFile (directory, leafname);
+	parseFileOptions (pathname);
+	eFree (pathname);
 }
 
 static void parseConfigurationFileOptionsInDirectory (const char* directory)
 {
 	char	*leafname = NULL;
 
-	asprintf (&leafname,".%s",(Option.configFilename)?Option.configFilename:"ctags");
+	if (asprintf (&leafname,".%s",(Option.configFilename)?Option.configFilename:"ctags") == -1)
+	{
+		error (FATAL, "error in asprintf");
+	}
 	parseConfigurationFileOptionsInDirectoryWithLeafname (directory, leafname);
 	free (leafname);
 #ifdef MSDOS_STYLE_PATH
-	asprintf (&leafname,"%s.cnf",(Option.configFilename)?Option.configFilename:"ctags");
+	if (asprintf (&leafname,"%s.cnf",(Option.configFilename)?Option.configFilename:"ctags") == -1)
+	{
+		error (FATAL, "error in asprintf");
+	}
 	parseConfigurationFileOptionsInDirectoryWithLeafname (directory, leafname);
 	free (leafname);
 #endif
 }
 
 #if defined(HAVE_SCANDIR)
-static int accept_only_dot_ctags(const struct dirent* dent)
+static int ignore_dot_file(const struct dirent* dent)
 {
-	size_t len;
-
 	/* Ignore a file which name is started from dot. */
 	if (*dent->d_name == '.')
 		return 0;
+	else
+		return 1;
+}
+
+static int accept_only_dot_d(const struct dirent* dent)
+{
+	size_t len;
+
+	/* accept only a directory ended with ".d" */
+	len = strlen(dent->d_name);
+
+	if (len < 3)
+		return 0;
+	return !strcmp(dent->d_name + (len - 2), ".d");
+}
+
+static int accept_only_dot_ctags(const struct dirent* dent)
+{
+	size_t len;
 
 	/* accept only a file ended with ".conf" or ".ctags" */
 	len = strlen(dent->d_name);
@@ -1852,37 +2397,71 @@ static int accept_only_dot_ctags(const struct dirent* dent)
 	return 0;
 }
 
-static boolean parseAllConfigurationFilesOptionsInDirectory (const char* const dirName)
+static boolean parseAllConfigurationFilesOptionsInDirectory (const char* const dirName,
+							     stringList* const already_loaded_files)
 {
 	struct dirent **dents;
 	int i, n;
 
-	n = scandir (dirName, &dents, accept_only_dot_ctags, alphasort);
+	n = scandir (dirName, &dents, ignore_dot_file, alphasort);
 	if (n < 0)
 		return FALSE;
 	
 	for (i = 0; i < n; i++)
 	{
-		parseConfigurationFileOptionsInDirectoryWithLeafname (dirName,
-								      dents[i]->d_name);
+		char* path;
+		fileStatus *s;
+
+		if (already_loaded_files && stringListHas (already_loaded_files, dents[i]->d_name))
+			continue;
+		else if (already_loaded_files)
+			stringListAdd (already_loaded_files, vStringNewInit (dents[i]->d_name));
+
+		path = combinePathAndFile (dirName, dents[i]->d_name);
+		s = eStat (path);
+
+		if (s->exists && s->isDirectory && accept_only_dot_d(dents[i]))
+			parseAllConfigurationFilesOptionsInDirectory (path,
+								      already_loaded_files);
+		else if (s->exists && accept_only_dot_ctags(dents[i]))
+			parseConfigurationFileOptionsInDirectoryWithLeafname (dirName,
+									      dents[i]->d_name);
+		eStatFree (s);
 		free (dents[i]);
+		eFree (path);
 	}
 	free (dents);
 	return TRUE;
 }
 #else
-static boolean parseAllConfigurationFilesOptionsInDirectory (const char* const dirName)
+static boolean parseAllConfigurationFilesOptionsInDirectory (const char* const dirName,
+							     stringList* const already_loaded_files)
 {
 	return FALSE;
 }
 #endif
 
+static void preload (const searchPathList *const pathList)
+{
+	unsigned int i;
+	stringList* loaded;
+
+	loaded = stringListNew ();
+	for (i = 0; i < stringListCount (pathList); ++i)
+	{
+		const char* const dir = vStringValue (stringListItem (pathList, i));
+		parseAllConfigurationFilesOptionsInDirectory (dir, loaded);
+	}
+	stringListClear (loaded);
+	stringListDelete (loaded);
+}
+
 static void parseConfigurationFileOptions (void)
 {
+	vString *home;
 	/* We parse .ctags on all systems, and additionally ctags.cnf on DOS. */
-	const char* const home = getenv ("HOME");
 	char *filename = NULL;
-	char *filename_body;
+	const char *filename_body;
 
 #ifdef CUSTOM_CONFIGURATION_FILE
 	parseFileOptions (CUSTOM_CONFIGURATION_FILE);
@@ -1890,67 +2469,37 @@ static void parseConfigurationFileOptions (void)
 	filename_body = (Option.configFilename)?Option.configFilename:"ctags";
 #ifdef MSDOS_STYLE_PATH
 
-	asprintf (&filename,"/%s.cnf", filename_body);
-	parseFileOptions (filename);
-	free (filename);
-#endif
-	asprintf (&filename,"/etc/%s.conf", filename_body);
-	parseFileOptions (filename);
-	free (filename);
-
-#ifndef MSDOS_STYLE_PATH
-	if (!Option.configFilename)
+	if (asprintf (&filename,"/%s.cnf", filename_body) == -1)
 	{
-		asprintf (&filename,"/etc/%s.conf.d", filename_body);
-		parseAllConfigurationFilesOptionsInDirectory(filename);
-		free (filename);
+		error (FATAL, "error in asprintf");
 	}
+	parseFileOptions (filename);
+	free (filename);
 #endif
-
-	asprintf (&filename,"/usr/local/etc/%s.conf", filename_body);
+	if (asprintf (&filename,"/etc/%s.conf", filename_body) == -1)
+	{
+		error (FATAL, "error in asprintf");
+	}
 	parseFileOptions (filename);
 	free (filename);
 
-#ifndef MSDOS_STYLE_PATH
-	if (!Option.configFilename)
+	if (asprintf (&filename,"/usr/local/etc/%s.conf", filename_body) == -1)
 	{
-		asprintf (&filename,"/usr/local/etc/%s.conf.d", filename_body);
-		parseAllConfigurationFilesOptionsInDirectory(filename);
-		free (filename);
+		error (FATAL, "error in asprintf");
 	}
-#endif
+	parseFileOptions (filename);
+	free (filename);
 
+	home = getHome ();
 	if (home != NULL)
 	{
-		parseConfigurationFileOptionsInDirectory (home);
-#ifndef MSDOS_STYLE_PATH
-		{
-			vString* const pathname = combinePathAndFile (home, ".ctags.d");
-			parseAllConfigurationFilesOptionsInDirectory(vStringValue (pathname));
-			vStringDelete (pathname);
-		}
-#endif
+		parseConfigurationFileOptionsInDirectory (vStringValue (home));
+		vStringDelete (home);
 	}
-	else
-	{
-#ifdef MSDOS_STYLE_PATH
-		/*
-		 * Windows users don't usually set HOME.
-		 * The OS sets HOMEDRIVE and HOMEPATH for them.
-		 */
-		const char* homeDrive = getenv ("HOMEDRIVE");
-		const char* homePath = getenv ("HOMEPATH");
-		if (homeDrive != NULL && homePath != NULL)
-		{
-			vString* const windowsHome = vStringNew ();
-			vStringCatS (windowsHome, homeDrive);
-			vStringCatS (windowsHome, homePath);
-			parseConfigurationFileOptionsInDirectory (vStringValue (windowsHome));
-			vStringDelete (windowsHome);
-		}
-#endif
-	}
+
 	parseConfigurationFileOptionsInDirectory (".");
+
+	preload (PreloadPathList);
 }
 
 static void parseEnvironmentOptions (void)
@@ -1988,6 +2537,105 @@ extern void readOptionConfiguration (void)
 	}
 }
 
+static void installDataPathList (void)
+{
+	char* dataPath = getenv (CTAGS_DATA_PATH_ENVIRONMENT);
+
+	OptlibPathList = stringListNew ();
+	CorpusPathList = stringListNew ();
+	PreloadPathList = stringListNew ();
+
+	if (dataPath)
+	{
+		char* needle;
+
+		while (dataPath[0])
+		{
+			needle = strchr (dataPath, ':');
+			if (needle)
+				*needle = '\0';
+
+			appendToDataPathList (dataPath, FALSE);
+
+			if (needle)
+			{
+				*needle = ':';
+				dataPath = needle + 1;
+			}
+			else
+				break;
+		}
+	}
+
+	{
+		vString *home = getHome ();
+		if (home != NULL)
+		{
+			char *ctags_d;
+
+			ctags_d = combinePathAndFile (vStringValue (home), ".ctags.d");
+
+			appendToDataPathList (ctags_d, FALSE);
+			eFree (ctags_d);
+			vStringDelete (home);
+		}
+	}
+#ifdef PKGCONFDIR
+	appendToDataPathList (PKGCONFDIR, FALSE);
+#endif
+
+#ifdef DATADIR
+	appendToDataPathList (DATADIR, FALSE);
+#endif
+}
+
+static void installLibexecPathList (void)
+{
+	char* libexecPath = getenv (CTAGS_LIBEXEC_PATH_ENVIRONMENT);
+
+	DriversPathList = stringListNew ();
+
+	if (libexecPath)
+	{
+		char* needle;
+
+		while (libexecPath[0])
+		{
+			needle = strchr (libexecPath, ':');
+			if (needle)
+				*needle = '\0';
+
+			appendToDataPathList (libexecPath, FALSE);
+
+			if (needle)
+			{
+				*needle = ':';
+				libexecPath = needle + 1;
+			}
+			else
+				break;
+		}
+	}
+
+	{
+		vString *home = getHome ();
+		if (home != NULL)
+		{
+			char *ctags_d;
+
+			ctags_d = combinePathAndFile (vStringValue (home), ".ctags.d");
+
+			appendToLibexecPathList (ctags_d, FALSE);
+			eFree (ctags_d);
+			vStringDelete (home);
+		}
+	}
+
+#ifdef PKGLIBEXECDIR
+	appendToLibexecPathList (PKGLIBEXECDIR, FALSE);
+#endif
+}
+
 /*
 *   Option initialization
 */
@@ -1995,10 +2643,19 @@ extern void readOptionConfiguration (void)
 extern void initOptions (void)
 {
 	OptionFiles = stringListNew ();
+	installDataPathList ();
+	installLibexecPathList ();
+	verboseSearchPathList (OptlibPathList,  "OptlibPathList");
+	verboseSearchPathList (CorpusPathList,  "CorpusPathList");
+	verboseSearchPathList (PreloadPathList, "PreloadPathList");
+	verboseSearchPathList (DriversPathList, "DriversPathList");
+
 	verbose ("Setting option defaults\n");
 	installHeaderListDefaults ();
 	verbose ("  Installing default language mappings:\n");
 	installLanguageMapDefaults ();
+	verbose ("  Installing default language aliases:\n");
+	installLanguageAliasesDefaults ();
 
 	/* always excluded by default */
 	verbose ("  Installing default exclude patterns:\n");
@@ -2033,6 +2690,12 @@ extern void freeOptionResources (void)
 	freeList (&Option.ignore);
 	freeList (&Option.headerExt);
 	freeList (&Option.etagsInclude);
+
+	freeSearchPathList (&CorpusPathList);
+	freeSearchPathList (&OptlibPathList);
+	freeSearchPathList (&PreloadPathList);
+	freeSearchPathList (&DriversPathList);
+
 	freeList (&OptionFiles);
 }
 

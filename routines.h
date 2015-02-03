@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -23,14 +21,14 @@
 #define xCalloc(n,Type)    (Type *)eCalloc((size_t)(n), sizeof (Type))
 #define xRealloc(p,n,Type) (Type *)eRealloc((p), (n) * sizeof (Type))
 
+#define ARRAY_SIZE(X)      (sizeof (X) / sizeof (X[0]))
+
 /*
  *  Portability macros
  */
 #ifndef PATH_SEPARATOR
 # if defined (MSDOS_STYLE_PATH)
 #  define PATH_SEPARATOR '\\'
-# elif defined (QDOS)
-#  define PATH_SEPARATOR '_'
 # else
 #  define PATH_SEPARATOR '/'
 # endif
@@ -45,7 +43,7 @@
 /*
 *   DATA DECLARATIONS
 */
-#if defined (MSDOS_STYLE_PATH) || defined (VMS)
+#if defined (MSDOS_STYLE_PATH)
 extern const char *const PathDelimiters;
 #endif
 extern char *CurrentDirectory;
@@ -103,7 +101,9 @@ extern int strnuppercmp (const char *s1, const char *s2, size_t n);
 #ifndef HAVE_STRSTR
 extern char* strstr (const char *str, const char *substr);
 #endif
+extern char* strrstr (const char *str, const char *substr);
 extern char* eStrdup (const char* str);
+extern char* eStrndup (const char* str, size_t len);
 extern void toLowerString (char* str);
 extern void toUpperString (char* str);
 extern char* newLowerString (const char* str);
@@ -114,6 +114,7 @@ extern void setCurrentDirectory (void);
 extern fileStatus *eStat (const char *const fileName);
 extern void eStatFree (fileStatus *status);
 extern boolean doesFileExist (const char *const fileName);
+extern boolean doesExecutableExist (const char *const fileName);
 extern boolean isRecursiveLink (const char* const dirName);
 extern boolean isSameFile (const char *const name1, const char *const name2);
 #if defined(NEED_PROTO_FGETPOS)
@@ -123,11 +124,13 @@ extern int fsetpos  (FILE *stream, fpos_t *pos);
 extern const char *baseFilename (const char *const filePath);
 extern const char *fileExtension (const char *const fileName);
 extern boolean isAbsolutePath (const char *const path);
-extern vString *combinePathAndFile (const char *const path, const char *const file);
+extern char *combinePathAndFile (const char *const path, const char *const file);
 extern char* absoluteFilename (const char *file);
 extern char* absoluteDirname (char *file);
 extern char* relativeFilename (const char *file, const char *dir);
 extern FILE *tempFile (const char *const mode, char **const pName);
+
+extern char* baseFilenameSansExtensionNew (const char *const fileName, const char *const templateExt);
 
 #endif  /* _ROUTINES_H */
 

@@ -1,0 +1,6 @@
+a	input.c	/^	int a;$/;"	m	struct:__anon1	file:
+a	input.c	/^	int a;$/;"	m	struct:mystruct	file:
+b	input.c	/^	int b;$/;"	m	struct:__anon1	file:
+b	input.c	/^	int b;$/;"	m	struct:mystruct	file:
+mystruct	input.c	/^typedef struct mystruct {$/;"	s	file:
+mystruct	input.c	/^} mystruct;$/;"	t	typeref:struct:__anon1	file:

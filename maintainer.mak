@@ -1,5 +1,3 @@
-#	$Id$
-#
 #	Copyright (c) 1996-2009, Darren Hiebert
 #
 #	Development makefile for Exuberant Ctags. Also used to build releases.
@@ -16,8 +14,8 @@ VERSION_FILES:= ctags.h ctags.1 NEWS
 LIB_FILES    := readtags.c readtags.h
 
 ENVIRONMENT_MAKEFILES := \
-				mk_bc3.mak mk_bc5.mak mk_djg.mak mk_manx.mak mk_mingw.mak \
-				mk_mpw.mak mk_mvc.mak mk_os2.mak mk_qdos.mak mk_sas.mak \
+				mk_mingw.mak \
+				mk_mvc.mak
 
 COMMON_FILES := COPYING EXTENDING.html FAQ INSTALL.oth MAINTAINERS NEWS README \
 				$(ENVIRONMENT_MAKEFILES) source.mak \
@@ -27,7 +25,7 @@ COMMON_FILES := COPYING EXTENDING.html FAQ INSTALL.oth MAINTAINERS NEWS README \
 UNIX_FILES   := $(COMMON_FILES) \
 				.indent.pro INSTALL configure.ac \
 				Makefile.in maintainer.mak \
-				descrip.mms mkinstalldirs magic.diff \
+				mkinstalldirs \
 				ctags.spec ctags.1
 
 REGEX_DIR    := gnu_regex

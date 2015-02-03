@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 2000-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -67,7 +65,7 @@ static void findAwkTags (void)
 	vStringDelete (name);
 }
 
-extern parserDefinition* AwkParser ()
+extern parserDefinition* AwkParser (void)
 {
 	static const char *const extensions [] = { "awk", "gawk", "mawk", NULL };
 	parserDefinition* def = parserNew ("Awk");

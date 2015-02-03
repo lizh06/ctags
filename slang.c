@@ -1,6 +1,4 @@
 /*
- *   $Id$
- *
  *   Copyright (c) 2000-2001, Francesc Rocher
  *
  *   Author: Francesc Rocher <f.rocher@computer.org>.
@@ -36,6 +34,6 @@ extern parserDefinition* SlangParser (void)
 	parserDefinition* const def = parserNew ("SLang");
 	def->extensions = extensions;
 	def->initialize = installSlangRegex;
-	def->regex      = TRUE;
+	def->method     = METHOD_NOT_CRAFTED|METHOD_REGEX;
 	return def;
 }

@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1996-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -75,7 +73,7 @@ static void setInputFileName (const char *const fileName)
 	}
 }
 
-static void setSourceFileParameters (vString *const fileName)
+static void setSourceFileParameters (vString *const fileName, const langType language)
 {
 	if (File.source.name != NULL)
 		vStringDelete (File.source.name);
@@ -93,21 +91,25 @@ static void setSourceFileParameters (vString *const fileName)
 		TagFile.max.file = vStringLength (fileName);
 
 	File.source.isHeader = isIncludeFile (vStringValue (fileName));
-	File.source.language = getFileLanguage (vStringValue (fileName));
+	File.source.language = language;
 }
 
 static boolean setSourceFileName (vString *const fileName)
 {
+	const langType language = getFileLanguage (vStringValue (fileName));
 	boolean result = FALSE;
-	if (getFileLanguage (vStringValue (fileName)) != LANG_IGNORE)
+	if (language != LANG_IGNORE)
 	{
 		vString *pathName;
 		if (isAbsolutePath (vStringValue (fileName)) || File.path == NULL)
 			pathName = vStringNewCopy (fileName);
 		else
-			pathName = combinePathAndFile (
-					vStringValue (File.path), vStringValue (fileName));
-		setSourceFileParameters (pathName);
+		{
+			char *tmp = combinePathAndFile (
+				vStringValue (File.path), vStringValue (fileName));
+			pathName = vStringNewOwn (tmp);
+		}
+		setSourceFileParameters (pathName, language);
 		result = TRUE;
 	}
 	return result;
@@ -245,11 +247,7 @@ static boolean parseLineDirective (void)
  */
 extern boolean fileOpen (const char *const fileName, const langType language)
 {
-#ifdef VMS
-	const char *const openMode = "r";
-#else
 	const char *const openMode = "rb";
-#endif
 	boolean opened = FALSE;
 
 	/*	If another file was already open, then close it.
@@ -278,7 +276,7 @@ extern boolean fileOpen (const char *const fileName, const langType language)
 		if (File.line != NULL)
 			vStringClear (File.line);
 
-		setSourceFileParameters (vStringNewInit (fileName));
+		setSourceFileParameters (vStringNewInit (fileName), language);
 		File.source.lineNumber = 0L;
 
 		verbose ("OPENING %s as %s language %sfile\n", fileName,
@@ -498,9 +496,9 @@ extern char *readLine (vString *const vLine, FILE *const fp)
 		do
 		{
 			char *const pLastChar = vStringValue (vLine) + vStringSize (vLine) -2;
-			fpos_t startOfLine;
+			long startOfLine;
 
-			fgetpos (fp, &startOfLine);
+			startOfLine = ftell(fp);
 			reReadLine = FALSE;
 			*pLastChar = '\0';
 			result = fgets (vStringValue (vLine), (int) vStringSize (vLine), fp);
@@ -515,19 +513,19 @@ extern char *readLine (vString *const vLine, FILE *const fp)
 				/*  buffer overflow */
 				reReadLine = vStringAutoResize (vLine);
 				if (reReadLine)
-					fsetpos (fp, &startOfLine);
+					fseek (fp, startOfLine, SEEK_SET);
 				else
 					error (FATAL | PERROR, "input line too big; out of memory");
 			}
 			else
 			{
 				char* eol;
-				vStringSetLength (vLine);
+				vStringLength(vLine) = ftell(fp) - startOfLine;
 				/* canonicalize new line */
 				eol = vStringValue (vLine) + vStringLength (vLine) - 1;
 				if (*eol == '\r')
 					*eol = '\n';
-				else if (*(eol - 1) == '\r'  &&  *eol == '\n')
+				else if (vStringLength (vLine) != 1 && *(eol - 1) == '\r'  &&  *eol == '\n')
 				{
 					*(eol - 1) = '\n';
 					*eol = '\0';
@@ -556,6 +554,48 @@ extern char *readSourceLine (
 	if (result == NULL)
 		error (FATAL, "Unexpected end of file: %s", vStringValue (File.name));
 	fsetpos (File.fp, &orignalPosition);
+
+	return result;
+}
+
+/*
+ *   Similar to readLine but this doesn't use fgetpos/fsetpos.
+ *   Useful for reading from pipe.
+ */
+
+char* readLineWithNoSeek (vString* const vline, FILE *const pp)
+{
+	int c;
+	boolean nlcr;
+	char *result = NULL;
+
+	vStringClear (vline);
+	nlcr = FALSE;
+	
+	while (1)
+	{
+		c = fgetc (pp);
+		
+		if (c == EOF)
+		{
+			if (! feof (pp))
+				error (FATAL | PERROR, "Failure on attempt to read file");
+			else
+				break;
+		}
+
+		result = vStringValue (vline);
+		
+		if (c == '\n' || c == '\r')
+			nlcr = TRUE;
+		else if (nlcr)
+		{
+			ungetc (c, pp);
+			break;
+		}
+		else
+			vStringPut (vline, c);
+	}
 
 	return result;
 }

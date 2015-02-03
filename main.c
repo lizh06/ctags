@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1996-2003, Darren Hiebert
 *
 *   Author: Darren Hiebert <dhiebert@users.sourceforge.net>
@@ -23,6 +21,12 @@
 */
 #include "general.h"  /* must always come first */
 
+#if HAVE_DECL___ENVIRON
+#include <unistd.h>
+#elif HAVE_DECL__NSGETENVIRON
+#include <crt_externs.h>
+#endif
+
 #include <string.h>
 
 /*  To provide timings features if available.
@@ -41,21 +45,8 @@
 
 /*  To provide directory searching for recursion feature.
  */
-#ifdef AMIGA
-# include <dos/dosasl.h>       /* for struct AnchorPath */
-# include <clib/dos_protos.h>  /* function prototypes */
-# define ANCHOR_BUF_SIZE 512
-# define ANCHOR_SIZE (sizeof (struct AnchorPath) + ANCHOR_BUF_SIZE)
-# ifdef __SASC
-   extern struct DosLibrary *DOSBase;
-#  include <pragmas/dos_pragmas.h>
-# endif
-#endif
 
 #ifdef HAVE_DIRENT_H
-# ifdef __BORLANDC__
-#  define boolean BORLAND_boolean
-# endif
 # ifdef HAVE_SYS_TYPES_H
 #  include <sys/types.h>  /* required by dirent.h */
 # endif
@@ -64,9 +55,6 @@
 #endif
 #ifdef HAVE_DIRECT_H
 # include <direct.h>  /* to _getcwd() */
-#endif
-#ifdef HAVE_DOS_H
-# include <dos.h>  /* to declare FA_DIREC */
 #endif
 #ifdef HAVE_DIR_H
 # include <dir.h>  /* to declare findfirst() and findnext */
@@ -93,17 +81,6 @@
 */
 static struct { long files, lines, bytes; } Totals = { 0, 0, 0 };
 
-#ifdef AMIGA
-# include "ctags.h"
-  static const char *VERsion = "$VER: "PROGRAM_NAME" "PROGRAM_VERSION" "
-# ifdef __SASC
-  __AMIGADATE__
-# else
-  __DATE__
-# endif
-  " "AUTHOR_NAME" $";
-#endif
-
 /*
 *   FUNCTION PROTOTYPES
 */
@@ -128,11 +105,7 @@ extern boolean isDestinationStdout (void)
 
 	if (Option.xref  ||  Option.filter  ||
 		(Option.tagFileName != NULL  &&  (strcmp (Option.tagFileName, "-") == 0
-#if defined (VMS)
-	|| strcmp (Option.tagFileName, "sys$output") == 0
-#else
-	|| strcmp (Option.tagFileName, "/dev/stdout") == 0
-#endif
+						  || strcmp (Option.tagFileName, "/dev/stdout") == 0
 		)))
 		toStdout = TRUE;
 	return toStdout;
@@ -153,13 +126,18 @@ static boolean recurseUsingOpendir (const char *const dirName)
 			if (strcmp (entry->d_name, ".") != 0  &&
 				strcmp (entry->d_name, "..") != 0)
 			{
-				vString *filePath;
+				char *filePath;
+				boolean free_p = FALSE;
 				if (strcmp (dirName, ".") == 0)
-					filePath = vStringNewInit (entry->d_name);
+					filePath = entry->d_name;
 				else
+				  {
 					filePath = combinePathAndFile (dirName, entry->d_name);
-				resize |= createTagsForEntry (vStringValue (filePath));
-				vStringDelete (filePath);
+					free_p = TRUE;
+				  }
+				resize |= createTagsForEntry (filePath);
+				if (free_p)
+					eFree (filePath);
 			}
 		}
 		closedir (dir);
@@ -215,33 +193,6 @@ static boolean createTagsForWildcardUsingFindfirst (const char *const pattern)
 	return resize;
 }
 
-#elif defined (AMIGA)
-
-static boolean createTagsForAmigaWildcard (const char *const pattern)
-{
-	boolean resize = FALSE;
-	struct AnchorPath *const anchor =
-			(struct AnchorPath *) eMalloc ((size_t) ANCHOR_SIZE);
-	LONG result;
-
-	memset (anchor, 0, (size_t) ANCHOR_SIZE);
-	anchor->ap_Strlen = ANCHOR_BUF_SIZE;
-	/* Allow '.' for current directory */
-#ifdef APF_DODOT
-	anchor->ap_Flags = APF_DODOT | APF_DOWILD;
-#else
-	anchor->ap_Flags = APF_DoDot | APF_DoWild;
-#endif
-	result = MatchFirst ((UBYTE *) pattern, anchor);
-	while (result == 0)
-	{
-		resize |= createTagsForEntry ((char *) anchor->ap_Buf);
-		result = MatchNext (anchor);
-	}
-	MatchEnd (anchor);
-	eFree (anchor);
-	return resize;
-}
 #endif
 
 static boolean recurseIntoDirectory (const char *const dirName)
@@ -263,19 +214,6 @@ static boolean recurseIntoDirectory (const char *const dirName)
 			vStringPut (pattern, OUTPUT_PATH_SEPARATOR);
 			vStringCatS (pattern, "*.*");
 			resize = createTagsForWildcardUsingFindfirst (vStringValue (pattern));
-			vStringDelete (pattern);
-		}
-#elif defined (AMIGA)
-		{
-			vString *const pattern = vStringNew ();
-			if (*dirName != '\0'  &&  strcmp (dirName, ".") != 0)
-			{
-				vStringCopyS (pattern, dirName);
-				if (dirName [strlen (dirName) - 1] != '/')
-					vStringPut (pattern, '/');
-			}
-			vStringCatS (pattern, "#?");
-			resize = createTagsForAmigaWildcard (vStringValue (pattern));
 			vStringDelete (pattern);
 		}
 #endif
@@ -483,7 +421,7 @@ static void makeTags (cookedArgs *args)
 	}
 
 #define timeStamp(n) timeStamps[(n)]=(Option.printTotals ? clock():(clock_t)0)
-	if (! Option.filter)
+	if ((! Option.filter) && (! Option.printLanguage))
 		openTagFile ();
 
 	timeStamp (0);
@@ -508,7 +446,7 @@ static void makeTags (cookedArgs *args)
 
 	timeStamp (1);
 
-	if (! Option.filter)
+	if ((! Option.filter) && (!Option.printLanguage))
 		closeTagFile (resize);
 
 	timeStamp (2);
@@ -518,6 +456,37 @@ static void makeTags (cookedArgs *args)
 #undef timeStamp
 }
 
+static void sanitizeEnviron (void)
+{
+	char **e = NULL;
+	int i;
+
+#if HAVE_DECL___ENVIRON
+	e = __environ;
+#elif HAVE_DECL__NSGETENVIRON
+	e = _NSGetEnviron();
+#endif
+
+	if (!e)
+		return;
+
+	for (i = 0; e [i]; i++)
+	{
+		char *value;
+
+		value = strchr (e [i], '=');
+		if (!value)
+			continue;
+
+		value++;
+		if (!strncmp (value, "() {", 4))
+		{
+			error (WARNING, "reset environment: %s", e [i]);
+			value [0] = '\0';
+		}
+	}
+}
+
 /*
  *		Start up code
  */
@@ -525,29 +494,10 @@ static void makeTags (cookedArgs *args)
 extern int main (int __unused__ argc, char **argv)
 {
 	cookedArgs *args;
-#ifdef VMS
-	extern int getredirection (int *ac, char ***av);
-
-	/* do wildcard expansion and I/O redirection */
-	getredirection (&argc, &argv);
-#endif
-
-#ifdef AMIGA
-	/* This program doesn't work when started from the Workbench */
-	if (argc == 0)
-		exit (1);
-#endif
-
-#ifdef __EMX__
-	_wildcard (&argc, &argv);  /* expand wildcards in argument list */
-#endif
-
-#if defined (macintosh) && BUILD_MPW_TOOL == 0
-	argc = ccommand (&argv);
-#endif
 
 	setCurrentDirectory ();
 	setExecutableName (*argv++);
+	sanitizeEnviron ();
 	checkRegex ();
 
 	args = cArgNewFromArgv (argv);
@@ -559,6 +509,7 @@ extern int main (int __unused__ argc, char **argv)
 	verbose ("Reading initial options from command line\n");
 	parseOptions (args);
 	checkOptions ();
+	unifyLanguageMaps ();
 	makeTags (args);
 
 	/*  Clean up.
@@ -571,6 +522,10 @@ extern int main (int __unused__ argc, char **argv)
 	freeOptionResources ();
 	freeParserResources ();
 	freeRegexResources ();
+	freeXcmdResources ();
+
+	if (Option.printLanguage)
+		return (Option.printLanguage == TRUE)? 0: 1;
 
 	exit (0);
 	return 0;

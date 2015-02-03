@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 2003, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -42,7 +40,7 @@ extern parserDefinition* HtmlParser (void)
 	parserDefinition *const def = parserNew ("HTML");
 	def->extensions = extensions;
 	def->initialize = installHtmlRegex;
-	def->regex      = TRUE;
+	def->method     = METHOD_NOT_CRAFTED|METHOD_REGEX;
 	return def;
 }
 

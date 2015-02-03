@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1998-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -79,6 +77,9 @@ extern void vStringCopyS (vString *const string, const char *const s);
 extern void vStringNCopyS (vString *const string, const char *const s, const size_t length);
 extern void vStringCopyToLower (vString *const dest, const vString *const src);
 extern void vStringSetLength (vString *const string);
+
+extern vString *vStringNewOwn (char *s);
+extern char    *vStringDeleteUnwrap (vString *const string);
 
 #endif  /* _VSTRING_H */
 

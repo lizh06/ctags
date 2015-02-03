@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 2001-2003, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -32,7 +30,7 @@ extern parserDefinition* RexxParser (void)
 	parserDefinition* const def = parserNew ("REXX");
 	def->extensions = extensions;
 	def->initialize = installRexxRegex;
-	def->regex      = TRUE;
+	def->method     = METHOD_NOT_CRAFTED|METHOD_REGEX;
 	return def;
 }
 

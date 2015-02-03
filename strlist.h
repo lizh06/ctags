@@ -1,6 +1,4 @@
 /*
-*   $Id$
-*
 *   Copyright (c) 1999-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
@@ -17,6 +15,8 @@
 #include "general.h"  /* must always come first */
 
 #include "vstring.h"
+
+#include <stdio.h>
 
 /*
 *   DATA DECLARATIONS
@@ -46,8 +46,11 @@ extern boolean stringListHas (const stringList *const current, const char *const
 extern boolean stringListHasTest (const stringList *const current, boolean (*test)(const char *s));
 extern boolean stringListRemoveExtension (stringList* const current, const char* const extension);
 extern boolean stringListExtensionMatched (const stringList* const list, const char* const extension);
+extern vString* stringListExtensionFinds (const stringList* const list, const char* const extension);
 extern boolean stringListFileMatched (const stringList* const list, const char* const str);
-extern void stringListPrint (const stringList *const current);
+extern vString* stringListFileFinds (const stringList* const list, const char* const str);
+extern void stringListPrint (const stringList *const current, FILE *fp);
+extern void stringListReverse (const stringList *const current);
 
 #endif  /* _STRLIST_H */
 
