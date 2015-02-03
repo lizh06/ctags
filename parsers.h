@@ -28,6 +28,7 @@
 	DosBatchParser, \
 	FlexParser, \
 	FortranParser, \
+	GoParser, \
 	HtmlParser, \
 	JavaParser, \
 	JavaScriptParser, \
@@ -46,6 +47,7 @@
 	RustParser, \
 	SchemeParser, \
 	ShParser, \
+	SmlParser, \
 	SqlParser, \
 	TclParser, \
 	TexParser, \

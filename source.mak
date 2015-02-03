@@ -22,6 +22,7 @@ SOURCES = \
 	flex.c \
 	fortran.c \
 	get.c \
+	go.c \
 	html.c \
 	htable.c \
 	jscript.c \
@@ -48,6 +49,7 @@ SOURCES = \
 	rust.c \
 	scheme.c \
 	sh.c \
+	sml.c \
 	sort.c \
 	sql.c \
 	strlist.c \
