@@ -26,7 +26,7 @@ The following parsers have been added:
 * go
 * json
 * mib *optlib*
-* rust *optlib*
+* rust
 * windres
 * SystemVerilog
 
@@ -366,6 +366,7 @@ If *bundle.d* is found and is a directory, files (*\*.ctags*
 and *\*.conf*), directories (\*.d) are loaded recursively.
 
 .. TODO
+
 NOTE: If *bundle.d* is not found above list, file
 *bundle.ctags* or *bundle.conf* is searched. This rule is a bit
 ugly. Following search rules look better.
@@ -630,3 +631,10 @@ There were 3 classes of message in ctags:
 *but more important for users than *verbose*. Generally the user can
 *ignore *notice*. With ``--quiet`` option can be used to turn off the
 priting the *notice* class messages.
+
+Miscellaneous new options
+---------------------------------------------------------------------
+
+``--undef[=yes|no]``
+    Allows disabling the generation of macro tags from ``#undef``
+    directives.

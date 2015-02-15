@@ -371,26 +371,25 @@ They have these additional language parsers:
 * `Haxe <http://en.wikipedia.org/wiki/Haxe>`_
 * `NSIS <http://en.wikipedia.org/wiki/Nullsoft_Scriptable_Install_System>`_
 * `R <http://en.wikipedia.org/wiki/R_%28programming_language%29>`_
-* `Rust <http://rust-lang.org>`_
 * `reStructuredText (reST) <http://en.wikipedia.org/wiki/ReStructuredText>`_
 * `txt2tags <http://en.wikipedia.org/wiki/Txt2tags>`_ 
 * `Vala (c.c) <http://en.wikipedia.org/wiki/Vala_%28programming_language%29>`_
-
 
 These changes have been merged:
 
 * Fix regex callback match count - https://github.com/fishman/ctags/pull/104 
 * SQL tags are stored with scopes instead of "tablename.field" - https://github.com/fishman/ctags/pull/100
 * Some fixes for D parser
+* C++11's enum class/struct support
 
 
 `VIM-Japan <https://github.com/vim-jp/ctags/>`_
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-VIM-Japan have some interesting things, especially regarding encoding
+VIM-Japan have some interesting things, especially regarding encoding.
 
 `Anjuta <https://git.gnome.org/browse/anjuta/tree/plugins/symbol-db/anjuta-tags>`_
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Anjuta is a Gnome IDE. They did not fork Exuberant ctags, but they did
 natively include it in Anjuta. They have made several additions to
