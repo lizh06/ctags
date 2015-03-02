@@ -13,6 +13,7 @@ SOURCES = \
 	awk.c \
 	basic.c \
 	c.c \
+	clojure.c \
 	css.c \
 	dosbatch.c \
 	entry.c \
