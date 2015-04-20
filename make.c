@@ -24,11 +24,12 @@
 *   DATA DEFINITIONS
 */
 typedef enum {
-	K_MACRO
+	K_MACRO, K_TARGET
 } shKind;
 
 static kindOption MakeKinds [] = {
-	{ TRUE, 'm', "macro", "macros"}
+	{ TRUE, 'm', "macro",  "macros"},
+	{ TRUE, 't', "target", "targets"}
 };
 
 /*
@@ -42,7 +43,7 @@ static int nextChar (void)
 	{
 		c = fileGetc ();
 		if (c == '\n')
-			c = fileGetc ();
+			c = nextChar ();
 	}
 	return c;
 }
@@ -57,26 +58,61 @@ static void skipLine (void)
 		fileUngetc (c);
 }
 
-static int skipToNonWhite (void)
+static int skipToNonWhite (int c)
 {
-	int c;
-	do
+	while (c != '\n' && isspace (c))
 		c = nextChar ();
-	while (c != '\n' && isspace (c));
 	return c;
 }
 
 static boolean isIdentifier (int c)
 {
-	return (boolean)(c != '\0' && (isalnum (c)  ||  strchr (".-_", c) != NULL));
+	return (boolean)(c != '\0' && (isalnum (c)  ||  strchr (".-_/$(){}%", c) != NULL));
+}
+
+static boolean isSpecialTarget (vString *const name)
+{
+	size_t i = 0;
+	/* All special targets begin with '.'. */
+	if (vStringLength (name) < 1 || vStringChar (name, i++) != '.') {
+		return FALSE;
+	}
+	while (i < vStringLength (name)) {
+		char ch = vStringChar (name, i++);
+		if (ch != '_' && !isupper (ch))
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+static void newTarget (vString *const name)
+{
+	/* Ignore GNU Make's "special targets". */
+	if  (isSpecialTarget (name))
+	{
+		return;
+	}
+	makeSimpleTag (name, MakeKinds, K_TARGET);
+}
+
+static void newMacro (vString *const name)
+{
+	makeSimpleTag (name, MakeKinds, K_MACRO);
 }
 
 static void readIdentifier (const int first, vString *const id)
 {
+	int depth = 0;
 	int c = first;
 	vStringClear (id);
-	while (isIdentifier (c))
+	while (isIdentifier (c) || (depth > 0 && c != EOF && c != '\n'))
 	{
+		if (c == '(' || c == '}')
+			depth++;
+		else if (depth > 0 && (c == ')' || c == '}'))
+			depth--;
 		vStringPut (id, c);
 		c = nextChar ();
 	}
@@ -84,31 +120,9 @@ static void readIdentifier (const int first, vString *const id)
 	vStringTerminate (id);
 }
 
-static void skipToMatch (const char *const pair)
-{
-	const int begin = pair [0], end = pair [1];
-	const unsigned long inputLineNumber = getInputLineNumber ();
-	int matchLevel = 1;
-	int c = '\0';
-
-	while (matchLevel > 0)
-	{
-		c = nextChar ();
-		if (c == begin)
-			++matchLevel;
-		else if (c == end)
-			--matchLevel;
-		else if (c == '\n' || c == EOF)
-			break;
-	}
-	if (c == EOF)
-		verbose ("%s: failed to find match for '%c' at line %lu\n",
-				getInputFileName (), begin, inputLineNumber);
-}
-
 static void findMakeTags (void)
 {
-	vString *name = vStringNew ();
+	stringList *identifiers = stringListNew ();
 	boolean newline = TRUE;
 	boolean in_define = FALSE;
 	boolean in_rule = FALSE;
@@ -121,14 +135,15 @@ static void findMakeTags (void)
 		{
 			if (in_rule)
 			{
-				if (c == '\t')
+				if (c == '\t' || (c = skipToNonWhite (c)) == '#')
 				{
-					skipLine ();  /* skip rule */
-					continue;
+					skipLine ();  /* skip rule or comment */
+					c = nextChar ();
 				}
-				else
+				else if (c != '\n')
 					in_rule = FALSE;
 			}
+			stringListClear (identifiers);
 			variable_possible = (boolean)(!in_rule);
 			newline = FALSE;
 		}
@@ -138,65 +153,70 @@ static void findMakeTags (void)
 			continue;
 		else if (c == '#')
 			skipLine ();
-		else if (c == '(')
-			skipToMatch ("()");
-		else if (c == '{')
-			skipToMatch ("{}");
-		else if (c == ':')
+		else if (variable_possible && c == '?')
 		{
-			variable_possible = TRUE;
-			in_rule = TRUE;
+			c = nextChar ();
+			fileUngetc (c);
+			variable_possible = (c == '=');
+		}
+		else if (variable_possible && c == ':' &&
+				 stringListCount (identifiers) > 0)
+		{
+			c = nextChar ();
+			fileUngetc (c);
+			if (c != '=')
+			{
+				unsigned int i;
+				for (i = 0; i < stringListCount (identifiers); i++)
+					newTarget (stringListItem (identifiers, i));
+				stringListClear (identifiers);
+				in_rule = TRUE;
+			}
+		}
+		else if (variable_possible && c == '=' &&
+				 stringListCount (identifiers) == 1)
+		{
+			newMacro (stringListItem (identifiers, 0));
+			skipLine ();
+			in_rule = FALSE;
 		}
 		else if (variable_possible && isIdentifier (c))
 		{
+			vString *name = vStringNew ();
 			readIdentifier (c, name);
-			if (strcmp (vStringValue (name), "endef") == 0)
-				in_define = FALSE;
-			else if (in_define)
-				skipLine ();
-			else if (strcmp (vStringValue (name), "define") == 0  &&
-				isIdentifier (c))
+			stringListAdd (identifiers, name);
+
+			if (stringListCount (identifiers) == 1)
 			{
-				in_define = TRUE;
-				c = skipToNonWhite ();
-				readIdentifier (c, name);
-				makeSimpleTag (name, MakeKinds, K_MACRO);
-				skipLine ();
-			}
-			else {
-				if (strcmp(vStringValue (name), "export") == 0 &&
-					isIdentifier (c))
-				{
-					c = skipToNonWhite ();
-					readIdentifier (c, name);
-				}
-				c = skipToNonWhite ();
-				if (strchr (":?+", c) != NULL)
-				{
-					boolean append = (boolean)(c == '+');
-					if (c == ':')
-						in_rule = TRUE;
-					c = nextChar ();
-					if (c != '=')
-						fileUngetc (c);
-					else if (append)
-					{
-						skipLine ();
-						continue;
-					}
-				}
-				if (c == '=')
-				{
-					makeSimpleTag (name, MakeKinds, K_MACRO);
-					in_rule = FALSE;
+				if (in_define && ! strcmp (vStringValue (name), "endef"))
+					in_define = FALSE;
+				else if (in_define)
 					skipLine ();
+				else if (! strcmp (vStringValue (name), "define"))
+				{
+					in_define = TRUE;
+					c = skipToNonWhite (nextChar ());
+					vStringClear (name);
+					/* all remaining characters on the line are the name -- even spaces */
+					while (c != EOF && c != '\n')
+					{
+						vStringPut (name, c);
+						c = nextChar ();
+					}
+					if (c == '\n')
+						fileUngetc (c);
+					vStringTerminate (name);
+					vStringStripTrailing (name);
+					newMacro (name);
 				}
+				else if (! strcmp (vStringValue (name), "export"))
+					stringListClear (identifiers);
 			}
 		}
 		else
 			variable_possible = FALSE;
 	}
-	vStringDelete (name);
+	stringListDelete (identifiers);
 }
 
 extern parserDefinition* MakefileParser (void)
