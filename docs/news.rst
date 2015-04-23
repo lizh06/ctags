@@ -192,6 +192,18 @@ ctags recognizes the following patterns used in vim:
       ex:se ft=SYNTAX
 
 
+ctags recognizes the following patterns and considers the
+input as a zsh script:
+
+  * at the head of input file::
+
+      #autoload
+
+    or ::
+
+      #compdef ....
+
+
 NOTE: This feature takes a performance hit: it opens the input file
 once to detect the file type and a second time to process the file
 with the detected parser. For this reason, this feature is enabled
@@ -532,7 +544,7 @@ For specifying exclusive-matching the flags ``exclusive`` (long) and
 	--mib-regex=/^([a-zA-Z][^ \t]+)[ \t]+[A-Za-z]/\1/n,name/
 
 
-passing parameter for long regex flag
+Passing parameter for long regex flag
 ---------------------------------------------------------------------
 
 In the implemented API long-flags can take a parameters.
@@ -547,6 +559,27 @@ This is implemented for extending ctags in future.
 
 .. TBW
 
+Wildcard in options
+---------------------------------------------------------------------
+
+For the purpose gathering as mach as possible information from source
+code "wildcard"(``*``) in option is introduced.
+
+``--fields=*``
+
+	Enables all available fields.
+
+``--<LANG>-kinds=*``
+
+	Enables all available kinds for ``LANG``.
+
+``--*-kinds=SPEC``
+
+	Applies SPEC as kinds to all available language parsers.
+
+``--*-kinds=*``
+
+	Enables all available kinds to all available language parsers.
 
 External parser command
 ---------------------------------------------------------------------
@@ -611,7 +644,7 @@ doesn't work with ``-e``.
   ctags cannot generate TAGS, etags format output
   if ``--<LANG>-xcmd=COMMAND`` is specified.
 
-notice message and --quiet option
+Notice message and --quiet option
 ---------------------------------------------------------------------
 There were 3 classes of message in ctags:
 
@@ -639,3 +672,19 @@ Miscellaneous new options
 ``--undef[=yes|no]``
     Allows disabling the generation of macro tags from ``#undef``
     directives.
+
+Build system add possibility to change program name
+---------------------------------------------------------------------
+
+As on some systems (e.g. BSD) there is a 'ctags' program in the base
+system it's somewhat inconvenient to have the same name for exuberant ctags
+During ``configure`` you can now change the output executable name.
+
+Add a prefix 'ex' which will result in 'ctags' transformed into 'exctags'
+
+	$ ./configure --program-prefix=ex
+
+Completely change program name, in this case it's important to remember
+there is also 'etags' along 'ctags'
+
+	$ ./configure --program-transform-name='s/ctags/my_ctags/; s/etags/myemacs_tags/'
