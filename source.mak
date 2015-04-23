@@ -10,16 +10,12 @@ SOURCES = \
 	args.c \
 	ant.c \
 	asm.c \
-	asp.c \
 	awk.c \
 	basic.c \
-	beta.c \
 	c.c \
 	clojure.c \
 	css.c \
-	cobol.c \
 	dosbatch.c \
-	eiffel.c \
 	entry.c \
 	erlang.c \
 	falcon.c \
@@ -33,7 +29,6 @@ SOURCES = \
 	jscript.c \
 	json.c \
 	keyword.c \
-	lisp.c \
 	lregex.c \
 	lua.c \
 	lxcmd.c \
@@ -50,13 +45,11 @@ SOURCES = \
 	php.c \
 	python.c \
 	read.c \
-	rexx.c \
 	routines.c \
 	ruby.c \
 	rust.c \
 	scheme.c \
 	sh.c \
-	slang.c \
 	sml.c \
 	sort.c \
 	sql.c \
