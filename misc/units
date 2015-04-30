@@ -1115,6 +1115,7 @@ fuzz_lang_file ()
 
     case $r in
 	0)
+	    rm -f "${ovalgrind}" "${ocmdline}"
 	    return 0
 	    ;;
 	${_TIMEOUT_EXIT})
@@ -1424,8 +1425,7 @@ noise_lang_file_noisespec ()
 	${_TIMEOUT_EXIT})
 	    printf "T"
 	    noise_report_line "${pos}" "${len}" "${r}" "${how}"
-	    printf '\n%-20s' "[timeout $lang]"
-	    echo "$onoised"
+	    printf '\n%-20s\n' "[timeout $lang]" "$onoised"
 	    [ "${RUN_SHRINK}" = 'yes' ] && fuzz_shrink "${cmdline_for_shirking}" "${onoised}" "${oshrink}" "${lang}"
 	    ;;
 	${_VALGRIND_EXIT})
@@ -1456,7 +1456,6 @@ noise_lang_file ()
     local r
     local i
     local c
-    local offset
     local guessed_lang
 
     guessed_lang=$( ${_CMDLINE_FOR_SHRINKING} --print-language "${input}" 2>/dev/null | sed -n 's/^.*: //p')
