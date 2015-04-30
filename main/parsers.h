@@ -17,6 +17,7 @@
 	AdaParser, \
 	AntParser, \
 	AsmParser, \
+	AspParser, \
 	AwkParser, \
 	BasicParser, \
 	CParser, \
@@ -25,6 +26,8 @@
 	CsharpParser, \
 	DParser, \
 	DosBatchParser, \
+	EiffelParser, \
+	ErlangParser, \
 	FlexParser, \
 	FortranParser, \
 	GoParser, \
@@ -32,6 +35,7 @@
 	JavaParser, \
 	JavaScriptParser, \
 	JsonParser, \
+	LispParser, \
 	LuaParser, \
 	MakefileParser, \
 	MatLabParser, \
@@ -41,10 +45,12 @@
 	PerlParser, \
 	PhpParser, \
 	PythonParser, \
+	RexxParser, \
 	RubyParser, \
 	RustParser, \
 	SchemeParser, \
 	ShParser, \
+	SlangParser, \
 	SmlParser, \
 	SqlParser, \
 	TclParser, \
