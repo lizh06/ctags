@@ -44,7 +44,6 @@ PARSER_SOURCES =				\
 	$(PARSER_DIR)/erlang.c			\
 	$(PARSER_DIR)/flex.c			\
 	$(PARSER_DIR)/fortran.c			\
-	$(PARSER_DIR)/go.c			\
 	$(PARSER_DIR)/html.c			\
 	$(PARSER_DIR)/jscript.c			\
 	$(PARSER_DIR)/json.c			\
