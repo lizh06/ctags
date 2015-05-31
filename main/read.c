@@ -235,8 +235,8 @@ static boolean parseLineDirective (void)
 				tag.isFileEntry     = TRUE;
 				tag.lineNumberEntry = TRUE;
 				tag.lineNumber      = 1;
-				tag.kindName        = "file";
-				tag.kind            = 'F';
+				tag.kindName        = KIND_FILE_DEFAULT_LONG;
+				tag.kind            = getSourceLanguageFileKind();
 
 				makeTagEntry (&tag);
 			}
@@ -386,7 +386,12 @@ readnext:
 
 extern void fileUngetc (int c)
 {
-	File.ungetch = c;
+	const size_t len = sizeof File.ungetchBuf / sizeof File.ungetchBuf[0];
+
+	Assert (File.ungetchIdx < len);
+	/* we cannot rely on the assertion that might be disabled in non-debug mode */
+	if (File.ungetchIdx < len)
+		File.ungetchBuf[File.ungetchIdx++] = c;
 }
 
 static vString *iFileGetLine (void)
@@ -426,10 +431,9 @@ extern int fileGetc (void)
 	 *  other processing on it, though, because we already did that the
 	 *  first time it was read through fileGetc ().
 	 */
-	if (File.ungetch != '\0')
+	if (File.ungetchIdx > 0)
 	{
-		c = File.ungetch;
-		File.ungetch = '\0';
+		c = File.ungetchBuf[--File.ungetchIdx];
 		return c;  /* return here to avoid re-calling debugPutc () */
 	}
 	do

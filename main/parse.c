@@ -17,6 +17,7 @@
 
 #include "debug.h"
 #include "entry.h"
+#include "flags.h"
 #include "main.h"
 #define OPTION_WRITE
 #include "options.h"
@@ -59,7 +60,7 @@ static vString* ext2ptrnNew (const char *const ext)
 	return ptrn;
 }
 
-static boolean enabled_p (const langType language)
+static boolean isLanguageEnabled (const langType language)
 {
 	const parserDefinition* const lang = LanguageTable [language];
 	if (!lang->enabled)
@@ -81,6 +82,7 @@ extern parserDefinition* parserNew (const char* name)
 {
 	parserDefinition* result = xCalloc (1, parserDefinition);
 	result->name = eStrdup (name);
+	result->fileKind = KIND_FILE_DEFAULT;
 	return result;
 }
 
@@ -95,6 +97,19 @@ extern const char *getLanguageName (const langType language)
 		result = LanguageTable [language]->name;
 	}
 	return result;
+}
+
+extern const char getLanguageFileKind (const langType language)
+{
+	char kind;
+
+	Assert (0 <= language  &&  language < (int) LanguageCount);
+
+	kind = LanguageTable [language]->fileKind;
+
+	Assert (kind != KIND_NULL);
+
+	return kind;
 }
 
 extern langType getNamedLanguage (const char *const name)
@@ -513,7 +528,7 @@ static const tgTableEntry* findTgTableEntry(const parserDefinition* const lang, 
 {
 	const tgTableEntry *entry;
 
-	for (entry = lang->tg_entries;
+	for (entry = lang->tgEntries;
 	     entry != NULL;
 	     entry = entry->next)
 		if (strcmp (vStringValue (entry->spec), spec) == 0)
@@ -534,7 +549,7 @@ static langType determineTwoGramLanguage(const unsigned char *const t,
 		const tgTableEntry *const i_entry = findTgTableEntry(LanguageTable[candidates[i].lang],
 								     candidates[i].spec);
 
-		r = tg_compare(winner_entry->tg_table, i_entry->tg_table, t);
+		r = tgCompare(winner_entry->tgTable, i_entry->tgTable, t);
 
 		verbose ("tg tournament %s:%s v.s. %s:%s => %d\n",
 			 LanguageTable[candidates[winner].lang]->name, candidates[winner].spec,
@@ -554,7 +569,7 @@ static langType getTwoGramLanguage (FILE* input,
 	unsigned int i;
 
 	for (result = LANG_AUTO, i = 0; candidates[i].lang != LANG_IGNORE; i++)
-		if (LanguageTable [candidates[i].lang]->tg_entries == NULL
+		if (LanguageTable [candidates[i].lang]->tgEntries == NULL
 		    || findTgTableEntry(LanguageTable [candidates[i].lang], candidates[i].spec) == NULL)
 		{
 			result = LANG_IGNORE;
@@ -566,14 +581,14 @@ static langType getTwoGramLanguage (FILE* input,
 
 		unsigned char* t;
 
-		t = tg_create();
-		tg_load(t, input);
+		t = tgCreate();
+		tgLoad(t, input);
 
 		result = determineTwoGramLanguage(t, candidates, n_candidates);
 
 		verbose("winner of tg tournament: %s\n", LanguageTable[result]->name);
 
-		tg_destroy(t);
+		tgDestroy(t);
 
 	}
 	return result;
@@ -975,10 +990,10 @@ static void addTgEntryFull (const langType language, vString* const spec, unsign
 
 	entry = xMalloc (1, tgTableEntry);
 	entry->spec = spec;
-	entry->tg_table = tg_table;
-	entry->corpus_file = corpus_file;
-	entry->next = LanguageTable [language]->tg_entries;
-	LanguageTable [language]->tg_entries = entry;
+	entry->tgTable = tg_table;
+	entry->corpusFile = corpus_file;
+	entry->next = LanguageTable [language]->tgEntries;
+	LanguageTable [language]->tgEntries = entry;
 
 	if (corpus_file)
 		verbose ("Compile corpus %s for %s of %s\n",
@@ -999,12 +1014,12 @@ extern void addCorpusFile (const langType language,
 		error (FATAL,
 		       "failed in open %s as corpus", vStringValue (corpus_file));
 
-	tg_table = tg_create ();
+	tg_table = tgCreate ();
 	if (!tg_table)
 		error (FATAL,
 		       "failed allocating memory for tg entry");
 
-	tg_load (tg_table, input);
+	tgLoad (tg_table, input);
 	fclose (input);
 
 	vspec = pattern_p? vStringNewInit (spec): ext2ptrnNew (spec);
@@ -1026,12 +1041,12 @@ static tgTableEntry* freeTgEntry(tgTableEntry *entry)
 {
 	tgTableEntry* r;
 
-	if (entry->corpus_file)
+	if (entry->corpusFile)
 	{
-		eFree (entry->tg_table);
-		entry->tg_table = NULL;
-		vStringDelete (entry->corpus_file);
-		entry->corpus_file = NULL;
+		eFree (entry->tgTable);
+		entry->tgTable = NULL;
+		vStringDelete (entry->corpusFile);
+		entry->corpusFile = NULL;
 	}
 
 	vStringDelete (entry->spec);
@@ -1057,12 +1072,28 @@ extern void enableLanguages (const boolean state)
 		enableLanguage (i, state);
 }
 
+static boolean doesParserUseKind (const parserDefinition *const parser, char letter)
+{
+	int k;
+
+	for (k = 0; k < parser->kindCount; k++)
+		if (parser->kinds [k].letter == letter)
+			return TRUE;
+	return FALSE;
+}
+
 static void initializeParsers (void)
 {
 	unsigned int i;
 	for (i = 0  ;  i < LanguageCount  ;  ++i)
+	{
 		if (LanguageTable [i]->initialize != NULL)
 			(LanguageTable [i]->initialize) ((langType) i);
+
+		Assert (LanguageTable [i]->fileKind != KIND_NULL);
+		Assert (!doesParserUseKind (LanguageTable [i],
+					    LanguageTable [i]->fileKind));
+	}
 }
 
 extern void initializeParsing (void)
@@ -1122,8 +1153,8 @@ extern void freeParserResources (void)
 		freeList (&lang->currentExtensions);
 		freeList (&lang->currentAliaes);
 
-		while (lang->tg_entries)
-			lang->tg_entries = freeTgEntry(lang->tg_entries);
+		while (lang->tgEntries)
+			lang->tgEntries = freeTgEntry(lang->tgEntries);
 
 		eFree (lang->name);
 		lang->name = NULL;
@@ -1158,6 +1189,28 @@ static void lazyInitialize (langType language)
 /*
 *   Option parsing
 */
+#define COUNT(D) (sizeof(D)/sizeof(D[0]))
+
+static void lang_def_flag_file_kind_long (const char* const optflag, const char* const param, void* data)
+{
+	parserDefinition*  def = data;
+
+	Assert (def);
+	Assert (param);
+	Assert (optflag);
+
+
+	if (param[0] == '\0')
+		error (WARNING, "No letter specified for \"%s\" flag of --langdef option", optflag);
+	else if (param[1] != '\0')
+		error (WARNING, "Specify just a letter for \"%s\" flag of --langdef option", optflag);
+
+	def->fileKind = param[0];
+}
+
+static flagDefinition LangDefFlagDef [] = {
+	{ '\0',  "fileKind", NULL, lang_def_flag_file_kind_long },
+};
 
 extern void processLanguageDefineOption (
 		const char *const option, const char *const parameter __unused__)
@@ -1169,8 +1222,19 @@ extern void processLanguageDefineOption (
 		error (WARNING, "Language \"%s\" already defined", parameter);
 	else
 	{
-		unsigned int i = LanguageCount++;
-		parserDefinition* const def = parserNew (parameter);
+		char *name;
+		char *flags;
+		unsigned int i;
+		parserDefinition*  def;
+
+		flags = strchr (parameter, LONG_FLAGS_OPEN);
+		if (flags)
+			name = eStrndup (parameter, flags - parameter);
+		else
+			name = eStrdup (parameter);
+
+		i = LanguageCount++;
+		def = parserNew (name);
 		def->initialize        = lazyInitialize;
 		def->currentPatterns   = stringListNew ();
 		def->currentExtensions = stringListNew ();
@@ -1179,6 +1243,10 @@ extern void processLanguageDefineOption (
 		def->id                = i;
 		LanguageTable = xRealloc (LanguageTable, i + 1, parserDefinition*);
 		LanguageTable [i] = def;
+
+		flagsEval (flags, LangDefFlagDef, COUNT (LangDefFlagDef), def);
+
+		eFree (name);
 	}
 #else
 	error (WARNING, "regex support not available; required for --%s option",
@@ -1305,6 +1373,21 @@ extern boolean processKindOption (
 	return handled;
 }
 
+extern void printLanguageFileKind (const langType language)
+{
+	if (language == LANG_AUTO)
+	{
+		unsigned int i;
+		for (i = 0  ;  i < LanguageCount  ;  ++i)
+		{
+			const parserDefinition* const lang = LanguageTable [i];
+			printf ("%s %c\n", lang->name, lang->fileKind);
+		}
+	}
+	else
+		printf ("%c\n", LanguageTable [language]->fileKind);
+}
+
 static void printLanguageKind (const kindOption* const kind, boolean indent)
 {
 	const char *const indentation = indent ? "    " : "";
@@ -1337,7 +1420,7 @@ extern void printLanguageKinds (const langType language)
 		for (i = 0  ;  i < LanguageCount  ;  ++i)
 		{
 			const parserDefinition* const lang = LanguageTable [i];
-			printf ("%s%s\n", lang->name, enabled_p (i) ? "" : " [disabled]");
+			printf ("%s%s\n", lang->name, isLanguageEnabled (i) ? "" : " [disabled]");
 			printKinds (i, TRUE);
 		}
 	}
@@ -1421,11 +1504,11 @@ static void printCorpus (langType language, const char* const spec, boolean inde
 	Assert (0 <= language  &&  language < (int) LanguageCount);
 	lang = LanguageTable [language];
 
-	for (entry = lang->tg_entries;
+	for (entry = lang->tgEntries;
 	     entry != NULL;
 	     entry = entry->next)
 	{
-		const char* corpus_file = entry->corpus_file? vStringValue (entry->corpus_file): "ctags";
+		const char* corpus_file = entry->corpusFile? vStringValue (entry->corpusFile): "ctags";
 
 		if (spec == NULL)
 			printf("%s%s: %s\n", indentation, vStringValue (entry->spec), corpus_file);
@@ -1443,7 +1526,7 @@ extern void printLanguageCorpus (langType language,
 		for (i = 0  ;  i < LanguageCount  ;  ++i)
 		{
 			const parserDefinition* const lang = LanguageTable [i];
-			printf ("%s%s\n", lang->name, enabled_p (i) ? "" : " [disabled]");
+			printf ("%s%s\n", lang->name, isLanguageEnabled (i) ? "" : " [disabled]");
 			printCorpus (i, spec, TRUE);
 		}
 	}
@@ -1520,7 +1603,7 @@ static void printLanguage (const langType language)
 	Assert (0 <= language  &&  language < (int) LanguageCount);
 	lang = LanguageTable [language];
 	if (lang->kinds != NULL  ||  (lang->method & METHOD_REGEX) || (lang->method & METHOD_XCMD))
-		printf ("%s%s\n", lang->name, enabled_p (language) ? "" : " [disabled]");
+		printf ("%s%s\n", lang->name, isLanguageEnabled (language) ? "" : " [disabled]");
 }
 
 extern void printLanguageList (void)
@@ -1544,8 +1627,8 @@ static void makeFileTag (const char *const fileName)
 		tag.isFileEntry     = TRUE;
 		tag.lineNumberEntry = TRUE;
 		tag.lineNumber      = 1;
-		tag.kindName        = "file";
-		tag.kind            = 'F';
+		tag.kindName        = KIND_FILE_DEFAULT_LONG;
+		tag.kind            = getSourceLanguageFileKind();
 
 		makeTagEntry (&tag);
 	}
@@ -1561,7 +1644,7 @@ static rescanReason createTagsForFile (
 	{
 		const parserDefinition* const lang = LanguageTable [language];
 
-		if (LanguageTable [language]->use_cork)
+		if (LanguageTable [language]->useCork)
 			corkTagFile();
 
 		makeFileTag (fileName);
@@ -1593,7 +1676,7 @@ static rescanReason createTagsForFile (
 			goto retry;
 		}
 
-		if (LanguageTable [language]->use_cork)
+		if (LanguageTable [language]->useCork)
 			uncorkTagFile();
 
 		fileClose ();
@@ -1681,7 +1764,7 @@ extern boolean parseFile (const char *const fileName)
 
 	if (language == LANG_IGNORE)
 		verbose ("ignoring %s (unknown language)\n", fileName);
-	else if (! enabled_p (language))
+	else if (! isLanguageEnabled (language))
 		verbose ("ignoring %s (language disabled)\n", fileName);
 	else
 	{

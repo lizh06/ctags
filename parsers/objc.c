@@ -483,6 +483,10 @@ static void popEnclosingContext (void)
 static void addTag (vString * const ident, int kind)
 {
 	tagEntryInfo toCreate;
+
+	if (! ObjcKinds[kind].enabled)
+		return;
+
 	prepareTag (&toCreate, ident, kind);
 	makeTagEntry (&toCreate);
 }
@@ -1247,6 +1251,7 @@ extern parserDefinition *ObjcParser (void)
 	parserDefinition *def = parserNew ("ObjectiveC");
 	def->kinds = ObjcKinds;
 	def->kindCount = KIND_COUNT (ObjcKinds);
+	def->fileKind  = KIND_FILE_ALT;
 	def->extensions = extensions;
 	def->aliases = aliases;
 	def->parser = findObjcTags;
