@@ -86,6 +86,7 @@ typedef enum eKeywordId {
 	KEYWORD_end,
 	KEYWORD_entry,
 	KEYWORD_equivalence,
+	KEYWORD_extends,
 	KEYWORD_external,
 	KEYWORD_format,
 	KEYWORD_function,
@@ -110,6 +111,7 @@ typedef enum eKeywordId {
 	KEYWORD_pointer,
 	KEYWORD_precision,
 	KEYWORD_private,
+	KEYWORD_procedure,
 	KEYWORD_program,
 	KEYWORD_public,
 	KEYWORD_pure,
@@ -198,7 +200,6 @@ static int Ungetc;
 static unsigned int Column;
 static boolean FreeSourceForm;
 static boolean ParsingString;
-static tokenInfo *Parent;
 
 /* indexed by tagType */
 static kindOption FortranKinds [] = {
@@ -249,6 +250,7 @@ static const keywordDesc FortranKeywordTable [] = {
 	{ "end",            KEYWORD_end          },
 	{ "entry",          KEYWORD_entry        },
 	{ "equivalence",    KEYWORD_equivalence  },
+	{ "extends",        KEYWORD_extends      },
 	{ "external",       KEYWORD_external     },
 	{ "format",         KEYWORD_format       },
 	{ "function",       KEYWORD_function     },
@@ -273,6 +275,7 @@ static const keywordDesc FortranKeywordTable [] = {
 	{ "pointer",        KEYWORD_pointer      },
 	{ "precision",      KEYWORD_precision    },
 	{ "private",        KEYWORD_private      },
+	{ "procedure",      KEYWORD_procedure    },
 	{ "program",        KEYWORD_program      },
 	{ "public",         KEYWORD_public       },
 	{ "pure",           KEYWORD_pure         },
@@ -1109,6 +1112,7 @@ static boolean isTypeSpec (tokenInfo *const token)
 		case KEYWORD_logical:
 		case KEYWORD_record:
 		case KEYWORD_type:
+		case KEYWORD_procedure:
 			result = TRUE;
 			break;
 		default:
@@ -1171,6 +1175,7 @@ static void parseTypeSpec (tokenInfo *const token)
 		case KEYWORD_integer:
 		case KEYWORD_logical:
 		case KEYWORD_real:
+		case KEYWORD_procedure:
 			readToken (token);
 			if (isType (token, TOKEN_PAREN_OPEN))
 				skipOverParens (token);  /* skip kind-selector */
@@ -1237,6 +1242,7 @@ static boolean skipStatementIfKeyword (tokenInfo *const token, keywordId keyword
  *      or access-spec (is PUBLIC or PRIVATE)
  *      or ALLOCATABLE
  *      or DIMENSION ( array-spec )
+ *      or EXTENDS ( extends-spec )
  *      or EXTERNAL
  *      or INTENT ( intent-spec )
  *      or INTRINSIC
@@ -1271,6 +1277,7 @@ static void parseQualifierSpecList (tokenInfo *const token)
 
 			case KEYWORD_dimension:
 			case KEYWORD_intent:
+			case KEYWORD_extends:
 				readToken (token);
 				skipOverParens (token);
 				break;
@@ -1323,7 +1330,8 @@ static void parseEntityDecl (tokenInfo *const token)
 			readToken (token);
 			skipPast (token, TOKEN_OPERATOR);
 		}
-		else if (strcmp (vStringValue (token->string), "=") == 0)
+		else if (strcmp (vStringValue (token->string), "=") == 0 ||
+				 strcmp (vStringValue (token->string), "=>") == 0)
 		{
 			while (! isType (token, TOKEN_COMMA) &&
 					! isType (token, TOKEN_STATEMENT_END))
@@ -2154,7 +2162,6 @@ static rescanReason findFortranTags (const unsigned int passCount,
 
 	trash_box = tbox;
 
-	Parent = newToken ();
 	token = newToken ();
 
 	FreeSourceForm = (boolean) (passCount > 1);
@@ -2175,7 +2182,6 @@ static rescanReason findFortranTags (const unsigned int passCount,
 	}
 	ancestorClear ();
 	F (token);
-	F (Parent);
 
 	return rescan;
 }

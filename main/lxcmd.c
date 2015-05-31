@@ -236,11 +236,12 @@ static boolean loadPathKind (xcmdPath *const path, char* line, char *args[])
 
 static boolean loadPathKinds  (xcmdPath *const path, const langType language)
 {
-	enum pcoproc_error r;
+	enum pcoprocError r;
 	FILE* pp = NULL;
 	char * argv[3];
 	int status;
 	vString * opt;
+	char file_kind = getLanguageFileKind (language);
 
 	opt = vStringNewInit(XCMD_LIST_KIND_OPTION);
 	vStringCatS (opt, "=");
@@ -253,7 +254,7 @@ static boolean loadPathKinds  (xcmdPath *const path, const langType language)
 	errno = 0;
 
 	verbose ("loading path kinds of %s from [%s %s]\n", getLanguageName(language), argv[0], argv[1]);
-	r = pcoproc_open (vStringValue (path->path), argv, &pp, NULL);
+	r = pcoprocOpen (vStringValue (path->path), argv, &pp, NULL);
 	switch (r) {
 	case PCOPROC_ERROR_WPIPE:
 		error (WARNING | PERROR, "failed to make pipe to write to command: [%s %s]",
@@ -278,17 +279,26 @@ static boolean loadPathKinds  (xcmdPath *const path, const langType language)
 		while (readLineWithNoSeek (vline, pp))
 		{
 			char* line;
+			char  kind_letter;
 
 			vStringStripNewline (vline);
 			line = vStringValue (vline);
 			if (!loadPathKind (path, line, argv))
 				break;
+
+			kind_letter = path->kinds [path->kount - 1].letter;
+			if (kind_letter == file_kind)
+				error (FATAL,
+				       "Kind letter \'%c\' returned from xcmd %s of %s language is reserved in ctags main",
+				       kind_letter,
+				       vStringValue (path->path),
+				       getLanguageName (language));
 		}
 
 		vStringDelete (vline);
 
 
-		status = pcoproc_close (pp);
+		status = pcoprocClose (pp);
 
 		/* TODO: Decode status */
 		verbose("	status: %d\n", status);
@@ -868,7 +878,7 @@ static boolean makeTagEntryFromTagEntry (tagEntry* entry)
 
 static boolean invokeXcmdPath (const char* const fileName, xcmdPath* path, const langType language)
 {
-	enum pcoproc_error r;
+	enum pcoprocError r;
 	boolean result = FALSE;
 	char* argv[4];
 	FILE* pp = NULL;
@@ -881,7 +891,7 @@ static boolean invokeXcmdPath (const char* const fileName, xcmdPath* path, const
 	argv[0] = vStringValue (path->path);
 
 	verbose ("getting tags of %s language from [%s %s]\n", getLanguageName(language), argv[0], argv[1]);
-	r = pcoproc_open (vStringValue (path->path), argv, &pp, NULL);
+	r = pcoprocOpen (vStringValue (path->path), argv, &pp, NULL);
 	switch (r) {
 	case PCOPROC_ERROR_WPIPE:
 		error (WARNING | PERROR, "failed to make pipe to write to command: [%s %s]",
@@ -925,7 +935,7 @@ static boolean invokeXcmdPath (const char* const fileName, xcmdPath* path, const
 
 		vStringDelete (vline);
 
-		status = pcoproc_close (pp);
+		status = pcoprocClose (pp);
 		verbose("	status: %d\n", status);
 		if (status)
 		{

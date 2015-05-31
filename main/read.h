@@ -38,6 +38,7 @@
 #define getSourceFileTagPath()   File.source.tagPath
 #define getSourceLanguage()      File.source.language
 #define getSourceLanguageName()  getLanguageName (File.source.language)
+#define getSourceLanguageFileKind()  getLanguageFileKind (File.source.language)
 #define getSourceLineNumber()    File.source.lineNumber
 #define isLanguage(lang)         (boolean)((lang) == File.source.language)
 #define isHeaderFile()           File.source.isHeader
@@ -75,7 +76,8 @@ typedef struct sInputFile {
 	FILE       *fp;            /* stream used for reading the file */
 	unsigned long lineNumber;  /* line number in the input file */
 	fpos_t      filePosition;  /* file position of current line */
-	int         ungetch;       /* a single character that was ungotten */
+	unsigned int ungetchIdx;
+	int         ungetchBuf[3]; /* characters that were ungotten */
 	boolean     eof;           /* have we reached the end of file? */
 	boolean     newLine;       /* will the next character begin a new line? */
 

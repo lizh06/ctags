@@ -435,7 +435,7 @@ static void deInitLexer (lexerState *lexer)
 
 static void addTag (vString* ident, const char* type, const char* arg_list, int kind, unsigned long line, fpos_t pos, vString *scope, int parent_kind)
 {
-	if (kind == K_NONE)
+	if (kind == K_NONE || ! rustKinds[kind].enabled)
 		return;
 	tagEntryInfo tag;
 	initTagEntry(&tag, ident->buffer);
@@ -977,6 +977,7 @@ extern parserDefinition *RustParser (void)
 	parserDefinition *def = parserNew ("Rust");
 	def->kinds = rustKinds;
 	def->kindCount = KIND_COUNT (rustKinds);
+	def->fileKind = KIND_FILE_ALT;
 	def->extensions = extensions;
 	def->parser = findRustTags;
 

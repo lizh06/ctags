@@ -301,6 +301,8 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Output list of language corpora."},
  {1,"  --list-features"},
  {1,"       Output list of features."},
+ {1,"  --list-file-kind"},
+ {1,"       List kind letter for file."},
  {1,"  --list-kinds=[language|all]"},
  {1,"       Output a list of all tag kinds for specified language or all."},
  {1,"  --list-languages"},
@@ -641,14 +643,14 @@ static void parseLongOption (cookedArgs *const args, const char *item)
 	if (equal == NULL)
 	{
 		args->item = eStrdup (item);
-		trashBoxPut (args->trash_box, args->item, (TrashBoxDestroyItemProc)eFree);
+		trashBoxPut (args->trashBox, args->item, (TrashBoxDestroyItemProc)eFree);
 		args->parameter = "";
 	}
 	else
 	{
 		const size_t length = equal - item;
 		args->item = eStrndup (item, length);
-		trashBoxPut (args->trash_box, args->item, (TrashBoxDestroyItemProc)eFree);
+		trashBoxPut (args->trashBox, args->item, (TrashBoxDestroyItemProc)eFree);
 		args->parameter = equal + 1;
 	}
 	Assert (args->item != NULL);
@@ -695,7 +697,7 @@ extern cookedArgs* cArgNewFromString (const char* string)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromString (string);
-	result->trash_box = trashBoxNew ();
+	result->trashBox = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -705,7 +707,7 @@ extern cookedArgs* cArgNewFromArgv (char* const* const argv)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromArgv (argv);
-	result->trash_box = trashBoxNew ();
+	result->trashBox = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -715,7 +717,7 @@ extern cookedArgs* cArgNewFromFile (FILE* const fp)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromFile (fp);
-	result->trash_box = trashBoxNew ();
+	result->trashBox = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -725,7 +727,7 @@ extern cookedArgs* cArgNewFromLineFile (FILE* const fp)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromLineFile (fp);
-	result->trash_box = trashBoxNew ();
+	result->trashBox = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -734,7 +736,7 @@ extern void cArgDelete (cookedArgs* const current)
 {
 	Assert (current != NULL);
 	argDelete (current->args);
-	trashBoxDelete (current->trash_box);
+	trashBoxDelete (current->trashBox);
 	memset (current, 0, sizeof (cookedArgs));
 	eFree (current);
 }
@@ -1492,6 +1494,22 @@ static void processListAliasesOption (
 	exit (0);
 }
 
+static void processListFileKindOption (
+		const char *const option, const char *const parameter)
+{
+	if (parameter [0] == '\0' || strcasecmp (parameter, "all") == 0)
+		printLanguageFileKind (LANG_AUTO);
+	else
+	{
+		langType language = getNamedLanguage (parameter);
+		if (language == LANG_IGNORE)
+			error (FATAL, "Unknown language \"%s\" in \"%s\" option", parameter, option);
+		else
+			printLanguageFileKind (language);
+	}
+	exit (0);
+}
+
 static void processListKindsOption (
 		const char *const option, const char *const parameter)
 {
@@ -2009,6 +2027,7 @@ static parametricOption ParametricOptions [] = {
 	{ "list-aliases",           processListAliasesOption,       TRUE    },
 	{ "list-corpora",           processListCorporaOption,       TRUE    },
 	{ "list-features",          processListFeaturesOption,      TRUE    },
+	{ "list-file-kind",         processListFileKindOption,      TRUE    },
 	{ "list-kinds",             processListKindsOption,         TRUE    },
 	{ "list-languages",         processListLanguagesOption,     TRUE    },
 	{ "list-maps",              processListMapsOption,          TRUE    },
