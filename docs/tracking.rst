@@ -9,7 +9,7 @@ I consider tracking activities as the first class fruits
 of this project.
 
 
-universal-ctags
+exuberant-ctags
 ----------------------------------------------------------------------
 
 subversion
@@ -115,6 +115,16 @@ bugs
 
    		$ make units UNITS=c-heapoverflow-sh-bug-363 VG=1
 
+   <361> Invalid C input file causes invalid read / heap overflow
+
+	* it is not reproduced.
+
+   <360> Fails to parse annotation's fields with default value
+
+	* fixed in::
+
+		682a7f3b180c27c1196f8a1ae662d6e8ad142939
+
    <358>  Vim parser: Segmentation fault when reading empty vim file
 
 	 * directly contributed by the original author of bug report and patch::
@@ -125,9 +135,15 @@ bugs
 
 	   	5d774f6022a1af71fa5866994699aafce0253085
 
+   <356> [python] mistakes module level attribute for class level attribute in module level if
+
+	 * fixed in::
+
+	        ab91e6e1ae84b80870a1e8712fc7f3133e4b5542
+
    <355> Error when parsing empty file (OCaml)
 
-	 * fixed::
+	 * fixed in::
 
 	   	02ec2066b5be6b129eba49685bd0b17fef4acfa
 
