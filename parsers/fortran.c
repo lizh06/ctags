@@ -77,6 +77,7 @@ typedef enum eKeywordId {
 	KEYWORD_complex,
 	KEYWORD_contains,
 	KEYWORD_data,
+	KEYWORD_deferred,
 	KEYWORD_dimension,
 	KEYWORD_dllexport,
 	KEYWORD_dllimport,
@@ -102,10 +103,13 @@ typedef enum eKeywordId {
 	KEYWORD_map,
 	KEYWORD_module,
 	KEYWORD_namelist,
+	KEYWORD_non_overridable,
+	KEYWORD_nopass,
 	KEYWORD_operator,
 	KEYWORD_optional,
 	KEYWORD_parameter,
 	KEYWORD_pascal,
+	KEYWORD_pass,
 	KEYWORD_pexternal,
 	KEYWORD_pglobal,
 	KEYWORD_pointer,
@@ -174,6 +178,7 @@ typedef enum eTagType {
 	TAG_MODULE,
 	TAG_NAMELIST,
 	TAG_PROGRAM,
+	TAG_PROTOTYPE,
 	TAG_SUBROUTINE,
 	TAG_DERIVED_TYPE,
 	TAG_VARIABLE,
@@ -208,13 +213,14 @@ static kindOption FortranKinds [] = {
 	{ TRUE,  'c', "common",     "common blocks"},
 	{ TRUE,  'e', "entry",      "entry points"},
 	{ TRUE,  'f', "function",   "functions"},
-	{ FALSE, 'i', "interface",  "interface contents, generic names, and operators"},
+	{ TRUE,  'i', "interface",  "interface contents, generic names, and operators"},
 	{ TRUE,  'k', "component",  "type and structure components"},
 	{ TRUE,  'l', "label",      "labels"},
 	{ FALSE, 'L', "local",      "local, common block, and namelist variables"},
 	{ TRUE,  'm', "module",     "modules"},
 	{ TRUE,  'n', "namelist",   "namelists"},
 	{ TRUE,  'p', "program",    "programs"},
+	{ FALSE, 'P', "prototype",  "subprogram prototypes"},
 	{ TRUE,  's', "subroutine", "subroutines"},
 	{ TRUE,  't', "type",       "derived types and structures"},
 	{ TRUE,  'v', "variable",   "program (global) and module variables"}
@@ -242,6 +248,7 @@ static const keywordDesc FortranKeywordTable [] = {
 	{ "complex",        KEYWORD_complex      },
 	{ "contains",       KEYWORD_contains     },
 	{ "data",           KEYWORD_data         },
+	{ "deferred",       KEYWORD_deferred     },
 	{ "dimension",      KEYWORD_dimension    },
 	{ "dll_export",     KEYWORD_dllexport    },
 	{ "dll_import",     KEYWORD_dllimport    },
@@ -267,10 +274,13 @@ static const keywordDesc FortranKeywordTable [] = {
 	{ "map",            KEYWORD_map          },
 	{ "module",         KEYWORD_module       },
 	{ "namelist",       KEYWORD_namelist     },
+	{ "non_overridable", KEYWORD_non_overridable },
+	{ "nopass",         KEYWORD_nopass       },
 	{ "operator",       KEYWORD_operator     },
 	{ "optional",       KEYWORD_optional     },
 	{ "parameter",      KEYWORD_parameter    },
 	{ "pascal",         KEYWORD_pascal       },
+	{ "pass",           KEYWORD_pass         },
 	{ "pexternal",      KEYWORD_pexternal    },
 	{ "pglobal",        KEYWORD_pglobal      },
 	{ "pointer",        KEYWORD_pointer      },
@@ -314,8 +324,7 @@ static struct {
 static void parseStructureStmt (tokenInfo *const token);
 static void parseUnionStmt (tokenInfo *const token);
 static void parseDerivedTypeDef (tokenInfo *const token);
-static void parseFunctionSubprogram (tokenInfo *const token);
-static void parseSubroutineSubprogram (tokenInfo *const token);
+static void parseSubprogram (tokenInfo *const token);
 
 /*
 *   FUNCTION DEFINITIONS
@@ -502,8 +511,7 @@ static void makeFortranTag (tokenInfo *const token, tagType tag)
 		    vStringLength (token->parentType) > 0 &&
 		    token->tag == TAG_DERIVED_TYPE)
 			e.extensionFields.inheritance = vStringValue (token->parentType);
-		if (! insideInterface () || includeTag (TAG_INTERFACE))
-			makeTagEntry (&e);
+		makeTagEntry (&e);
 	}
 }
 
@@ -1286,6 +1294,10 @@ static void parseExtendsQualifier (tokenInfo *const token,
  *      or POINTER
  *      or SAVE
  *      or TARGET
+ *      or PASS
+ *      or NOPASS
+ *      or DEFERRED
+ *      or NON_OVERRIDABLE
  * 
  *  component-attr-spec
  *      is POINTER
@@ -1310,6 +1322,9 @@ static tokenInfo *parseQualifierSpecList (tokenInfo *const token)
 			case KEYWORD_public:
 			case KEYWORD_save:
 			case KEYWORD_target:
+			case KEYWORD_nopass:
+			case KEYWORD_deferred:
+			case KEYWORD_non_overridable:
 				readToken (token);
 				break;
 
@@ -1322,6 +1337,12 @@ static tokenInfo *parseQualifierSpecList (tokenInfo *const token)
 			case KEYWORD_extends:
 				readToken (token);
 				parseExtendsQualifier (token, qualifierToken);
+				break;
+
+			case KEYWORD_pass:
+				readToken (token);
+				if (isType (token, TOKEN_PAREN_OPEN))
+					skipOverParens (token);
 				break;
 
 			default: skipToToken (token, TOKEN_STATEMENT_END); break;
@@ -1345,6 +1366,7 @@ static tagType variableTagType (void)
 			case TAG_DERIVED_TYPE: result = TAG_COMPONENT; break;
 			case TAG_FUNCTION:     result = TAG_LOCAL;     break;
 			case TAG_SUBROUTINE:   result = TAG_LOCAL;     break;
+			case TAG_PROTOTYPE:    result = TAG_LOCAL;     break;
 			default:               result = TAG_VARIABLE;  break;
 		}
 	}
@@ -1779,8 +1801,8 @@ static void parseInterfaceBlock (tokenInfo *const token)
 	{
 		switch (token->keyword)
 		{
-			case KEYWORD_function:   parseFunctionSubprogram (token);   break;
-			case KEYWORD_subroutine: parseSubroutineSubprogram (token); break;
+			case KEYWORD_function:
+			case KEYWORD_subroutine: parseSubprogram (token); break;
 
 			default:
 				if (isSubprogramPrefix (token))
@@ -1995,9 +2017,9 @@ static void parseInternalSubprogramPart (tokenInfo *const token)
 	{
 		switch (token->keyword)
 		{
-			case KEYWORD_function:   parseFunctionSubprogram (token);   break;
-			case KEYWORD_subroutine: parseSubroutineSubprogram (token); break;
-			case KEYWORD_end:        done = TRUE;                       break;
+			case KEYWORD_function:
+			case KEYWORD_subroutine: parseSubprogram (token); break;
+			case KEYWORD_end:        done = TRUE;             break;
 
 			default:
 				if (isSubprogramPrefix (token))
@@ -2102,7 +2124,7 @@ static boolean parseExecutionPart (tokenInfo *const token)
 	return result;
 }
 
-static void parseSubprogram (tokenInfo *const token, const tagType tag)
+static void parseSubprogramFull (tokenInfo *const token, const tagType tag)
 {
 	Assert (isKeyword (token, KEYWORD_program) ||
 			isKeyword (token, KEYWORD_function) ||
@@ -2125,6 +2147,21 @@ static void parseSubprogram (tokenInfo *const token, const tagType tag)
 	ancestorPop ();
 }
 
+static tagType subprogramTagType (tokenInfo *const token)
+{
+	tagType result = TAG_UNDEFINED;
+
+	if (insideInterface ())
+		result = TAG_PROTOTYPE;
+	else if (isKeyword (token, KEYWORD_subroutine))
+		result = TAG_SUBROUTINE;
+	else if (isKeyword (token, KEYWORD_function))
+		result = TAG_FUNCTION;
+
+	Assert (result != TAG_UNDEFINED);
+
+	return result;
+}
 
 /*  function-subprogram is
  *      function-stmt (is [prefix] FUNCTION function-name etc.)
@@ -2137,11 +2174,6 @@ static void parseSubprogram (tokenInfo *const token, const tagType tag)
  *      is type-spec [RECURSIVE]
  *      or [RECURSIVE] type-spec
  */
-static void parseFunctionSubprogram (tokenInfo *const token)
-{
-	parseSubprogram (token, TAG_FUNCTION);
-}
-
 /*  subroutine-subprogram is
  *      subroutine-stmt (is [RECURSIVE] SUBROUTINE subroutine-name etc.)
  *          [specification-part]
@@ -2149,9 +2181,9 @@ static void parseFunctionSubprogram (tokenInfo *const token)
  *          [internal-subprogram-part]
  *          end-subroutine-stmt (is END [SUBROUTINE [function-name]])
  */
-static void parseSubroutineSubprogram (tokenInfo *const token)
+static void parseSubprogram (tokenInfo *const token)
 {
-	parseSubprogram (token, TAG_SUBROUTINE);
+	parseSubprogramFull (token, subprogramTagType (token));
 }
 
 /*  main-program is
@@ -2163,7 +2195,7 @@ static void parseSubroutineSubprogram (tokenInfo *const token)
  */
 static void parseMainProgram (tokenInfo *const token)
 {
-	parseSubprogram (token, TAG_PROGRAM);
+	parseSubprogramFull (token, TAG_PROGRAM);
 }
 
 /*  program-unit
@@ -2183,10 +2215,10 @@ static void parseProgramUnit (tokenInfo *const token)
 		{
 			case KEYWORD_block:      parseBlockData (token);            break;
 			case KEYWORD_end:        skipToNextStatement (token);       break;
-			case KEYWORD_function:   parseFunctionSubprogram (token);   break;
+			case KEYWORD_function:
+			case KEYWORD_subroutine: parseSubprogram (token);           break;
 			case KEYWORD_module:     parseModule (token);               break;
 			case KEYWORD_program:    parseMainProgram (token);          break;
-			case KEYWORD_subroutine: parseSubroutineSubprogram (token); break;
 
 			default:
 				if (isSubprogramPrefix (token))
