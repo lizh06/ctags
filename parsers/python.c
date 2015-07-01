@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "entry.h"
+#include "nestlevel.h"
 #include "options.h"
 #include "read.h"
 #include "main.h"
@@ -25,22 +26,6 @@
 /*
 *   DATA DECLARATIONS
 */
-typedef struct NestingLevel NestingLevel;
-typedef struct NestingLevels NestingLevels;
-
-struct NestingLevel
-{
-	int indentation;
-	vString *name;
-	int type;
-};
-
-struct NestingLevels
-{
-	NestingLevel *levels;
-	int n;					/* number of levels in use */
-	int allocated;
-};
 
 typedef enum {
 	K_CLASS, K_FUNCTION, K_MEMBER, K_VARIABLE, K_IMPORT
@@ -71,61 +56,6 @@ static char const * const doubletriple = "\"\"\"";
 /*
 *   FUNCTION DEFINITIONS
 */
-
-static NestingLevels *nestingLevelsNew (void)
-{
-	NestingLevels *nls = xCalloc (1, NestingLevels);
-	return nls;
-}
-
-static void nestingLevelsFree (NestingLevels *nls)
-{
-	int i;
-	for (i = 0; i < nls->allocated; i++)
-		vStringDelete(nls->levels[i].name);
-	if (nls->levels) eFree(nls->levels);
-	eFree(nls);
-}
-
-static void nestingLevelsPush (NestingLevels *nls,
-	const vString *name, int type)
-{
-	NestingLevel *nl = NULL;
-
-	if (nls->n >= nls->allocated)
-	{
-		nls->allocated++;
-		nls->levels = xRealloc(nls->levels,
-			nls->allocated, NestingLevel);
-		nls->levels[nls->n].name = vStringNew();
-	}
-	nl = &nls->levels[nls->n];
-	nls->n++;
-
-	vStringCopy(nl->name, name);
-	nl->type = type;
-}
-
-#if 0
-static NestingLevel *nestingLevelsGetCurrent (NestingLevels *nls)
-{
-	Assert (nls != NULL);
-
-	if (nls->n < 1)
-		return NULL;
-
-	return &nls->levels[nls->n - 1];
-}
-
-static void nestingLevelsPop (NestingLevels *nls)
-{
-	const NestingLevel *nl = nestingLevelsGetCurrent(nls);
-
-	Assert (nl != NULL);
-	vStringClear(nl->name);
-	nls->n--;
-}
-#endif
 
 static boolean isIdentifierFirstCharacter (int c)
 {
@@ -295,25 +225,35 @@ static const char *skipEverything (const char *cp)
 	int match;
 	for (; *cp; cp++)
 	{
+		if (*cp == '#')
+			return strchr(cp, '\0');
+
 		match = 0;
-		if (*cp == '"' || *cp == '\'' || *cp == '#')
+		if (*cp == '"' || *cp == '\'')
 			match = 1;
 
 		/* these checks find unicode, binary (Python 3) and raw strings */
-		if (!match && (
-			!strncasecmp(cp, "u'", 2) || !strncasecmp(cp, "u\"", 2) ||
-			!strncasecmp(cp, "r'", 2) || !strncasecmp(cp, "r\"", 2) ||
-			!strncasecmp(cp, "b'", 2) || !strncasecmp(cp, "b\"", 2)))
+		if (!match)
 		{
-			match = 1;
-			cp += 1;
-		}
-		if (!match && (
-			!strncasecmp(cp, "ur'", 3) || !strncasecmp(cp, "ur\"", 3) ||
-			!strncasecmp(cp, "br'", 3) || !strncasecmp(cp, "br\"", 3)))
-		{
-			match = 1;
-			cp += 2;
+			boolean r_first = (*cp == 'r' || *cp == 'R');
+
+			/* "r" | "R" | "u" | "U" | "b" | "B" */
+			if (r_first || *cp == 'u' || *cp == 'U' ||  *cp == 'b' || *cp == 'B')
+			{
+				unsigned int i = 1;
+
+				/*  r_first -> "rb" | "rB" | "Rb" | "RB"
+				   !r_first -> "ur" | "UR" | "Ur" | "uR" | "br" | "Br" | "bR" | "BR" */
+				if (( r_first && (cp[i] == 'b' || cp[i] == 'B')) ||
+					(!r_first && (cp[i] == 'r' || cp[i] == 'R')))
+					i++;
+
+				if (cp[i] == '\'' || cp[i] == '"')
+				{
+					match = 1;
+					cp += i;
+				}
+			}
 		}
 		if (match)
 		{
