@@ -15,6 +15,7 @@ MAIN_HEADERS =				\
 	$(MAIN_DIR)/htable.h		\
 	$(MAIN_DIR)/keyword.h		\
 	$(MAIN_DIR)/main.h		\
+	$(MAIN_DIR)/mbcs.h		\
 	$(MAIN_DIR)/nestlevel.h		\
 	$(MAIN_DIR)/options.h		\
 	$(MAIN_DIR)/parse.h		\
@@ -85,6 +86,7 @@ MAIN_SOURCES =					\
 	$(MAIN_DIR)/lregex.c			\
 	$(MAIN_DIR)/lxcmd.c			\
 	$(MAIN_DIR)/main.c			\
+	$(MAIN_DIR)/mbcs.c			\
 	$(MAIN_DIR)/nestlevel.c			\
 	$(MAIN_DIR)/options.c			\
 	$(MAIN_DIR)/parse.c			\

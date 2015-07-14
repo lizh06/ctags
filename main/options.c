@@ -69,6 +69,12 @@
 #define SUBDIR_PRELOAD "preload"
 #define SUBDIR_DRIVERS "drivers"
 
+#define ENTER(STAGE) do {							\
+		Assert (Stage <= OptionLoadingStage##STAGE); \
+		Stage = OptionLoadingStage##STAGE;	\
+	} while (0)
+#define ACCEPT(STAGE) (1UL << OptionLoadingStage##STAGE)
+
 /*
 *   Data declarations
 */
@@ -89,19 +95,21 @@ typedef const struct {
 	const char* name;   /* name of option as specified by user */
 	parametricOptionHandler handler;  /* routine to handle option */
 	boolean initOnly;   /* option must be specified before any files */
+	unsigned long acceptableStages;
 } parametricOption;
 
 typedef const struct {
 	const char* name;   /* name of option as specified by user */
 	boolean* pValue;    /* pointer to option value */
 	boolean initOnly;   /* option must be specified before any files */
+	unsigned long acceptableStages;
 } booleanOption;
 
 /*
 *   DATA DEFINITIONS
 */
 
-static boolean NonOptionEncountered;
+static boolean NonOptionEncountered = FALSE;
 static stringList *OptionFiles;
 
 typedef stringList searchPathList;
@@ -157,6 +165,10 @@ optionValues Option = {
 	NULL,		/* --config-filename */
 	NULL,       /* --etags-include */
 	DEFAULT_FILE_FORMAT,/* --format */
+#ifdef HAVE_ICONV
+	NULL,		/* --input-encoding */
+	NULL,		/* --output-encoding */
+#endif
 	FALSE,      /* --if0 */
 	TRUE,       /* --undef */
 	FALSE,      /* --kind-long */
@@ -170,10 +182,14 @@ optionValues Option = {
 	FALSE,	    /* --print-language */
 	FALSE,	    /* --guess-language-eagerly(-G) */
 	FALSE,	    /* --quiet */
+	FALSE,	    /* --_allow-xcmd-in-homedir */
 #ifdef DEBUG
 	0, 0        /* -D, -b */
 #endif
 };
+
+static OptionLoadingStage Stage = OptionLoadingStageNone;
+#define STAGE_ANY ~0UL
 
 /*
 -   Locally used only
@@ -230,6 +246,12 @@ static optionDescription LongOptionDescription [] = {
  {1,"      Include reference to 'file' in Emacs-style tag file (requires -e)."},
  {1,"  --exclude=pattern"},
  {1,"      Exclude files and directories matching 'pattern'."},
+#ifdef HAVE_ICONV
+ {1,"  --input-encoding=encoding"},
+ {1,"      Specify encoding of all of source files."},
+ {1,"  --input-encoding-<LANG>=encoding"},
+ {1,"      Specify encoding of the LANG source files."},
+#endif
  {0,"  --excmd=number|pattern|mix"},
 #ifdef MACROS_USE_PATTERNS
  {0,"       Uses the specified type of EX command to locate tags [pattern]."},
@@ -302,6 +324,11 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Output list of language mappings."},
  {1,"  --map-<LANG>=[+]map"},
  {1,"       Alternative version of --langmap option."},
+#ifdef HAVE_ICONV
+ {1,"  --output-encoding=encoding"},
+ {1,"      The encoding to write the tag file in. Defaults to UTF-8 if --input-encoding"},
+ {1,"      is specified, otherwise no conversion is performed."},
+#endif
  {1,"  --options=file"},
  {1,"       Specify file from which command line options should be read."},
  {0,"  --print-language"},
@@ -334,6 +361,10 @@ static optionDescription LongOptionDescription [] = {
  {1,"  --xcmd-<LANG>=parser_command_path|parser_command_name"},
  {1,"       Define external parser command path or name for specific language."},
 #endif
+ {1,"  --_allow-xcmd-in-homedir"},
+ {1,"       Allow specifying --xcmd-<LANG> option in ~/.ctags and/or ~/.ctags/*."},
+ {1,"       By default it is not allow. This option itself can be specfied only "},
+ {1,"       in /etc or /usr/local/etc."},
  {1,"  --_echo=msg"},
  {1,"       Echo MSG to standard error. Useful to debug the chain"},
  {1,"       of loading option files."},
@@ -381,6 +412,9 @@ static const char *const Features [] = {
 #if defined (WIN32) && defined (UNIX_PATH_SEPARATOR)
 	"unix-path-separator",
 #endif
+#ifdef HAVE_ICONV
+	"multibyte",
+#endif
 #ifdef DEBUG
 	"debug",
 #endif
@@ -391,6 +425,19 @@ static const char *const Features [] = {
 	"coproc",
 #endif
 	NULL
+};
+
+static const char *const StageDescription [] = {
+	[OptionLoadingStageNone]   = "not initialized",
+	[OptionLoadingStageCustom] = "custom file",
+	[OptionLoadingStageDosCnf] = "DOS .cnf file",
+	[OptionLoadingStageEtc] = "file under /etc (e.g. ctags.conf)",
+	[OptionLoadingStageLocalEtc] = "file under /usr/local/etc (e.g. ctags.conf)",
+	[OptionLoadingStageHomeRecursive] = "file(s) under HOME",
+	[OptionLoadingStageCurrentRecursive] = "file(s) under the current directory",
+	[OptionLoadingStagePreload] = "optlib preload files",
+	[OptionLoadingStageEnvVar] = "environment variable",
+	[OptionLoadingStageCmdline] = "command line",
 };
 
 /*
@@ -644,7 +691,7 @@ static void parseShortOption (cookedArgs *const args)
 {
 	args->simple [0] = *args->shortOptions++;
 	args->simple [1] = '\0';
-	args->item = args->simple;
+	args->item = eStrdup (args->simple);
 	if (! isCompoundOption (*args->simple))
 		args->parameter = "";
 	else if (*args->shortOptions == '\0')
@@ -676,7 +723,6 @@ static void parseLongOption (cookedArgs *const args, const char *item)
 		args->item = eStrndup (item, equal - item);
 		args->parameter = equal + 1;
 	}
-	trashBoxPut (args->trashBox, args->item, (TrashBoxDestroyItemProc)eFree);
 	Assert (args->item != NULL);
 	Assert (args->parameter != NULL);
 }
@@ -710,7 +756,7 @@ static void cArgRead (cookedArgs *const current)
 		{
 			current->isOption = FALSE;
 			current->longOption = FALSE;
-			current->item = item;
+			current->item = eStrdup (item);
 			current->parameter = NULL;
 		}
 	}
@@ -721,7 +767,6 @@ extern cookedArgs* cArgNewFromString (const char* string)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromString (string);
-	result->trashBox = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -731,7 +776,6 @@ extern cookedArgs* cArgNewFromArgv (char* const* const argv)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromArgv (argv);
-	result->trashBox = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -741,7 +785,6 @@ extern cookedArgs* cArgNewFromFile (FILE* const fp)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromFile (fp);
-	result->trashBox = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -751,7 +794,6 @@ extern cookedArgs* cArgNewFromLineFile (FILE* const fp)
 	cookedArgs* const result = xMalloc (1, cookedArgs);
 	memset (result, 0, sizeof (cookedArgs));
 	result->args = argNewFromLineFile (fp);
-	result->trashBox = trashBoxNew ();
 	cArgRead (result);
 	return result;
 }
@@ -760,7 +802,8 @@ extern void cArgDelete (cookedArgs* const current)
 {
 	Assert (current != NULL);
 	argDelete (current->args);
-	trashBoxDelete (current->trashBox);
+	if (current->item != NULL)
+		eFree (current->item);
 	memset (current, 0, sizeof (cookedArgs));
 	eFree (current);
 }
@@ -796,6 +839,8 @@ extern void cArgForth (cookedArgs* const current)
 {
 	Assert (current != NULL);
 	Assert (! cArgOff (current));
+	if (current->item != NULL)
+		eFree (current->item);
 	if (cArgOptionPending (current))
 		parseShortOption (current);
 	else
@@ -1072,6 +1117,29 @@ static void processFormatOption (
 	else
 		error (FATAL, "Unsupported value for \"%s\" option", option);
 }
+
+#ifdef HAVE_ICONV
+static void processInputEncodingOption(const char *const option,
+				const char *const parameter)
+{
+	if (Option.inputEncoding)
+		eFree (Option.inputEncoding);
+	else
+	{
+		if (!Option.outputEncoding)
+			Option.outputEncoding = eStrdup("UTF-8");
+	}
+	Option.inputEncoding = eStrdup(parameter);
+}
+
+static void processOutputEncodingOption(const char *const option,
+				const char *const parameter)
+{
+	if (Option.outputEncoding)
+		eFree (Option.outputEncoding);
+	Option.outputEncoding = eStrdup(parameter);
+}
+#endif
 
 static void printInvocationDescription (void)
 {
@@ -2024,67 +2092,72 @@ static void processLibexecDir (const char *const option,
  */
 
 static parametricOption ParametricOptions [] = {
-	{ "config-filename",      	processConfigFilenameOption,  	TRUE    },
-	{ "data-dir",               processDataDir,                 FALSE   },
-	{ "etags-include",          processEtagsInclude,            FALSE   },
-	{ "exclude",                processExcludeOption,           FALSE   },
-	{ "excmd",                  processExcmdOption,             FALSE   },
-	{ "extra",                  processExtraTagsOption,         FALSE   },
-	{ "fields",                 processFieldsOption,            FALSE   },
-	{ "filter-terminator",      processFilterTerminatorOption,  TRUE    },
-	{ "format",                 processFormatOption,            TRUE    },
-	{ "help",                   processHelpOption,              TRUE    },
-	{ "lang",                   processLanguageForceOption,     FALSE   },
-	{ "language",               processLanguageForceOption,     FALSE   },
-	{ "language-force",         processLanguageForceOption,     FALSE   },
-	{ "languages",              processLanguagesOption,         FALSE   },
-	{ "langdef",                processLanguageDefineOption,    FALSE   },
-	{ "langmap",                processLanguageMapOption,       FALSE   },
-	{ "libexec-dir",            processLibexecDir,              FALSE   },
-	{ "license",                processLicenseOption,           TRUE    },
-	{ "list-aliases",           processListAliasesOption,       TRUE    },
-	{ "list-corpora",           processListCorporaOption,       TRUE    },
-	{ "list-features",          processListFeaturesOption,      TRUE    },
-	{ "list-file-kind",         processListFileKindOption,      TRUE    },
-	{ "list-kinds",             processListKindsOption,         TRUE    },
-	{ "list-languages",         processListLanguagesOption,     TRUE    },
-	{ "list-maps",              processListMapsOption,          TRUE    },
-	{ "options",                processOptionFile,              FALSE   },
-	{ "sort",                   processSortOption,              TRUE    },
-	{ "version",                processVersionOption,           TRUE    },
-	{ "_echo",                  processEchoOption,              FALSE   },
-	{ "_force-quit",             processForceQuitOption,         TRUE    },
+	{ "config-filename",      	processConfigFilenameOption,  	TRUE, STAGE_ANY },
+	{ "data-dir",               processDataDir,                 FALSE,  STAGE_ANY },
+	{ "etags-include",          processEtagsInclude,            FALSE,  STAGE_ANY },
+	{ "exclude",                processExcludeOption,           FALSE,  STAGE_ANY },
+	{ "excmd",                  processExcmdOption,             FALSE,  STAGE_ANY },
+	{ "extra",                  processExtraTagsOption,         FALSE,  STAGE_ANY },
+	{ "fields",                 processFieldsOption,            FALSE,  STAGE_ANY },
+	{ "filter-terminator",      processFilterTerminatorOption,  TRUE,   STAGE_ANY },
+	{ "format",                 processFormatOption,            TRUE,   STAGE_ANY },
+	{ "help",                   processHelpOption,              TRUE,   STAGE_ANY },
+#ifdef HAVE_ICONV
+	{ "input-encoding",         processInputEncodingOption,     FALSE,  STAGE_ANY },
+	{ "output-encoding",        processOutputEncodingOption,    FALSE,  STAGE_ANY },
+#endif
+	{ "lang",                   processLanguageForceOption,     FALSE,  STAGE_ANY },
+	{ "language",               processLanguageForceOption,     FALSE,  STAGE_ANY },
+	{ "language-force",         processLanguageForceOption,     FALSE,  STAGE_ANY },
+	{ "languages",              processLanguagesOption,         FALSE,  STAGE_ANY },
+	{ "langdef",                processLanguageDefineOption,    FALSE,  STAGE_ANY },
+	{ "langmap",                processLanguageMapOption,       FALSE,  STAGE_ANY },
+	{ "libexec-dir",            processLibexecDir,              FALSE,  STAGE_ANY },
+	{ "license",                processLicenseOption,           TRUE,   STAGE_ANY },
+	{ "list-aliases",           processListAliasesOption,       TRUE,   STAGE_ANY },
+	{ "list-corpora",           processListCorporaOption,       TRUE,   STAGE_ANY },
+	{ "list-features",          processListFeaturesOption,      TRUE,   STAGE_ANY },
+	{ "list-file-kind",         processListFileKindOption,      TRUE,   STAGE_ANY },
+	{ "list-kinds",             processListKindsOption,         TRUE,   STAGE_ANY },
+	{ "list-languages",         processListLanguagesOption,     TRUE,   STAGE_ANY },
+	{ "list-maps",              processListMapsOption,          TRUE,   STAGE_ANY },
+	{ "options",                processOptionFile,              FALSE,  STAGE_ANY },
+	{ "sort",                   processSortOption,              TRUE,   STAGE_ANY },
+	{ "version",                processVersionOption,           TRUE,   STAGE_ANY },
+	{ "_echo",                  processEchoOption,              FALSE,  STAGE_ANY },
+	{ "_force-quit",            processForceQuitOption,         FALSE,  STAGE_ANY },
 };
 
 static booleanOption BooleanOptions [] = {
-	{ "append",         &Option.append,                 TRUE    },
-	{ "file-scope",     &Option.include.fileScope,      FALSE   },
-	{ "file-tags",      &Option.include.fileNames,      FALSE   },
-	{ "filter",         &Option.filter,                 TRUE    },
-	{ "guess-language-eagerly", &Option.guessLanguageEagerly, TRUE },
-	{ "if0",            &Option.if0,                    FALSE   },
-	{ "kind-long",      &Option.kindLong,               TRUE    },
-	{ "line-directives",&Option.lineDirectives,         FALSE   },
-	{ "links",          &Option.followLinks,            FALSE   },
-	{ "print-language", &Option.printLanguage,          TRUE    },
-	{ "quiet",          &Option.quiet,                  FALSE   },
+	{ "append",         &Option.append,                 TRUE,  STAGE_ANY },
+	{ "file-scope",     &Option.include.fileScope,      FALSE, STAGE_ANY },
+	{ "file-tags",      &Option.include.fileNames,      FALSE, STAGE_ANY },
+	{ "filter",         &Option.filter,                 TRUE,  STAGE_ANY },
+	{ "guess-language-eagerly", &Option.guessLanguageEagerly, FALSE, STAGE_ANY },
+	{ "if0",            &Option.if0,                    FALSE, STAGE_ANY },
+	{ "kind-long",      &Option.kindLong,               TRUE,  STAGE_ANY },
+	{ "line-directives",&Option.lineDirectives,         FALSE, STAGE_ANY },
+	{ "links",          &Option.followLinks,            FALSE, STAGE_ANY },
+	{ "print-language", &Option.printLanguage,          TRUE,  STAGE_ANY },
+	{ "quiet",          &Option.quiet,                  FALSE, STAGE_ANY },
 #ifdef RECURSE_SUPPORTED
-	{ "recurse",        &Option.recurse,                FALSE   },
+	{ "recurse",        &Option.recurse,                FALSE, STAGE_ANY },
 #endif
-	{ "tag-relative",   &Option.tagRelative,            TRUE    },
-	{ "totals",         &Option.printTotals,            TRUE    },
-	{ "undef",          &Option.undef,                  FALSE   },
-	{ "verbose",        &Option.verbose,                FALSE   },
+	{ "tag-relative",   &Option.tagRelative,            TRUE,  STAGE_ANY },
+	{ "totals",         &Option.printTotals,            TRUE,  STAGE_ANY },
+	{ "undef",          &Option.undef,                  FALSE, STAGE_ANY },
+	{ "verbose",        &Option.verbose,                FALSE, STAGE_ANY },
+	{ "_allow-xcmd-in-homedir", &Option.allowXcmdInHomeDir, TRUE, ACCEPT(Etc)|ACCEPT(LocalEtc) }
 };
 
 /*
  *  Generic option parsing
  */
 
-static void checkOptionOrder (const char* const option)
+static void checkOptionOrder (const char* const option, boolean longOption)
 {
 	if (NonOptionEncountered)
-		error (FATAL, "-%s option may not follow a file name", option);
+		error (FATAL, "-%s%s option may not follow a file name", longOption? "-": "", option);
 }
 
 static boolean processParametricOption (
@@ -2100,8 +2173,14 @@ static boolean processParametricOption (
 		if (strcmp (option, entry->name) == 0)
 		{
 			found = TRUE;
+			if (!(entry->acceptableStages & (1UL << Stage)))
+			{
+				error (WARNING, "Cannot use --%s option in %s",
+				       option, StageDescription[Stage]);
+				break;
+			}
 			if (entry->initOnly)
-				checkOptionOrder (option);
+				checkOptionOrder (option, TRUE);
 			(entry->handler) (option, parameter);
 		}
 	}
@@ -2138,8 +2217,14 @@ static boolean processBooleanOption (
 		if (strcmp (option, entry->name) == 0)
 		{
 			found = TRUE;
+			if (!(entry->acceptableStages & (1UL << Stage)))
+			{
+				error (WARNING, "Cannot use --%s option in %s",
+				       option, StageDescription[Stage]);
+				break;
+			}
 			if (entry->initOnly)
-				checkOptionOrder (option);
+				checkOptionOrder (option, TRUE);
 			*entry->pValue = getBooleanOption (option, parameter);
 		}
 	}
@@ -2167,10 +2252,14 @@ static void processLongOption (
 		;
 	else if (processRegexOption (option, parameter))
 		;
-	else if (processXcmdOption (option, parameter))
+	else if (processXcmdOption (option, parameter, Stage))
 		;
 	else if (processMapOption (option, parameter))
 		;
+#ifdef HAVE_ICONV
+	else if (processLanguageEncodingOption (option, parameter))
+		;
+#endif
 #ifndef RECURSE_SUPPORTED
 	else if (strcmp (option, "recurse") == 0)
 		error (WARNING, "%s option not supported on this host", option);
@@ -2196,7 +2285,7 @@ static void processShortOption (
 			exit (0);
 			break;
 		case 'a':
-			checkOptionOrder (option);
+			checkOptionOrder (option, FALSE);
 			Option.append = TRUE;
 			break;
 #ifdef DEBUG
@@ -2215,12 +2304,12 @@ static void processShortOption (
 			Option.backward = TRUE;
 			break;
 		case 'e':
-			checkOptionOrder (option);
+			checkOptionOrder (option, FALSE);
 			setEtagsMode ();
 			break;
 		case 'f':
 		case 'o':
-			checkOptionOrder (option);
+			checkOptionOrder (option, FALSE);
 			if (Option.tagFileName != NULL)
 			{
 				error (WARNING,
@@ -2268,7 +2357,7 @@ static void processShortOption (
 #endif
 			break;
 		case 'u':
-			checkOptionOrder (option);
+			checkOptionOrder (option, FALSE);
 			Option.sorted = SO_UNSORTED;
 			break;
 		case 'V':
@@ -2278,7 +2367,7 @@ static void processShortOption (
 			/* silently ignored */
 			break;
 		case 'x':
-			checkOptionOrder (option);
+			checkOptionOrder (option, FALSE);
 			Option.xref = TRUE;
 			break;
 		default:
@@ -2287,7 +2376,7 @@ static void processShortOption (
 	}
 }
 
-extern void parseOption (cookedArgs* const args)
+static void parseOption (cookedArgs* const args)
 {
 	Assert (! cArgOff (args));
 	if (args->isOption)
@@ -2305,13 +2394,18 @@ extern void parseOption (cookedArgs* const args)
 	}
 }
 
-extern void parseOptions (cookedArgs* const args)
+static void parseOptions (cookedArgs* const args)
 {
-	NonOptionEncountered = FALSE;
 	while (! cArgOff (args)  &&  cArgIsOption (args))
 		parseOption (args);
 	if (! cArgOff (args)  &&  ! cArgIsOption (args))
 		NonOptionEncountered = TRUE;
+}
+
+extern void parseCmdlineOptions (cookedArgs* const args)
+{
+	ENTER (Cmdline);
+	parseOptions (args);
 }
 
 static boolean checkSameFile (const char *const fileName, void * userData)
@@ -2508,6 +2602,7 @@ static void parseConfigurationFileOptions (void)
 	const char *filename_body;
 
 #ifdef CUSTOM_CONFIGURATION_FILE
+	ENTER(Custom);
 	parseFileOptions (CUSTOM_CONFIGURATION_FILE);
 #endif
 	filename_body = (Option.configFilename)?Option.configFilename:"ctags";
@@ -2517,6 +2612,7 @@ static void parseConfigurationFileOptions (void)
 	{
 		error (FATAL, "error in asprintf");
 	}
+	ENTER(DosCnf);
 	parseFileOptions (filename);
 	free (filename);
 #endif
@@ -2524,6 +2620,7 @@ static void parseConfigurationFileOptions (void)
 	{
 		error (FATAL, "error in asprintf");
 	}
+	ENTER(Etc);
 	parseFileOptions (filename);
 	free (filename);
 
@@ -2531,18 +2628,22 @@ static void parseConfigurationFileOptions (void)
 	{
 		error (FATAL, "error in asprintf");
 	}
+	ENTER(LocalEtc);
 	parseFileOptions (filename);
 	free (filename);
 
 	home = getHome ();
 	if (home != NULL)
 	{
+		ENTER(HomeRecursive);
 		parseConfigurationFileOptionsInDirectory (vStringValue (home));
 		vStringDelete (home);
 	}
 
+	ENTER(CurrentRecursive);
 	parseConfigurationFileOptionsInDirectory (".");
 
+	ENTER(Preload);
 	preload (PreloadPathList);
 }
 
@@ -2551,6 +2652,7 @@ static void parseEnvironmentOptions (void)
 	const char *envOptions = NULL;
 	const char* var = NULL;
 
+	ENTER(EnvVar);
 	if (Option.etags)
 	{
 		var = ETAGS_ENVIRONMENT;

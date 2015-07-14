@@ -1630,6 +1630,7 @@ tmain_compare()
     fi
 }
 
+CODE_FOR_IGNORING_THIS_TMAIN_TEST=77
 tmain_run ()
 {
     local topdir=$1
@@ -1643,6 +1644,8 @@ tmain_run ()
     local aspect
     local engine
 
+    local r
+    local a
     local status=0
 
     basedir=$(pwd)
@@ -1661,9 +1664,25 @@ tmain_run ()
 	    cd ${subdir}
 	    ${SHELL} run.sh ${basedir}/${CTAGS} ${basedir}/${DATADIR} ${basedir}/${LIBEXECDIR}
 	) > ${subdir}/stdout-actual.txt 2> ${subdir}/stderr-actual.txt
-	echo $? > ${subdir}/exit-actual.txt
+	r=$?
+	echo $r > ${subdir}/exit-actual.txt
 
-	for aspect in stdout stderr exit; do
+	if [ $r = $CODE_FOR_IGNORING_THIS_TMAIN_TEST ]; then
+	    run_result skip '/dev/null' "$(cat ${subdir}/stdout-actual.txt)"
+	    for a in ${subdir}/*-actual.txt; do
+		if [ -f "$a" ]; then
+		    rm $a
+		fi
+	    done
+	    echo
+	    continue
+	fi
+
+	if [ -f ${subdir}/tags ]; then
+	    mv ${subdir}/tags ${subdir}/tags-actual.txt
+	fi
+
+	for aspect in stdout stderr exit tags; do
 	    if [ -f ${subdir}/${aspect}-expected.txt ]; then
 		engine=compare
 		if tmain_${engine} ${subdir} ${aspect}; then
@@ -1672,10 +1691,11 @@ tmain_run ()
 		    failed="${failed} ${test_name}/${aspect}-${engine}"
 		    status=1
 		fi
-	    else
-		rm ${subdir}/${aspect}-actual.txt
+	    elif [ -f ${subdir}/${aspect}-actual.txt ]; then
+		     rm ${subdir}/${aspect}-actual.txt
 	    fi
 	done
+
 	echo
     done
 

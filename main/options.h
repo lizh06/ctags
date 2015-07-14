@@ -25,7 +25,6 @@
 #include "args.h"
 #include "parse.h"
 #include "strlist.h"
-#include "trashbox.h"
 #include "vstring.h"
 
 /*
@@ -42,7 +41,6 @@ typedef struct sCookedArgs {
 	boolean isOption;
 	boolean longOption;
 	const char* parameter;
-	TrashBox* trashBox;
 	/* public */
 	char* item;
 } cookedArgs;
@@ -100,6 +98,10 @@ typedef struct sOptionValues {
 	char* configFilename;   /* --config-filename  use instead of 'ctags' in option file names */
 	stringList* etagsInclude;/* --etags-include  list of TAGS files to include*/
 	unsigned int tagFileFormat;/* --format  tag file format (level) */
+#ifdef HAVE_ICONV
+	char *inputEncoding;	/* --input-encoding	convert text into --output-encoding */
+	char *outputEncoding;	/* --output-encoding	write tags file as this encoding */
+#endif
 	boolean if0;            /* --if0  examine code within "#if 0" branch */
 	boolean undef;          /* --undef  generate a tag from #undef'd macros  */
 	boolean kindLong;       /* --kind-long */
@@ -113,11 +115,25 @@ typedef struct sOptionValues {
 	boolean printLanguage;  /* --print-language */
 	boolean guessLanguageEagerly; /* --guess-language-eagerly|-G */
 	boolean quiet;		      /* --quiet */
+	boolean allowXcmdInHomeDir;     /* --_allow-xcmd-in-homedir */
 #ifdef DEBUG
 	long debugLevel;        /* -D  debugging output */
 	unsigned long breakLine;/* -b  source line at which to call lineBreak() */
 #endif
 } optionValues;
+
+typedef enum eOptionLoadingStage {
+	OptionLoadingStageNone,
+	OptionLoadingStageCustom,
+	OptionLoadingStageDosCnf,
+	OptionLoadingStageEtc,
+	OptionLoadingStageLocalEtc,
+	OptionLoadingStageHomeRecursive,
+	OptionLoadingStageCurrentRecursive,
+	OptionLoadingStagePreload,
+	OptionLoadingStageEnvVar,
+	OptionLoadingStageCmdline,
+} OptionLoadingStage;
 
 /*
 *   GLOBAL VARIABLES
@@ -152,12 +168,14 @@ extern void cArgForth (cookedArgs* const current);
 extern boolean isExcludedFile (const char* const name);
 extern boolean isIncludeFile (const char *const fileName);
 extern boolean isIgnoreToken (const char *const name, boolean *const pIgnoreParens, const char **const replacement);
-extern void parseOption (cookedArgs* const cargs);
-extern void parseOptions (cookedArgs* const cargs);
+extern void parseCmdlineOptions (cookedArgs* const cargs);
 extern void previewFirstOption (cookedArgs* const cargs);
 extern void readOptionConfiguration (void);
 extern void initOptions (void);
 extern void freeOptionResources (void);
+#ifdef HAVE_ICONV
+extern void freeEncodingResources (void);
+#endif
 
 extern vString* expandOnCorpusPathList (const char* leaf);
 extern vString* expandOnDriversPathList (const char* leaf);
