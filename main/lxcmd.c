@@ -13,28 +13,30 @@
 *
 */
 
-#define XCMD_NOT_AVAILABLE_STATUS 77
-
 /*
-  XCMD PROTOCOL
-  =============
+  XCMD PROTOCOL (version 2)
+  ==================================================================
   When invoking xcmd just only with --lint-kinds=LANG option,
   xcmd must write lines matching one of following patterns
   to stdout.
 
   patterns
   --------
-  ([^ \t])
-  ([^ \t])[ \t]+
-  ([^ \t])[ \t]+([^ \t]+)
-  ([^ \t])[ \t]+([^ \t]+)[ \t]+
-  ([^ \t])[ \t]+([^ \t]+)[ \t]+(.+)
 
-  patterns are dealt as follows
+  ^([^ \t])[ \t]+(.+)([ \t]+(\[off\]))?$
   \1 => letter
-  \2 => name (default "xcmd")
-  \3 => description (default: "xcmd" or name if it is available) */
+  \2 => description
+  \4 => \[off\] is optional.
 
+
+  exit code
+  ---------
+
+  If xcmd itself recognizes it cannot run, it should exit with
+  XCMD_NOT_AVAILABLE_STATUS exit code. ctags may ignore the xcmd.
+*/
+
+#define XCMD_NOT_AVAILABLE_STATUS 127
 
 /*
 *   INCLUDE FILES
@@ -59,6 +61,8 @@
 #include "vstring.h"
 
 #include "pcoproc.h"
+
+#include "flags.h"
 
 /*
 *   MACROS
@@ -128,9 +132,10 @@ struct sKind {
 typedef struct {
 	vString *path;
 	struct sKind *kinds;
-	unsigned int kount;
+	unsigned int n_kinds;
 	boolean available;
 	unsigned int id;	/* not used yet */
+	int not_available_status;
 } xcmdPath;
 
 typedef struct {
@@ -156,7 +161,7 @@ static void clearPathSet (const langType language)
 			vStringDelete (p->path);
 			p->path = NULL;
 			p->available = FALSE;
-			for (k = 0; k < p->kount; k++)
+			for (k = 0; k < p->n_kinds; k++)
 			{
 				struct sKind* kind = &(p->kinds[k]);
 
@@ -180,57 +185,77 @@ static void clearPathSet (const langType language)
 
 static boolean loadPathKind (xcmdPath *const path, char* line, char *args[])
 {
+	const char* backup = line;
+	char* off;
+	vString *desc;
 	struct sKind *kind;
 
 	if (line[0] == '\0')
 		return FALSE;
-	else if (line[1] != ' ')
+	else if (!isblank(line[1]))
 	{
-		error (WARNING, "unexpected line(%s) from pipe connected to \"%s\"",
-		       line, args[0]);
+		error (WARNING, "[%s] a space after letter is not found in kind desciption line: %s", args[0], backup);
 		return FALSE;
 	}
 
-	path->kinds = xRealloc (path->kinds, path->kount + 1, struct sKind);
-	kind = &path->kinds [path->kount];
+	path->kinds = xRealloc (path->kinds, path->n_kinds + 1, struct sKind);
+	kind = &path->kinds [path->n_kinds];
 	kind->enabled = TRUE;
 	kind->letter = line[0];
+	kind->name = NULL;
+	kind->description = NULL;
 
 	verbose ("	kind letter: <%c>\n", kind->letter);
 
 	for (line++; isblank(*line); line++)
-		; /* do nothing */
+		;		/* do nothing */
 
 	if (*line == '\0')
 	{
-		kind->name = eStrdup ("xcmd");
-		kind->description = eStrdup ("xcmd");
+		error (WARNING, "[%s] unexpectedly a kind description line is terminated: %s",
+		       args[0], backup);
+		return FALSE;
 	}
-	else
-	{
-		char* name;
 
-		name = line;
-		for (line++; (*line != '\0') && (!isblank(*line)); line++)
-			; /* do nothing */
-		if (*line == '\0')
+	Assert (!isblank (*line));
+
+	off = strrstr(line, "[off]");
+	if (off == line)
+	{
+		error (WARNING, "[%s] [off] is given but no kind description is found: %s",
+		       args[0], backup);
+		return FALSE;
+	}
+	else if (off)
+	{
+		if (!isblank (*(off - 1)))
 		{
-			kind->name = eStrdup (name);
-			kind->description = eStrdup (name);
+			error (WARNING, "[%s] a whitespace must precede [off] flag: %s",
+			       args[0], backup);
+			return FALSE;
 		}
-		else
+		kind->enabled = FALSE;
+		*off = '\0';
+	}
+	desc = vStringNewInit (line);
+	vStringStripTrailing (desc);
+
+	Assert (vStringLength (desc) > 0);
+
+	kind->description = vStringDeleteUnwrap (desc);
+
+	/* TODO: This conversion should be part of protocol. */
+	kind->name = eStrdup (kind->description);
+	{
+		char *c;
+		for (c = kind->name; *c != '\0'; c++)
 		{
-			Assert (isblank (*line));
-			*line = '\0';
-			kind->name = eStrdup (name);
-			*line = ' ';
-			for (line++; isblank(*line); line++)
-				; /* do nothing */
-			Assert (!isblank (*line));
-			kind->description = eStrdup (*line == '\0'? kind->name: line);
+			if (*c == ' ' || *c == '\t')
+				*c = '_';
 		}
 	}
-	path->kount += 1;
+
+	path->n_kinds += 1;
 	return TRUE;
 }
 
@@ -286,7 +311,7 @@ static boolean loadPathKinds  (xcmdPath *const path, const langType language)
 			if (!loadPathKind (path, line, argv))
 				break;
 
-			kind_letter = path->kinds [path->kount - 1].letter;
+			kind_letter = path->kinds [path->n_kinds - 1].letter;
 			if (kind_letter == file_kind)
 				error (FATAL,
 				       "Kind letter \'%c\' returned from xcmd %s of %s language is reserved in ctags main",
@@ -304,9 +329,9 @@ static boolean loadPathKinds  (xcmdPath *const path, const langType language)
 		verbose("	status: %d\n", status);
 		if (status != 0)
 		{
-			if (status > 0 
-			    && WIFEXITED (status) 
-			    && (WEXITSTATUS (status) == XCMD_NOT_AVAILABLE_STATUS))
+			if (status > 0
+			    && WIFEXITED (status)
+			    && (WEXITSTATUS (status) == path->not_available_status))
 				verbose ("xcmd: the %s backend is not available\n", argv[0]);
 			else
 				error (WARNING, "xcmd exits abnormally status(%d): [%s %s]",
@@ -343,7 +368,7 @@ static void foreachXcmdKinds (const langType language,
 			if (!path[i].available)
 				continue;
 
-			for (k = 0; k < path[i].kount; k++)
+			for (k = 0; k < path[i].n_kinds; k++)
 				if (func (& (path[i].kinds[k]), data))
 					break;
 		}
@@ -464,7 +489,7 @@ static void printXcmdKind (xcmdPath *path, unsigned int i, boolean indent)
 	if (!path[i].available)
 		return;
 
-	for (k = 0; k < path[i].kount; k++)
+	for (k = 0; k < path[i].n_kinds; k++)
 	{
 		const struct sKind *const kind = path[i].kinds + k;
 		printf ("%s%c  %s %s\n", indentation,
@@ -500,11 +525,28 @@ extern void freeXcmdResources (void)
 	SetUpper = -1;
 #endif
 }
-extern void addTagXcmd (const langType language, vString* pathvstr)
+
+#ifdef HAVE_COPROC
+static void xcmd_flag_not_avaible_status_long (const char* const s, const char* const v, void* data)
+{
+	xcmdPath *path = data;
+
+	path->not_available_status = strtol ((const char *)v, NULL, 0);
+}
+#endif
+
+extern void addTagXcmd (const langType language, vString* pathvstr, const char* flags)
 {
 #ifdef HAVE_COPROC
 	pathSet* set;
 	xcmdPath *path;
+
+#define COUNT(D) (sizeof(D)/sizeof(D[0]))
+	flagDefinition xcmdFlagDefs[] = {
+		{ '\0', "notAvailableStatus",  NULL,  xcmd_flag_not_avaible_status_long  },
+	};
+
+
 	Assert (pathvstr != NULL);
 
 	if (language > SetUpper)
@@ -524,10 +566,13 @@ extern void addTagXcmd (const langType language, vString* pathvstr)
 	path = &set->paths [set->count];
 	path->path = pathvstr;
 	path->kinds = NULL;
-	path->kount = 0;
+	path->n_kinds = 0;
 	path->id = set->count;
+	path->not_available_status = XCMD_NOT_AVAILABLE_STATUS;
 
 	set->count += 1;
+
+	flagsEval (flags, xcmdFlagDefs, COUNT(xcmdFlagDefs), path);
 
 	path->available = (loadPathKinds (path, language));
 	useXcmdMethod (language);
@@ -539,16 +584,27 @@ extern void addLanguageXcmd (
 	const langType language __unused__, const char* const parameter __unused__)
 {
 #ifdef HAVE_COPROC
+	char *path;
 	vString* vpath;
+	const char* flags;
+
+	flags = strchr (parameter, LONG_FLAGS_OPEN);
+	if (flags)
+		path = eStrndup (parameter, flags - parameter);
+	else
+		path = eStrdup (parameter);
 
 	if (parameter [0] != '/' && parameter [0] != '.')
 	{
-		vpath = expandOnDriversPathList (parameter);
-		vpath = vpath? vpath: vStringNewInit(parameter);
+		vpath = expandOnDriversPathList (path);
+		vpath = vpath? vpath: vStringNewInit(path);
 	}
 	else
-		vpath = vStringNewInit(parameter);
-	addTagXcmd (language, vpath);
+		vpath = vStringNewInit(path);
+
+	eFree (path);
+
+	addTagXcmd (language, vpath, flags);
 #endif
 }
 
@@ -563,13 +619,29 @@ static void processLanguageXcmd (const langType language,
 }
 #endif
 
-extern boolean processXcmdOption (const char *const option, const char *const parameter)
+extern boolean processXcmdOption (const char *const option, const char *const parameter,
+				  OptionLoadingStage stage)
 {
 	langType language;
 
 	language = getLanguageComponentInOption (option, "xcmd-");
 	if (language == LANG_IGNORE)
 		return FALSE;
+
+	if (stage == OptionLoadingStageCurrentRecursive)
+	{
+		error (WARNING, "Don't use --xcmd-<LANG> option in ./.ctags nor ./.ctags/*: %s",
+		       option);
+		/* Consume it here. */
+		return TRUE;
+	}
+	else if (stage == OptionLoadingStageHomeRecursive && (!Option.allowXcmdInHomeDir))
+	{
+		error (WARNING, "Don't use --xcmd-<LANG> option in ~/.ctags and/or ~/.ctags/*: %s",
+		       option);
+		/* Consume it here. */
+		return TRUE;
+	}
 
 #ifdef HAVE_COPROC
 	processLanguageXcmd (language, parameter);
@@ -587,7 +659,7 @@ static const char* lookupKindName  (char kind_letter, const xcmdPath* const path
 	unsigned int k;
 	struct sKind *kind;
 
-	for (k = 0; k < path->kount; k++)
+	for (k = 0; k < path->n_kinds; k++)
 	{
 		kind = path->kinds + k;
 		if (kind->letter == kind_letter)
@@ -603,7 +675,7 @@ static const char* lookupKindLetter (const char* const kind_name, const xcmdPath
 	unsigned int k;
 	struct sKind *kind;
 
-	for (k = 0; k < path->kount; k++)
+	for (k = 0; k < path->n_kinds; k++)
 	{
 		kind = path->kinds + k;
 		if (kind->name && (!strcmp(kind->name, kind_name)))
@@ -656,7 +728,7 @@ static boolean isKindEnabled (xcmdPath* path, const char* value)
 	Assert (value);
 	Assert (*value);
 
-	for (k = 0; k < path->kount; k++)
+	for (k = 0; k < path->n_kinds; k++)
 	{
 		kind = path->kinds + k;
 		if (!kind->enabled)

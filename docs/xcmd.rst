@@ -7,6 +7,14 @@ Extending ctags with *xcmd*
 
 *xcmd* means "External parser command".
 
+WARNING: You cannot use ``--xcmd-<LANG>=COMMAND`` option in
+*./.ctags* and *~/.ctags* to avoid run unwanted ``COMMAND``
+unexpectedly. However, it is inconvenient to test and develop a xcmd
+driver described here. For those who understands risk, you can
+use ``--_allow-xcmd-in-homedir``. By putting this option to
+*/etc/ctags.conf* or */usr/local/etc/ctags.conf*, you can
+use ``--xcmd-<LANG>=COMMAND`` in *~/.ctags* or *~/.ctags/\**.
+
 Basic usage
 ---------------------------------------------------------------------
 There are commands generating tags file specialized to a language.
@@ -57,10 +65,13 @@ generator and universal-ctags. This is the reason why the name
 To write a driver for a tags generator, please read
 -"xcmd protocol and writing a driver".
 
-xcmd protocol and writing a driver
+xcmd v2 protocol and writing a driver
 ---------------------------------------------------------------------
 
-Call convention
+This is still experimental.
+The v1 protocol was obsoleted.
+
+list-kinds enumeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ctags invokes ``COMMAND`` specified with ``--xcmd-<LANG>=COMMAND``
@@ -81,20 +92,19 @@ following two tings.
 Availability is detected by the exit status of 
 ``COMMAND`` process; 0 means available.
 If the status is other than 0, the ``LANG`` parser is treated
-as ``disabled`` with warning messages. 77 is a special
+as ``disabled`` with warning messages. 127 is a special
 number; the ``LANG`` parser is treated as disabled without
-warning messages.
+warning messages. You can override the code 127 with your
+own value with notAvailableStatus flag like::
 
-
+  ... \
+  --xcmd-foo=./foo.sh{notAvailableStatus=42}
+  ... \
 
 Standard output contributes to know the lists.
 ctags expects following format when parsing the output::
 
-  ([^ \t])
-  ([^ \t])[ \t]+
-  ([^ \t])[ \t]+([^ \t]+)
-  ([^ \t])[ \t]+([^ \t]+)[ \t]+
-  ([^ \t])[ \t]+([^ \t]+)[ \t]+(.+)
+  ^([^ \t])[ \t]+(.+)([ \t]+(\[off\]))?$
 
 The output lines matched above pattern are recognized as follows::
 
@@ -104,11 +114,10 @@ The output lines matched above pattern are recognized as follows::
 
 ``\2``
 
-	kind name (default ``xcmd``)
+	kind description
 
-``\3``
-
-	kind description (default: ``xcmd`` or kind name if it is given)
+``[off]`` given after a kind description means the kind is disabled by
+default.
 
 Here is the example command line and output of ``coffeetags`` driver::
 
@@ -120,15 +129,21 @@ Here is the example command line and output of ``coffeetags`` driver::
 	p  proto
 	b  block	
 
-In this case ``\3``, kind description, is empty.
 
-Here after ctags calls ``COMMAND`` with one argument, 
-the name of input file::
+Generating tags
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+After getting kinds related information from ``COMMAND``,
+ctags calls ``COMMAND`` with one argument, the name of input file::
 
 	$ COMMAND input-file
 
 ctags expects ``COMMAND`` prints the result to standard output.
 ctags reads them via a pipe connected to the process of ``COMMAND``.
+
+ctags expects ``COMMAND`` generates tags elements with enabling all
+kinds.  Tags elements of disabled kinds are filtered by ctags side
+when generating tags file.
+
 
 Note for tags format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -154,7 +169,7 @@ Following example is taken from ``CoffeeTags``::
 	!_TAG_PROGRAM_URL	https://github.com/lukaszkorecki/CoffeeTags	/GitHub repository/
 	!_TAG_PROGRAM_VERSION	0.5.0	//
 
-ctags merges the Psuedo-tag lines with ``!LANG`` suffix::
+ctags merges the Pseudo-tag lines with ``!LANG`` suffix::
 
 	$ ./ctags   --language-force=coffee foo.coffee; cat tags | grep '^!'
 	!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
@@ -215,7 +230,7 @@ Here is an example taken from ``data/optlib/coffee.ctags``::
 	--coffee-map=+.coffee
 	--coffee-xcmd=coffeetags
 
-Finnaly you have to add these new two files to ``Makefile.in``.
+Finally you have to add these new two files to ``Makefile.in``.
 Add the name of driver file to ``DRIVERS`` variable like::
 
 	DRIVERS = coffeetags

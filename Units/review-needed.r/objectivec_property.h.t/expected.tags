@@ -1,2 +1,0 @@
-personAge	input.h	/^@property(readonly) int personAge;$/;"	v
-personName	input.h	/^@property(copy) NSString *personName;$/;"	v

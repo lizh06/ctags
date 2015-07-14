@@ -85,6 +85,13 @@ subversion
 
 bugs
 ......................................................................
+   <367>  C++11 override makes a C++ member function declaration ignored
+
+	 * fixed in::
+
+	        d4fcbdd
+		#413
+		#405
 
    <366>  --options=.ctags doesn't work under Windows
 
@@ -182,6 +189,12 @@ Patches are always there. So it is easy to evaluate the value:)
 	tree developers.  We don't have to take time for this ticket.
 
 ----
+
+   <85> Add --encoding option to make utf-8 encoded tags file
+
+	* contributed by the original author::
+
+	      b3f670c7c4a3c3570b8d2d82756735586aafc0cb
 
    <84> C++11 new using semantics
 

@@ -182,6 +182,10 @@ static void addPseudoTags (void)
 		writePseudoTag ("TAG_PROGRAM_NAME",    PROGRAM_NAME, "", NULL);
 		writePseudoTag ("TAG_PROGRAM_URL",     PROGRAM_URL,  "official site", NULL);
 		writePseudoTag ("TAG_PROGRAM_VERSION", PROGRAM_VERSION, "", NULL);
+#ifdef HAVE_ICONV
+		if (Option.outputEncoding)
+			writePseudoTag ("TAG_FILE_ENCODING", Option.outputEncoding, "", NULL);
+#endif
 	}
 }
 
@@ -1073,9 +1077,9 @@ extern int makeTagEntry (const tagEntryInfo *const tag)
 	if (tag->name [0] == '\0')
 		error (WARNING, "ignoring null tag in %s", vStringValue (File.name));
 	else if (TagFile.cork)
-			r = queueTagEntry (tag);
+		r = queueTagEntry (tag);
 	else
-			writeTagEntry (tag);
+		writeTagEntry (tag);
 	return r;
 }
 
