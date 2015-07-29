@@ -86,6 +86,7 @@ extern parserDefinition* parserNew (const char* name)
 	parserDefinition* result = xCalloc (1, parserDefinition);
 	result->name = eStrdup (name);
 	result->fileKind = KIND_FILE_DEFAULT;
+	result->enabled = TRUE;
 	return result;
 }
 
@@ -247,7 +248,7 @@ nominateLanguageCandidatesForPattern(const char *const baseName, parserCandidate
 	return count;
 }
 
-static vString* extracEmacsModeAtFirstLine(FILE* input);
+static vString* extractEmacsModeAtFirstLine(FILE* input);
 
 /*  The name of the language interpreter, either directly or as the argument
  *  to "env".
@@ -286,7 +287,7 @@ static vString* extractInterpreter (FILE* input)
 		   line if the first line specifies an
 		   interpreter.  */
 
-		interpreter = extracEmacsModeAtFirstLine(input);
+		interpreter = extractEmacsModeAtFirstLine(input);
 		if (!interpreter)
 		{
 			const char* const lastSlash = strrchr (line, '/');
@@ -337,7 +338,7 @@ static vString* determineEmacsModeAtFirstLine (const char* const line)
 
 }
 
-static vString* extracEmacsModeAtFirstLine(FILE* input)
+static vString* extractEmacsModeAtFirstLine(FILE* input)
 {
 	vString* const vLine = vStringNew ();
 	const char* const line = readLine (vLine, input);
@@ -633,7 +634,7 @@ static const struct taster {
 		.msg    = "zsh autoload tag",
 	},
         {
-		.taste  = extracEmacsModeAtFirstLine,
+		.taste  = extractEmacsModeAtFirstLine,
 		.msg    = "emacs mode at the first line",
         },
         {
@@ -1123,7 +1124,7 @@ extern void initializeParsing (void)
 				accepted = TRUE;
 #endif
 			}
-			else if (((!!def->parser) + (!!def->parser2) + (!!def->parser_with_gc)) != 1)
+			else if (((!!def->parser) + (!!def->parser2)) != 1)
 				error (FATAL,
 		"%s parser definition must define one and only one parsing routine\n",
 					   def->name);
@@ -1138,7 +1139,6 @@ extern void initializeParsing (void)
 		}
 	}
 	verbose ("\n");
-	enableLanguages (TRUE);
 	initializeParsers ();
 }
 
@@ -1242,7 +1242,6 @@ extern void processLanguageDefineOption (
 		def->currentPatterns   = stringListNew ();
 		def->currentExtensions = stringListNew ();
 		def->method            = METHOD_NOT_CRAFTED;
-		def->enabled           = TRUE;
 		def->id                = i;
 		LanguageTable = xRealloc (LanguageTable, i + 1, parserDefinition*);
 		LanguageTable [i] = def;
@@ -1270,7 +1269,7 @@ static kindOption *langKindOption (const langType language, const int flag)
 	return result;
 }
 
-extern boolean isLanguageKindEnabled (langType language, char kind)
+extern boolean isLanguageKindEnabled (const langType language, char kind)
 {
 	const kindOption *kindOpt;
 
@@ -1279,7 +1278,8 @@ extern boolean isLanguageKindEnabled (langType language, char kind)
 	else if (hasXcmdKind (language, kind))
 		return isXcmdKindEnabled (language, kind);
 
-	Assert (kindOpt  = langKindOption (language, kind));
+	kindOpt = langKindOption (language, kind);
+	Assert (kindOpt);
 
 	return kindOpt->enabled;
 }
@@ -1690,20 +1690,6 @@ static rescanReason createTagsForFile (
 			lang->parser ();
 		else if (lang->parser2 != NULL)
 			rescan = lang->parser2 (passCount);
-		else if (lang->parser_with_gc != NULL)
-		{
-			TrashBox* trash_box = trashBoxNew ();
-			jmp_buf jbuf;
-
-			while (!setjmp (jbuf))
-			{
-				trashBoxDelete (trash_box);
-				trash_box = trashBoxNew ();
-				rescan = lang->parser_with_gc (passCount, &jbuf, trash_box);
-				break;
-			}
-			trashBoxDelete (trash_box);
-		}
 		else if (lang->initialize != NULL)
 		{
 			parserInitialize init = lang->initialize;

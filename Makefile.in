@@ -121,6 +121,7 @@ PRELOAD_OPTLIB =				\
 	\
 	coffee.ctags				\
 	ctags.ctags				\
+	gdbinit.ctags				\
 	m4.ctags				\
 	mib.ctags				\
 	\
@@ -382,8 +383,8 @@ ifdef TRAVIS
 SHOW_DIFF_OUTPUT=--show-diff-output
 endif
 
-.PHONY: check units fuzz noise clean-units clean-gcov
-check: units
+.PHONY: check units fuzz noise tmain tinst clean-units clean-gcov run-gcov codecheck
+check: tmain units
 
 #
 # FUZZ Target

@@ -246,12 +246,6 @@ static optionDescription LongOptionDescription [] = {
  {1,"      Include reference to 'file' in Emacs-style tag file (requires -e)."},
  {1,"  --exclude=pattern"},
  {1,"      Exclude files and directories matching 'pattern'."},
-#ifdef HAVE_ICONV
- {1,"  --input-encoding=encoding"},
- {1,"      Specify encoding of all of source files."},
- {1,"  --input-encoding-<LANG>=encoding"},
- {1,"      Specify encoding of the LANG source files."},
-#endif
  {0,"  --excmd=number|pattern|mix"},
 #ifdef MACROS_USE_PATTERNS
  {0,"       Uses the specified type of EX command to locate tags [pattern]."},
@@ -287,6 +281,12 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Print this option summary."},
  {1,"  --if0=[yes|no]"},
  {1,"       Should code within #if 0 conditional branches be parsed [no]?"},
+#ifdef HAVE_ICONV
+ {1,"  --input-encoding=encoding"},
+ {1,"      Specify encoding of all of source files."},
+ {1,"  --input-encoding-<LANG>=encoding"},
+ {1,"      Specify encoding of the LANG source files."},
+#endif
  {1,"  --kinds-<LANG>=[+|-]kinds, or"},
  {1,"  --<LANG>-kinds=[+|-]kinds"},
  {1,"       Enable/disable tag kinds for language <LANG>."},
@@ -324,13 +324,13 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Output list of language mappings."},
  {1,"  --map-<LANG>=[+]map"},
  {1,"       Alternative version of --langmap option."},
+ {1,"  --options=file"},
+ {1,"       Specify file from which command line options should be read."},
 #ifdef HAVE_ICONV
  {1,"  --output-encoding=encoding"},
  {1,"      The encoding to write the tag file in. Defaults to UTF-8 if --input-encoding"},
  {1,"      is specified, otherwise no conversion is performed."},
 #endif
- {1,"  --options=file"},
- {1,"       Specify file from which command line options should be read."},
  {0,"  --print-language"},
  {0,"       Don't make tags file but just print the guessed language name for input file."},
  {1,"  --quiet=[yes|no]"},
@@ -2829,6 +2829,38 @@ extern void initOptions (void)
 	processExcludeOption (NULL, ".svn");
 	processExcludeOption (NULL, "*~");
 	processExcludeOption (NULL, ".*.swp");
+
+	/* Exclude binary files
+	 * -----------------------------------------------
+	 *
+	 * TODO
+	 *
+	 * It will be interesting if ctags can extract
+	 * symbols from these binaries.
+	 *
+	 * --langdef=nm --regex-nm=...
+	 * --langdef=elf --pre-processor-elf=/bin/nm ...
+	 *
+	 * vim/emacs users never wants the cursor to jump to
+	 * a binary file but may wants to utilize the symbol
+	 * information for completion.
+	 *
+	 * https://bitbucket.org/haypo/hachoir3 can be
+	 * used the alternative for /bin/nm
+	 */
+	processExcludeOption (NULL, "*.o");
+	processExcludeOption (NULL, "*.a");
+	processExcludeOption (NULL, "*.so");
+
+	processExcludeOption (NULL, "*.obj");
+	processExcludeOption (NULL, "*.lib");
+	processExcludeOption (NULL, "*.dll");
+	processExcludeOption (NULL, "*.exe");
+
+	processExcludeOption (NULL, "*.gcno");
+	processExcludeOption (NULL, "*.gcda");
+
+	processExcludeOption (NULL, "*.class");
 }
 
 extern void freeOptionResources (void)
