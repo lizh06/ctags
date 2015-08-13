@@ -672,6 +672,35 @@ static langType arbitrateByTastingAndTwoGram (struct getLangCtx *glc, parserCand
 	return language;
 }
 
+/* If all the candidates have the same specialized language selector, return
+ * it.  Otherwise, return NULL.
+ */
+static selectLanguage
+commonSelector (const parserCandidate *candidates, int n_candidates)
+{
+    Assert (n_candidates > 1);
+    selectLanguage selector =
+        LanguageTable[ candidates[0].lang ]->selectLanguage;
+    int i;
+    for (i = 1; i < n_candidates; ++i)
+        if (LanguageTable[ candidates[i].lang ]->selectLanguage != selector)
+            return NULL;
+    return selector;        /* This, too, may be NULL */
+}
+
+/* Calls the selector and returns the integer value of the parser for the
+ * language associated with the string returned by the selector.
+ */
+static int
+pickLanguageBySelection (selectLanguage selector, FILE *input)
+{
+    const char *lang = selector(input);
+    if (lang)
+        return getNamedLanguage(lang);
+    else
+        return LANG_IGNORE;
+}
+
 static langType getSpecLanguageCommon (const char *const spec, struct getLangCtx *glc,
 				       unsigned int nominate (const char *const, parserCandidate**),
 				       langType arbitrate (struct getLangCtx *, parserCandidate  *,
@@ -691,7 +720,14 @@ static langType getSpecLanguageCommon (const char *const spec, struct getLangCtx
 	else if (n_candidates > 1)
 	{
 		GLC_FOPEN_IF_NECESSARY(glc, fopen_error);
-		language = arbitrate (glc, candidates, n_candidates);
+		selectLanguage selector = commonSelector(candidates, n_candidates);
+		if (selector) {
+			language = pickLanguageBySelection(selector, glc->input);
+			if (LANG_IGNORE == language)
+				language = arbitrate (glc, candidates, n_candidates);
+		} else {
+			language = arbitrate (glc, candidates, n_candidates);
+		}
 		/* At this point we are guaranteed that a language has been
 		 * selected:
 		 */
@@ -1653,7 +1689,7 @@ extern void printLanguageList (void)
 *   File parsing
 */
 
-static void makeFileTag (const char *const fileName)
+extern void makeFileTag (const char *const fileName)
 {
 	if (Option.include.fileNames)
 	{
@@ -1738,6 +1774,7 @@ static boolean createTagsWithFallback (
 	return tagFileResized;
 }
 
+#ifdef HAVE_COPROC
 static boolean createTagsWithXcmd (
 		const char *const fileName, const langType language)
 {
@@ -1754,6 +1791,7 @@ static boolean createTagsWithXcmd (
 
 	return tagFileResized;
 }
+#endif
 
 static void printGuessedParser (const char* const fileName, langType language)
 {

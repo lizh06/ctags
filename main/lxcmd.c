@@ -7,7 +7,7 @@
 *   This source code is released for free distribution under the terms of the
 *   GNU General Public License.
 *
-*   This module contains functions for invoking external comand.
+*   This module contains functions for invoking external command.
 *   Half of codes are derived from lregex.c.
 *   Core data structure is taken from readtags.h.
 *
@@ -200,7 +200,7 @@ static boolean loadPathKind (xcmdPath *const path, char* line, char *args[])
 		return FALSE;
 	else if (!isblank(line[1]))
 	{
-		error (WARNING, "[%s] a space after letter is not found in kind desciption line: %s", args[0], backup);
+		error (WARNING, "[%s] a space after letter is not found in kind description line: %s", args[0], backup);
 		return FALSE;
 	}
 
@@ -1139,11 +1139,11 @@ static boolean invokeXcmdPath (const char* const fileName, xcmdPath* path, const
 
 #endif
 
+#ifdef HAVE_COPROC
 extern boolean invokeXcmd (const char* const fileName, const langType language)
 {
 	boolean result = FALSE;
 
-#ifdef HAVE_COPROC
 	if (language != LANG_IGNORE  &&  language <= SetUpper  &&
 		Sets [language].count > 0)
 	{
@@ -1158,6 +1158,6 @@ extern boolean invokeXcmd (const char* const fileName, const langType language)
 		}
 
 	}
-#endif
 	return result;
 }
+#endif

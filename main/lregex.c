@@ -6,7 +6,7 @@
 *
 *   This module contains functions for applying regular expression matching.
 *
-*   The code for utlizing the Gnu regex package with regards to processing the
+*   The code for utilizing the Gnu regex package with regards to processing the
 *   regex option and checking for regex matches was adapted from routines in
 *   Gnu etags.
 */
@@ -136,7 +136,7 @@ static void clearPatternSet (const langType language)
 }
 
 /*
-*   Regex psuedo-parser
+*   Regex pseudo-parser
 */
 
 static void makeRegexTag (
@@ -260,18 +260,8 @@ static void pre_ptrn_flag_exclusive_long (const char* const s __unused__, const 
 	pre_ptrn_flag_exclusive_short ('x', data);
 }
 
-static void ptrn_flag_optional_long (const char* const s, const char* const unused __unused__, void* data)
-{
-	regexPattern *ptrn = data;
-	ptrn->u.tag.kind->enabled = FALSE;
-}
-
 static flagDefinition prePtrnFlagDef[] = {
 	{ 'x',  "exclusive", pre_ptrn_flag_exclusive_short, pre_ptrn_flag_exclusive_long },
-};
-
-static flagDefinition ptrnFlagDef[] = {
-	{ '\0', "optional",  NULL, ptrn_flag_optional_long  },
 };
 
 static struct sKind *kindNew ()
@@ -379,7 +369,6 @@ static regexPattern *addCompiledTagPattern (
 		ptrn->u.tag.kind->name    = kindName? eStrdup (kindName): NULL;
 		ptrn->u.tag.kind->description = description? eStrdup (description): NULL;
 	}
-	flagsEval (flags, ptrnFlagDef, COUNT(ptrnFlagDef), ptrn);
 
 	return ptrn;
 }
@@ -395,7 +384,6 @@ static void addCompiledCallbackPattern (
 	ptrn->type    = PTRN_CALLBACK;
 	ptrn->u.callback.function = callback;
 	ptrn->exclusive = exclusive;
-	flagsEval (flags, ptrnFlagDef, COUNT(ptrnFlagDef), ptrn);
 }
 
 
@@ -842,7 +830,7 @@ static boolean enable_kind_cb (struct sKind *kind, void *data)
 		kind->enabled = kmr->mode;
 		kmr->result = TRUE;
 	}
-	/* conitnue:
+	/* continue:
 	   There can be more than one patterns which represents this kind. */
 	return FALSE;
 }

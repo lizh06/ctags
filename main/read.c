@@ -229,20 +229,9 @@ static boolean parseLineDirective (void)
 								lineStr, lNum, vStringValue (fileName)); )
 			}
 
-			if (Option.include.fileNames && vStringLength (fileName) > 0 &&
+			if (vStringLength (fileName) > 0 &&
 				lNum == 1)
-			{
-				tagEntryInfo tag;
-				initTagEntry (&tag, baseFilename (vStringValue (fileName)));
-
-				tag.isFileEntry     = TRUE;
-				tag.lineNumberEntry = TRUE;
-				tag.lineNumber      = 1;
-				tag.kindName        = KIND_FILE_DEFAULT_LONG;
-				tag.kind            = getSourceLanguageFileKind();
-
-				makeTagEntry (&tag);
-			}
+				makeFileTag (vStringValue (fileName));
 			vStringDelete (fileName);
 			result = TRUE;
 		}
@@ -573,7 +562,7 @@ extern char *readSourceLine (
 		*pSeekValue = ftell (File.fp);
 	result = readLine (vLine, File.fp);
 	fsetpos (File.fp, &orignalPosition);
-	/* If the file is empty, we cannt get the line
+	/* If the file is empty, we can't get the line
 	   for location 0. readSourceLine doesn't know
 	   what itself should do; just report it to the caller. */
 	return result;

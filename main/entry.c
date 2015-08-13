@@ -61,7 +61,7 @@
 # define USE_REPLACEMENT_TRUNCATE
 #endif
 
-/*  Hack for rediculous practice of Microsoft Visual C++.
+/*  Hack for ridiculous practice of Microsoft Visual C++.
  */
 #if defined (WIN32) && defined (_MSC_VER)
 # define chsize         _chsize
@@ -163,6 +163,7 @@ static void addPseudoTags (void)
 	{
 		char format [11];
 		const char *formatComment = "unknown format";
+		char commit_id [8] = "";
 
 		sprintf (format, "%u", Option.tagFileFormat);
 
@@ -178,10 +179,15 @@ static void addPseudoTags (void)
 			(Option.sorted == SO_SORTED ? "1" : "0"),
 			"0=unsorted, 1=sorted, 2=foldcase",
 			NULL);
-		writePseudoTag ("TAG_PROGRAM_AUTHOR",  AUTHOR_NAME,  AUTHOR_EMAIL, NULL);
-		writePseudoTag ("TAG_PROGRAM_NAME",    PROGRAM_NAME, "", NULL);
+		writePseudoTag ("TAG_PROGRAM_AUTHOR",  AUTHOR_NAME,  "", NULL);
+		writePseudoTag ("TAG_PROGRAM_NAME",    PROGRAM_NAME, "Derived from Exuberant Ctags", NULL);
 		writePseudoTag ("TAG_PROGRAM_URL",     PROGRAM_URL,  "official site", NULL);
-		writePseudoTag ("TAG_PROGRAM_VERSION", PROGRAM_VERSION, "", NULL);
+
+#if defined(CTAGS_COMMIT_ID) && CTAGS_COMMIT_ID != 0
+			snprintf (commit_id, sizeof (commit_id), "%.7x", CTAGS_COMMIT_ID);
+#endif
+		writePseudoTag ("TAG_PROGRAM_VERSION", PROGRAM_VERSION, commit_id, NULL);
+
 #ifdef HAVE_ICONV
 		if (Option.outputEncoding)
 			writePseudoTag ("TAG_FILE_ENCODING", Option.outputEncoding, "", NULL);
@@ -312,7 +318,7 @@ static boolean isCtagsLine (const char *const line)
 		/*  There must be exactly five fields: two tab fields containing
 		 *  exactly one tab each, the tag must not begin with "#", and the
 		 *  file name should not end with ";", and the excmd must be
-		 *  accceptable.
+		 *  acceptable.
 		 *
 		 *  These conditions will reject tag-looking lines like:
 		 *      int a;        <C-comment>
