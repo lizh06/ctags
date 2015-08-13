@@ -20,6 +20,7 @@
 #include "options.h"
 #include "read.h"
 #include "routines.h"
+#include "selectors.h"
 #include "vstring.h"
 
 #define TRACE_PERL_C 0
@@ -378,7 +379,7 @@ static void findPerlTags (void)
 		else if (strncmp((const char*) cp, "package", (size_t) 7) == 0 &&
 				 ('\0' == cp[7] || isspace(cp[7])))
 		{
-			cp += 8;
+			cp += 7;
 			while (isspace (*cp))
 				cp++;
 			while (!*cp || '#' == *cp) {
@@ -533,6 +534,7 @@ extern parserDefinition* PerlParser (void)
 	def->kindCount  = KIND_COUNT (PerlKinds);
 	def->extensions = extensions;
 	def->parser     = findPerlTags;
+	def->selectLanguage = selectByPickingPerlVersion;
 	return def;
 }
 

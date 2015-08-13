@@ -66,7 +66,7 @@ L_FAILED_BY_TIMEED_OUT=
 # TODO
 #
 #  * write new class 'r' (category directory) to units.rst.
-#  * write new class 'v' (skip the checkin by valgrind) to units.rst.
+#  * write new class 'v' (skip the checking by valgrind) to units.rst.
 #
 action_help ()
 {
@@ -85,6 +85,8 @@ Usage:
 	$(help_noise)
 
 	$(help_tmain)
+
+	$(help_clean_tmain)
 EOF
 }
 
@@ -343,7 +345,7 @@ run_tcase ()
     #
     # tags-e if for etags output(-e). TAGS is good
     # suffix but foo.tags and foo.TAGS may be the same on Windows.
-    # tags-x is for corss reference output(-x).
+    # tags-x is for cross reference output(-x).
     #
     # fexpected must be set even if none of
     # expected.{tags,tags-e,xref} exits.
@@ -444,7 +446,7 @@ run_tcase ()
 
     {
 	#
-	# When a lauched process is exited abnormally, the parent shell reports it
+	# When a launched process is exited abnormally, the parent shell reports it
 	# to stderr: See j_strsignal function call in wait_for in bash-4.2/nojobs.c.
 	# This becomes noise; close the stderr of subshell.
 	#
@@ -872,7 +874,7 @@ help_clean ()
 cat <<EOF
 $0 clean UNITS-DIR
 
-	   Clean all files created during testing
+	   Clean all files created during units testing
 EOF
 
 }
@@ -1667,6 +1669,8 @@ tmain_run ()
 	r=$?
 	echo $r > ${subdir}/exit-actual.txt
 
+	sed -i -e 's|^ctags.exe|ctags|' ${subdir}/stderr-actual.txt
+
 	if [ $r = $CODE_FOR_IGNORING_THIS_TMAIN_TEST ]; then
 	    run_result skip '/dev/null' "$(cat ${subdir}/stdout-actual.txt)"
 	    for a in ${subdir}/*-actual.txt; do
@@ -1818,6 +1822,47 @@ $0 tmain [OPTIONS] TMAIN-DIR
 EOF
 }
 
+action_clean_tmain()
+{
+    local action="$1"
+    shift
+
+    local tmain_dir=$1
+    shift
+
+    if [ $# -gt 0 ]; then
+	ERROR 1 "too many arguments for ${action} action: $*"
+    elif [ -z "$tmain_dir" ]; then
+	ERROR 1 "TMAIN_DIR parameter is not given in ${action} action"
+    fi
+
+    if ! [ -d "$tmain_dir" ]; then
+	ERROR 1 "No such directory: ${tmain_dir}"
+    fi
+
+    check_availability find
+    check_availability rm
+
+    local object
+    local type
+    for object in stdout stderr exit tags; do
+	for type in actual diff; do
+	    rm -f $(find "$tmain_dir" -name ${object}-${type}.txt)
+	done
+    done
+    return 0
+}
+
+help_clean_tmain ()
+{
+cat <<EOF
+$0 clean_tmain TMAIN-DIR
+
+	   Clean all files created during tmain testing
+EOF
+
+}
+
 # Avoid issues between sed and the locale settings by overriding it using
 # LC_ALL, which takes precedence over all other locale configurations:
 # https://www.gnu.org/software/gettext/manual/html_node/Locale-Environment-Variables.html
@@ -1856,6 +1901,10 @@ main ()
 	    ;;
 	tmain)
 	    action_tmain "$@"
+	    return $?
+	    ;;
+	clean-tmain)
+	    action_clean_tmain "$@"
 	    return $?
 	    ;;
 	shrink)

@@ -42,6 +42,7 @@
 	OcamlParser, \
 	PascalParser, \
 	PerlParser, \
+	Perl6Parser, \
 	PhpParser, \
 	PythonParser, \
 	RexxParser, \

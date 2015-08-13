@@ -297,7 +297,7 @@ static optionDescription LongOptionDescription [] = {
  {1,"  --language-force=language"},
  {1,"       Force all files to be interpreted using specified language."},
  {1,"  --languages=[+|-]list"},
- {1,"       Restrict files scanned for tags to those mapped to langauges"},
+ {1,"       Restrict files scanned for tags to those mapped to languages"},
  {1,"       specified in the comma-separated 'list'. The list can contain any"},
  {1,"       built-in or user-defined language [all]."},
  {1,"  --libexec-dir=[+]DIR"},
@@ -363,7 +363,7 @@ static optionDescription LongOptionDescription [] = {
 #endif
  {1,"  --_allow-xcmd-in-homedir"},
  {1,"       Allow specifying --xcmd-<LANG> option in ~/.ctags and/or ~/.ctags/*."},
- {1,"       By default it is not allow. This option itself can be specfied only "},
+ {1,"       By default it is not allow. This option itself can be specified only "},
  {1,"       in /etc or /usr/local/etc."},
  {1,"  --_echo=msg"},
  {1,"       Echo MSG to standard error. Useful to debug the chain"},
@@ -1191,11 +1191,21 @@ static void processListFeaturesOption(const char *const option __unused__,
 
 static void printProgramIdentification (void)
 {
-	printf ("%s %s, %s %s\n",
+	printf (
+#if defined(CTAGS_COMMIT_ID) && CTAGS_COMMIT_ID != 0
+		"%s %s(%.7x), %s %s\n",
+		PROGRAM_NAME, PROGRAM_VERSION, CTAGS_COMMIT_ID,
+#else
+		"%s %s, %s %s\n",
 	        PROGRAM_NAME, PROGRAM_VERSION,
-	        PROGRAM_COPYRIGHT, AUTHOR_NAME);
+#endif
+		PROGRAM_COPYRIGHT, AUTHOR_NAME);
+	printf ("Universal Ctags is derived from Exuberant Ctags.\n");
+	printf ("Exuberant Ctags 5.8, Copyright (C) 1996-2009 Darren Hiebert\n");
+
 	printf ("  Compiled: %s, %s\n", __DATE__, __TIME__);
-	printf ("  Addresses: <%s>, %s\n", AUTHOR_EMAIL, PROGRAM_URL);
+	printf ("  URL: %s\n", PROGRAM_URL);
+
 	printFeatureList ();
 }
 
