@@ -123,6 +123,10 @@
 # define S_ISUID 0
 #endif
 
+#ifndef S_ISGID
+# define S_ISGID 0
+#endif
+
 /*  Hack for ridiculous practice of Microsoft Visual C++.
  */
 #if defined (WIN32)
@@ -417,6 +421,7 @@ extern fileStatus *eStat (const char *const fileName)
 				file.isExecutable = (boolean) ((status.st_mode &
 					(S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
 				file.isSetuid = (boolean) ((status.st_mode & S_ISUID) != 0);
+				file.isSetgid = (boolean) ((status.st_mode & S_ISGID) != 0);
 				file.size = status.st_size;
 			}
 		}
@@ -509,12 +514,12 @@ static boolean isPathSeparator (const int c)
 
 static void canonicalizePath (char *const path __unused__)
 {
-#if defined (MSDOS_STYLE_PATH)
+# if defined (MSDOS_STYLE_PATH)
 	char *p;
 	for (p = path  ;  *p != '\0'  ;  ++p)
 		if (isPathSeparator (*p)  &&  *p != ':')
 			*p = PATH_SEPARATOR;
-#endif
+# endif
 }
 
 #endif
@@ -535,9 +540,9 @@ extern boolean isSameFile (const char *const name1, const char *const name2)
 		canonicalizePath (n2);
 # if defined (CASE_INSENSITIVE_FILENAMES)
 		result = (boolean) (strcasecmp (n1, n2) == 0);
-#else
+# else
 		result = (boolean) (strcmp (n1, n2) == 0);
-#endif
+# endif
 		free (n1);
 		free (n2);
 	}
@@ -555,7 +560,7 @@ extern const char *baseFilename (const char *const filePath)
 	 */
 	for (i = 0  ;  i < strlen (PathDelimiters)  ;  ++i)
 	{
-#ifdef HAVE_MBLEN
+# ifdef HAVE_MBLEN
 		const char *p;
 		int ml;
 
@@ -569,12 +574,12 @@ extern const char *baseFilename (const char *const filePath)
 			else if (*p == PathDelimiters [i] && p > tail)
 				tail = p;
 		}
-#else
+# else
 		const char *sep = strrchr (filePath, PathDelimiters [i]);
 
 		if (sep > tail)
 			tail = sep;
-#endif
+# endif
 	}
 #else
 	const char *tail = strrchr (filePath, PATH_SEPARATOR);
@@ -829,8 +834,12 @@ extern FILE *tempFile (const char *const mode, char **const pName)
 	const char *const pattern = "tags.XXXXXX";
 	const char *tmpdir = NULL;
 	fileStatus *file = eStat (ExecutableProgram);
+# ifdef WIN32
+	tmpdir = getenv ("TMP");
+# else
 	if (! file->isSetuid)
 		tmpdir = getenv ("TMPDIR");
+# endif
 	if (tmpdir == NULL)
 		tmpdir = TMPDIR;
 	name = xMalloc (strlen (tmpdir) + 1 + strlen (pattern) + 1, char);
@@ -838,7 +847,13 @@ extern FILE *tempFile (const char *const mode, char **const pName)
 	fd = mkstemp (name);
 	eStatFree (file);
 #elif defined(HAVE_TEMPNAM)
-	name = tempnam (TMPDIR, "tags");
+	const char *tmpdir = NULL;
+# ifdef WIN32
+	tmpdir = getenv ("TMP");
+# endif
+	if (tmpdir == NULL)
+		tmpdir = TMPDIR;
+	name = tempnam (tmpdir, "tags");
 	if (name == NULL)
 		error (FATAL | PERROR, "cannot allocate temporary file name");
 	fd = open (name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
