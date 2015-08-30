@@ -25,6 +25,7 @@
 	CssParser, \
 	CsharpParser, \
 	DParser, \
+	DiffParser, \
 	DosBatchParser, \
 	EiffelParser, \
 	ErlangParser, \
