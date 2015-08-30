@@ -41,9 +41,11 @@ static unsigned int LanguageCount = 0;
 *   FUNCTION DEFINITIONS
 */
 
-extern void makeSimpleTag (
+extern int makeSimpleTag (
 		const vString* const name, kindOption* const kinds, const int kind)
 {
+	int r = SCOPE_NIL;
+
 	if (kinds [kind].enabled  &&  name != NULL  &&  vStringLength (name) > 0)
 	{
 	    tagEntryInfo e;
@@ -52,8 +54,9 @@ extern void makeSimpleTag (
 	    e.kindName = kinds [kind].name;
 	    e.kind     = kinds [kind].letter;
 
-	    makeTagEntry (&e);
+	    r = makeTagEntry (&e);
 	}
+	return r;
 }
 
 static vString* ext2ptrnNew (const char *const ext)
@@ -1020,7 +1023,7 @@ static boolean removeLanguagePatternMap (const char *const pattern)
 	for (i = 0  ;  i < LanguageCount  &&  ! result ;  ++i)
 	{
 		stringList* const ptrn = LanguageTable [i]->currentPatterns;
-		if (ptrn != NULL  &&  stringListRemoveExtension (ptrn, pattern))
+		if (ptrn != NULL && stringListDeleteItemExtension (ptrn, pattern))
 		{
 			verbose (" (removed from %s)", getLanguageName (i));
 			result = TRUE;
@@ -1047,7 +1050,7 @@ extern boolean removeLanguageExtensionMap (const char *const extension)
 	for (i = 0  ;  i < LanguageCount  &&  ! result ;  ++i)
 	{
 		stringList* const exts = LanguageTable [i]->currentExtensions;
-		if (exts != NULL  &&  stringListRemoveExtension (exts, extension))
+		if (exts != NULL && stringListDeleteItemExtension (exts, extension))
 		{
 			verbose (" (removed from %s)", getLanguageName (i));
 			result = TRUE;
@@ -1584,16 +1587,12 @@ static void processLangAliasOption (const langType language,
 	}
 	else if (parameter[0] == '-')
 	{
-		vString* tmp;
 		if (lang->currentAliaes)
 		{
 			alias = parameter + 1;
-			tmp = stringListExtensionFinds(lang->currentAliaes, alias);
-			if (tmp)
+			if (stringListDeleteItemExtension (lang->currentAliaes, alias))
 			{
 				verbose ("remove alias %s from %s\n", alias, lang->name);
-				stringListRemoveExtension (lang->currentAliaes, alias);
-				vStringDelete (tmp);
 			}
 		}
 	}
