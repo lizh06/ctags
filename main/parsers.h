@@ -26,6 +26,7 @@
 	CsharpParser, \
 	DParser, \
 	DiffParser, \
+	DTSParser, \
 	DosBatchParser, \
 	EiffelParser, \
 	ErlangParser, \
@@ -46,6 +47,7 @@
 	Perl6Parser, \
 	PhpParser, \
 	PythonParser, \
+	RParser, \
 	RexxParser, \
 	RstParser, \
 	RubyParser, \

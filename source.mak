@@ -43,6 +43,7 @@ PARSER_SOURCES =				\
 	$(PARSER_DIR)/css.c			\
 	$(PARSER_DIR)/diff.c			\
 	$(PARSER_DIR)/dosbatch.c		\
+	$(PARSER_DIR)/dts.c			\
 	$(PARSER_DIR)/eiffel.c			\
 	$(PARSER_DIR)/erlang.c			\
 	$(PARSER_DIR)/flex.c			\
@@ -61,6 +62,7 @@ PARSER_SOURCES =				\
 	$(PARSER_DIR)/perl6.c			\
 	$(PARSER_DIR)/php.c			\
 	$(PARSER_DIR)/python.c			\
+	$(PARSER_DIR)/r.c			\
 	$(PARSER_DIR)/rexx.c			\
 	$(PARSER_DIR)/rst.c			\
 	$(PARSER_DIR)/ruby.c			\
