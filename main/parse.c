@@ -1205,9 +1205,10 @@ extern void initializeParsing (void)
 		if (def != NULL)
 		{
 			boolean accepted = FALSE;
+			const unsigned int regex_only = ( METHOD_REGEX | METHOD_NOT_CRAFTED );
 			if (def->name == NULL  ||  def->name[0] == '\0')
 				error (FATAL, "parser definition must contain name\n");
-			else if (def->method & ( METHOD_REGEX | METHOD_NOT_CRAFTED ))
+			else if ((def->method & regex_only) == regex_only)
 			{
 #ifdef HAVE_REGEX
 				def->parser = findRegexTags;
@@ -1754,19 +1755,28 @@ extern void printLanguageList (void)
 /*
 *   File parsing
 */
-
 extern void makeFileTag (const char *const fileName)
 {
-	if (Option.include.fileNames)
+	boolean via_line_directive = (strcmp (fileName, getInputFileName()) != 0);
+	if (Option.include.fileNames || Option.include.fileNamesWithTotalLines)
 	{
 		tagEntryInfo tag;
 		initTagEntry (&tag, baseFilename (fileName));
 
 		tag.isFileEntry     = TRUE;
 		tag.lineNumberEntry = TRUE;
-		tag.lineNumber      = 1;
 		tag.kindName        = KIND_FILE_DEFAULT_LONG;
 		tag.kind            = getSourceLanguageFileKind();
+		if (via_line_directive || Option.include.fileNames)
+		{
+			tag.lineNumber = 1;
+		}
+		else
+		{
+			while (fileReadLine () != NULL)
+				;		/* Do nothing */
+			tag.lineNumber = getInputLineNumber ();
+		}
 
 		makeTagEntry (&tag);
 	}
@@ -1785,8 +1795,6 @@ static rescanReason createTagsForFile (
 		if (LanguageTable [language]->useCork)
 			corkTagFile();
 
-		makeFileTag (fileName);
-
 	  retry:
 		if (lang->parser != NULL)
 			lang->parser ();
@@ -1799,6 +1807,8 @@ static rescanReason createTagsForFile (
 			Assert (lang->parser || lang->parser2);
 			goto retry;
 		}
+
+		makeFileTag (fileName);
 
 		if (LanguageTable [language]->useCork)
 			uncorkTagFile();
