@@ -180,7 +180,9 @@ static void writeSortedTags (
 			char *q = table[i];
 			if (*q != '!') {
 				char *p = strchr(q, '\t');
-				strcpy(p+1, p+2);
+				char *o = p+2;
+				while (*o) *++p = *o++;
+				*++p = 0;
 			}
 
 			if (fputs (table [i], fp) == EOF)
