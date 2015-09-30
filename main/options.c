@@ -2,7 +2,7 @@
 *   Copyright (c) 1996-2003, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
-*   GNU General Public License.
+*   GNU General Public License version 2 or (at your option) any later version.
 *
 *   This module contains functions to process command line options.
 */
@@ -324,6 +324,8 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Output list of supported languages."},
  {1,"  --list-maps=[language|all]"},
  {1,"       Output list of language mappings."},
+ {1,"  --list-regex-flags"},
+ {1,"       Output list of flags which can be used in a regex parser definition."},
  {1,"  --map-<LANG>=[+]map"},
  {1,"       Set or add(+) a map for <LANG>."},
  {1,"       Unlike --langmap a pattern or an extension can be specified at once."},
@@ -389,7 +391,7 @@ static optionDescription LongOptionDescription [] = {
 static const char* const License1 =
 "This program is free software; you can redistribute it and/or\n"
 "modify it under the terms of the GNU General Public License\n"
-"as published by the Free Software Foundation; either version 2\n"
+"as published by the Free Software Foundation; either version 2"
 "of the License, or (at your option) any later version.\n"
 "\n";
 static const char* const License2 =
@@ -1672,6 +1674,14 @@ static void processListLanguagesOption (
 	exit (0);
 }
 
+static void processListRegexFlagsOptions (
+		const char *const option __unused__,
+		const char *const parameter __unused__)
+{
+	printRegexFlags ();
+	exit (0);
+}
+
 
 static void freeSearchPathList (searchPathList** pathList)
 {
@@ -2146,6 +2156,7 @@ static parametricOption ParametricOptions [] = {
 	{ "_list-kinds-full",       processListKindsOption,         TRUE,   STAGE_ANY },
 	{ "list-languages",         processListLanguagesOption,     TRUE,   STAGE_ANY },
 	{ "list-maps",              processListMapsOption,          TRUE,   STAGE_ANY },
+	{ "list-regex-flags",       processListRegexFlagsOptions,   TRUE,   STAGE_ANY },
 	{ "options",                processOptionFile,              FALSE,  STAGE_ANY },
 	{ "sort",                   processSortOption,              TRUE,   STAGE_ANY },
 	{ "version",                processVersionOption,           TRUE,   STAGE_ANY },

@@ -2,7 +2,7 @@
 *   Copyright (c) 1998-2002, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
-*   GNU General Public License.
+*   GNU General Public License version 2 or (at your option) any later version.
 *
 *   External interface to entry.c
 */
@@ -93,6 +93,10 @@ typedef struct sTagEntryInfo {
 		const char* typeRef [2];  /* e.g., "struct" and struct name */
 
 	} extensionFields;  /* list of extension fields*/
+
+	boolean placeholder;	/* This is just a part of scope context.
+				   Put this entry to cork queue but
+				   don't print it to tags file. */
 } tagEntryInfo;
 
 /*

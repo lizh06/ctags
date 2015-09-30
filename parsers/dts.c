@@ -2,7 +2,7 @@
 *   Copyright (c) 2015, André Rivotti Casimiro <andre.r.casimiro@gmail.com>
 *
 *   This source code is released for free distribution under the terms of the
-*   GNU General Public License.
+*   GNU General Public License version 2 or (at your option) any later version.
 *
 *   This module contains functions for generating tags for YACC language files.
 */
@@ -31,11 +31,25 @@ static void installDTSRegex (const langType language)
 {
 	/* phandle = <0x00> */
 	addTagRegex (language,
-		"^[ \t]*phandle[ \t]+=[ \t]+<(0x[a-fA-F0-9]+)>", "\\1", "p,phandler,phandlers", NULL);
+		     "^[ \t]*phandle[ \t]+=[ \t]+<(0x[a-fA-F0-9]+)>", "\\1",
+		     "p,phandler,phandlers",
+		     "{scope=ref}");
 
 	/* label: */
 	addTagRegex (language,
-		"^[ \t]*([a-zA-Z][a-zA-Z0-9_]*)[ \t]*:", "\\1", "l,label,labels", NULL);
+		     "^[ \t]*([a-zA-Z][a-zA-Z0-9_]*)[ \t]*:", "\\1",
+		     "l,label,labels",
+		     "{scope=push}{exclusive}");
+
+	/* extras for tracking scopes  */
+	addTagRegex (language,
+		     "^[ \t]*([a-zA-Z][a-zA-Z0-9_]*)[ \t]*\\{", "",
+		     "",
+		     "{scope=push}{placeholder}{exclusive}");
+	addTagRegex (language,
+		     "^[ \t]*\\};", "",
+		     "",
+		     "{scope=pop}{exclusive}");
 }
 
 static void runCppGetc (void)
