@@ -1,11 +1,12 @@
 #	Copyright (c) 2009, Darren Hiebert
 #
 #	This source code is released for free distribution under the terms
-#	of the GNU General Public License.
+#	of the GNU General Public License version 2 or (at your option) any
+#	later version.
 
 #	Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.61])
+AC_PREREQ([2.59])
 AC_INIT([ctags],[universal])
 AC_CONFIG_HEADERS([config.h])
 if ! test -e "${srcdir}/config.h.in"; then
@@ -136,10 +137,11 @@ uname -mrsv 2>/dev/null
 # CHECK_HEADER_DEFINE(LABEL, HEADER [,ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND ] ])
 AC_DEFUN([CHECK_HEADER_DEFINE], [
 	AC_MSG_CHECKING([if $1 is defined in $2])
-	AC_EGREP_CPP(yes,
-[#include <$2>
+	AC_EGREP_CPP([$2:$1],
+[
+#include <$2>
 #ifdef $1
-  yes
+const char *result_yes = "$2:$1";
 #endif
 ], [
 	AC_MSG_RESULT(yes)
@@ -190,10 +192,6 @@ AC_ARG_ENABLE(macro-patterns,
 	[AS_HELP_STRING([--enable-macro-patterns],
 		[use patterns as default method to locate macros instead of line numbers])])
 
-AC_ARG_ENABLE(maintainer-mode,
-	[AS_HELP_STRING([--enable-maintainer-mode],
-		[use maintainer makefile])])
-
 AC_ARG_ENABLE(shell-globbing,
 	[AS_HELP_STRING([--enable-shell-globbing=DIR],
 		[does shell expand wildcards (yes|no)? [yes]])])
@@ -207,10 +205,6 @@ AC_ARG_PROGRAM
 
 # Process configuration options
 # -----------------------------
-
-if test "$enable_maintainer_mode" = yes ; then
-	AC_MSG_NOTICE(enabling maintainer mode)
-fi
 
 install_targets="install-ctags install-data install-libexec"
 AC_MSG_CHECKING(whether to install link to etags)
@@ -285,7 +279,6 @@ case `uname` in
 esac
 
 AC_PROG_LN_S
-AC_PROG_MKDIR_P
 AC_CHECK_PROG(STRIP, strip, strip, :)
 AC_SYS_LARGEFILE
 
@@ -355,9 +348,9 @@ fi
 # Checks for header files
 # -----------------------
 
-AC_CHECK_HEADERS_ONCE([dirent.h fcntl.h io.h stat.h stdlib.h string.h])
-AC_CHECK_HEADERS_ONCE([time.h types.h unistd.h])
-AC_CHECK_HEADERS_ONCE([sys/dir.h sys/stat.h sys/times.h sys/types.h sys/wait.h])
+AC_CHECK_HEADERS([dirent.h fcntl.h io.h stat.h stdlib.h string.h])
+AC_CHECK_HEADERS([time.h types.h unistd.h])
+AC_CHECK_HEADERS([sys/dir.h sys/stat.h sys/times.h sys/types.h sys/wait.h])
 
 
 # Checks for header file macros
@@ -412,13 +405,15 @@ esac
 # MinGW has st_ino, but it doesn't work.
 if test yes != "$host_mingw"; then
 	AC_MSG_CHECKING(if struct stat contains st_ino)
-	AC_TRY_COMPILE([#include <sys/stat.h>
-					#include <stdlib.h>], [
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
+		#include <sys/stat.h>
+		#include <stdlib.h>
+		], [
 		struct stat st;
 		stat(".", &st);
 		if (st.st_ino > 0)
 			exit(0);
-	], have_st_ino=yes, have_st_ino=no)
+	])],[have_st_ino=yes],[have_st_ino=no])
 	AC_MSG_RESULT($have_st_ino)
 	if test yes = "$have_st_ino"; then
 		AC_DEFINE(HAVE_STAT_ST_INO)
@@ -508,13 +503,14 @@ dnl
 dnl
 AC_CHECK_FUNCS(regcomp,[
 AC_MSG_CHECKING(if regcomp works)
-AC_TRY_RUN([
+AC_RUN_IFELSE([AC_LANG_SOURCE([
 #include <sys/types.h>
 #include <regex.h>
 int main(void) {
 	regex_t patbuf;
 	return (regcomp (&patbuf, "/hello/", 0) != 0);
-}],regcomp_works=yes,regcomp_works=no,AC_DEFINE(CHECK_REGCOMP))
+}
+])],[regcomp_works=yes],[regcomp_works=no],[AC_DEFINE(CHECK_REGCOMP)])
 AC_MSG_RESULT($regcomp_works)
 if test yes != "$regcomp_works"; then
 	AC_DEFINE(REGCOMP_BROKEN)
@@ -561,12 +557,13 @@ AC_MSG_NOTICE(checking for new missing prototypes)
 
 AC_DEFUN([CHECK_PROTO], [
 	AC_EGREP_HEADER([[^A-Za-z0-9_]$1([ 	]+[A-Za-z0-9_]*)?[	 ]*\(],
-	$2,
-	,
+	[$2],
+	[],
 	[
 		AC_MSG_NOTICE([adding prototype for $1])
-		AC_DEFINE(patsubst([NEED_PROTO_NAME], [NAME], translit([$1], [[a-z]], [[A-Z]])))
-	])])
+		AC_DEFINE(AS_TR_CPP([NEED_PROTO_$1]))
+	])
+])
 
 if test "$have_remove" = yes ; then
 	CHECK_PROTO(remove, stdio.h)
@@ -627,13 +624,8 @@ fi
 
 AC_CHECK_FUNCS([mblen], [], [HAVE_MBLEN=1], [])
 
-rm -f Makefile
-if test "$enable_maintainer_mode" = yes ; then
-	AC_MSG_NOTICE(creating maintainer Makefile)
-	ln -s maintainer.mak Makefile
-else
-	AC_CONFIG_FILES(Makefile ctags.1)
-fi
+AC_CONFIG_FILES([Makefile
+		 ctags.1])
 
 AC_OUTPUT
 

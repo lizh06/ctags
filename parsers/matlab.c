@@ -2,7 +2,7 @@
 *   Copyright (c) 2008, David Fishburn
 *
 *   This source code is released for free distribution under the terms of the
-*   GNU General Public License.
+*   GNU General Public License version 2 or (at your option) any later version.
 *
 *   This module contains functions for generating tags for MATLAB language files.
 */
@@ -28,6 +28,8 @@ static void installMatLabRegex (const langType language)
     addTagRegex (language, "^function[ \t]*[a-zA-Z0-9_]+[ \t]*=[ \t]*([a-zA-Z0-9_]+)", "\\1", "f,function", NULL);
     /* function asdf */
     addTagRegex (language, "^function[ \t]*([a-zA-Z0-9_]+)[^=]*$", "\\1", "f,function", NULL);
+    /* variables */
+    addTagRegex (language, "^[ \t]*([a-zA-Z0-9_]+)[ \t]*=[ \t]", "\\1", "v,variable", NULL);
 }
 
 extern parserDefinition* MatLabParser (void)

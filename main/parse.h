@@ -2,7 +2,7 @@
 *   Copyright (c) 1998-2003, Darren Hiebert
 *
 *   This source code is released for free distribution under the terms of the
-*   GNU General Public License.
+*   GNU General Public License version 2 or (at your option) any later version.
 *
 *   Private definitions for parsing support.
 */
@@ -168,6 +168,8 @@ extern void printRegexKinds (const langType language, boolean allKindFields, boo
 extern void freeRegexResources (void);
 extern boolean checkRegex (void);
 extern void useRegexMethod (const langType language);
+extern void printRegexFlags (void);
+extern boolean hasScopeActionInRegex (const langType language);
 
 #ifdef HAVE_COPROC
 extern boolean invokeXcmd (const char* const fileName, const langType language);
