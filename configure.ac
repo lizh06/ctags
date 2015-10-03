@@ -84,42 +84,6 @@ AH_TEMPLATE([__USE_FIXED_PROTOTYPES__],
 AH_TEMPLATE([NON_CONST_PUTENV_PROTOTYPE],
 	[Define this is you have a prototype for putenv() in <stdlib.h>, but
 	doesn't declare its argument as "const char *".])
-AH_TEMPLATE([NEED_PROTO_REMOVE],
-	[If you receive error or warning messages indicating that you are missing
-	a prototype for, or a type mismatch using, the following function, define
-	this label and remake.])
-AH_TEMPLATE([NEED_PROTO_UNLINK],
-	[If you receive error or warning messages indicating that you are missing
-	a prototype for, or a type mismatch using, the following function, define
-	this label and remake.])
-AH_TEMPLATE([NEED_PROTO_MALLOC],
-	[If you receive error or warning messages indicating that you are missing
-	a prototype for, or a type mismatch using, the following function, define
-	this label and remake.])
-AH_TEMPLATE([NEED_PROTO_GETENV],
-	[If you receive error or warning messages indicating that you are missing
-	a prototype for, or a type mismatch using, the following function, define
-	this label and remake.])
-AH_TEMPLATE([NEED_PROTO_FGETPOS],
-	[If you receive error or warning messages indicating that you are missing
-	a prototype for, or a type mismatch using, the following function, define
-	this label and remake.])
-AH_TEMPLATE([NEED_PROTO_STAT],
-	[If you receive error or warning messages indicating that you are missing
-	a prototype for, or a type mismatch using, the following function, define
-	this label and remake.])
-AH_TEMPLATE([NEED_PROTO_LSTAT],
-	[If you receive error or warning messages indicating that you are missing
-	a prototype for, or a type mismatch using, the following function, define
-	this label and remake.])
-AH_TEMPLATE([NEED_PROTO_TRUNCATE],
-	[If you receive error or warning messages indicating that you are missing
-	a prototype for, or a type mismatch using, the following function, define
-	this label and remake.])
-AH_TEMPLATE([NEED_PROTO_FTRUNCATE],
-	[If you receive error or warning messages indicating that you are missing
-	a prototype for, or a type mismatch using, the following function, define
-	this label and remake.])
 AH_TEMPLATE([MSDOS_STYLE_PATH],
 	[Define to 1 if your system uses MS-DOS style path.])
 
@@ -150,6 +114,19 @@ const char *result_yes = "$2:$1";
 	AC_MSG_RESULT(no)
 	[$4]
 ]) ])
+
+# CHECK_PROTO(FUNCTION, HEADER-FILE)
+AC_DEFUN([CHECK_PROTO], [
+	AC_EGREP_HEADER([[^A-Za-z0-9_]$1([ 	]+[A-Za-z0-9_]*)?[	 ]*\(],
+	[$2],
+	[],
+	[
+		AC_MSG_NOTICE([adding prototype for $1])
+		AH_TEMPLATE(AS_TR_CPP([NEED_PROTO_$1]),
+			    [If you receive error or warning messages indicating that you are missing a prototype for, or a type mismatch using, the following function, define this label and remake.])
+		AC_DEFINE(AS_TR_CPP([NEED_PROTO_$1]))
+	])
+])
 
 # Checks for configuration options
 # --------------------------------
@@ -201,10 +178,52 @@ AC_ARG_ENABLE(tmpdir,
 		[default directory for temporary files [ARG=/tmp]])],
 	tmpdir_specified=yes)
 
+AC_ARG_WITH([ctags-datadir],
+	[AS_HELP_STRING([--with-ctags-datadir=DIR],
+		['universal-ctags'-specific read-only architecture-independent data [DATADIR/ctags]])])
+
+AC_ARG_WITH([ctags-sysconfdir],
+	[AS_HELP_STRING([--with-ctags-sysconfdir=DIR],
+		['universal-ctags'-specific read-only single-machine data [SYSCONFDIR/ctags]])])
+
+AC_ARG_WITH([ctags-libexecdir],
+	[AS_HELP_STRING([--with-ctags-libexecdir=DIR],
+		['universal-ctags'-specific program executables [LIBEXECDIR/ctags]])])
+
 AC_ARG_PROGRAM
 
 # Process configuration options
 # -----------------------------
+
+case "${with_ctags_datadir+set}"-"$with_ctags_datadir" in #(
+"set"-"yes") ctags_datadir="${datadir}/ctags"	   ;; #(
+"set"-"no")  ctags_datadir="${datadir}"		   ;; #(
+"set"-*)     ctags_datadir="${with_ctags_datadir}" ;; #(
+*)	     ctags_datadir="${datadir}/ctags"	   ;;
+esac
+
+case "${with_ctags_sysconfdir+set}"-"$with_ctags_sysconfdir" in #(
+"set"-"yes") ctags_sysconfdir="${sysconfdir}/ctags"	 ;; #(
+"set"-"no")  ctags_sysconfdir="${sysconfdir}"		 ;; #(
+"set"-*)     ctags_sysconfdir="${with_ctags_sysconfdir}" ;; #(
+*)	     ctags_sysconfdir="${sysconfdir}/ctags"	 ;;
+esac
+
+case "${with_ctags_libexecdir+set}"-"$with_ctags_libexecdir" in #(
+"set"-"yes") ctags_libexecdir="${libexecdir}/ctags"	 ;; #(
+"set"-"no")  ctags_libexecdir="${libexecdir}"		 ;; #(
+"set"-*)     ctags_libexecdir="${with_ctags_libexecdir}" ;; #(
+*)	     ctags_libexecdir="${libexecdir}/ctags"	 ;;
+esac
+
+pkgdatadir="${ctags_datadir}"
+pkgsysconfdir="${ctags_sysconfdir}"
+pkglibexecdir="${ctags_libexecdir}"
+
+AC_SUBST([pkgdatadir])
+AC_SUBST([pkgsysconfdir])
+AC_SUBST([pkglibexecdir])
+
 
 install_targets="install-ctags install-data install-libexec"
 AC_MSG_CHECKING(whether to install link to etags)
@@ -542,9 +561,7 @@ AC_DEFINE(HAVE_REGCOMP)
 # 		have_regex=yes
 # 	fi
 # fi
-
-install_data_targets="install-data-corpora"
-AC_CHECK_FUNCS(scandir,[install_data_targets="$install_data_targets install-data-optlib install-data-preload"])
+AC_CHECK_FUNCS(scandir,[install_data_targets="install-data-optlib install-data-preload"])
 AC_SUBST(install_data_targets)
 
 install_libexec_targets=
@@ -554,16 +571,6 @@ AC_SUBST(install_libexec_targets)
 # Checks for missing prototypes
 # -----------------------------
 AC_MSG_NOTICE(checking for new missing prototypes)
-
-AC_DEFUN([CHECK_PROTO], [
-	AC_EGREP_HEADER([[^A-Za-z0-9_]$1([ 	]+[A-Za-z0-9_]*)?[	 ]*\(],
-	[$2],
-	[],
-	[
-		AC_MSG_NOTICE([adding prototype for $1])
-		AC_DEFINE(AS_TR_CPP([NEED_PROTO_$1]))
-	])
-])
 
 if test "$have_remove" = yes ; then
 	CHECK_PROTO(remove, stdio.h)
