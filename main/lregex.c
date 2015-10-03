@@ -149,11 +149,11 @@ static int makeRegexTag (
 	if (kind->enabled)
 	{
 		tagEntryInfo e;
-		Assert (name != NULL  &&  vStringLength (name) > 0);
+		Assert (name != NULL  &&  ((vStringLength (name) > 0) || placeholder));
 		Assert (kind != NULL);
 		initTagEntry (&e, vStringValue (name), kind);
 		e.extensionFields.scopeIndex = scopeIndex;
-		e.placeholder = (boolean)!!placeholder;
+		e.placeholder = !!placeholder;
 		return makeTagEntry (&e);
 	}
 	else
@@ -320,12 +320,12 @@ static void kindFree (void *data)
 	kind->letter = '\0';
 	if (kind->name)
 	{
-		eFree (kind->name);
+		eFree ((void *)kind->name);
 		kind->name = NULL;
 	}
 	if (kind->description)
 	{
-		eFree (kind->description);
+		eFree ((void *)kind->description);
 		kind->description = NULL;
 	}
 	eFree (kind);

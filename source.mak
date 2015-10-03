@@ -9,6 +9,7 @@ MAIN_HEADERS =				\
 	$(MAIN_DIR)/args.h		\
 	$(MAIN_DIR)/ctags.h		\
 	$(MAIN_DIR)/entry.h		\
+	$(MAIN_DIR)/field.h		\
 	$(MAIN_DIR)/flags.h		\
 	$(MAIN_DIR)/general.h		\
 	$(MAIN_DIR)/get.h		\
@@ -27,7 +28,6 @@ MAIN_HEADERS =				\
 	$(MAIN_DIR)/selectors.h		\
 	$(MAIN_DIR)/sort.h		\
 	$(MAIN_DIR)/strlist.h		\
-	$(MAIN_DIR)/tg.h		\
 	$(MAIN_DIR)/vstring.h
 
 PARSER_HEADERS =
@@ -85,6 +85,7 @@ PARSER_SOURCES =				\
 MAIN_SOURCES =					\
 	$(MAIN_DIR)/args.c			\
 	$(MAIN_DIR)/entry.c			\
+	$(MAIN_DIR)/field.c			\
 	$(MAIN_DIR)/flags.c			\
 	$(MAIN_DIR)/get.c			\
 	$(MAIN_DIR)/htable.c			\
@@ -102,7 +103,6 @@ MAIN_SOURCES =					\
 	$(MAIN_DIR)/selectors.c			\
 	$(MAIN_DIR)/sort.c			\
 	$(MAIN_DIR)/strlist.c			\
-	$(MAIN_DIR)/tg.c			\
 	$(MAIN_DIR)/vstring.c
 
 DEBUG_SOURCES = $(MAIN_DIR)/debug.c
