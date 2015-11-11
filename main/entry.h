@@ -6,8 +6,8 @@
 *
 *   External interface to entry.c
 */
-#ifndef _ENTRY_H
-#define _ENTRY_H
+#ifndef CTAGS_MAIN_ENTRY_H
+#define CTAGS_MAIN_ENTRY_H
 
 /*
 *   INCLUDE FILES
@@ -50,6 +50,8 @@ typedef struct eTagFile {
 		unsigned int length;
 		unsigned int count;
 	} corkQueue;
+
+	boolean patternCacheValid;
 } tagFile;
 
 typedef struct sTagFields {
@@ -125,6 +127,14 @@ extern void initTagEntryFull (tagEntryInfo *const e, const char *const name,
 			      const char *sourceFileName,
 			      const kindOption *kind);
 
+/* Getting line associated with tag */
+extern char *readSourceLineAnyway (vString *const vLine, const tagEntryInfo *const tag,
+				   long *const pSeekValue);
+
+/* Generating pattern associated tag, caller must do eFree for the returned value. */
+extern char* makePatternString (const tagEntryInfo *const tag);
+
+
 /* language is optional: can be NULL. */
 extern void writePseudoTag (const char *const tagName,
 			    const char *const fileName,
@@ -136,6 +146,7 @@ void          uncorkTagFile(void);
 tagEntryInfo *getEntryInCorkQueue   (unsigned int n);
 size_t        countEntryInCorkQueue (void);
 
-#endif  /* _ENTRY_H */
+
+#endif  /* CTAGS_MAIN_ENTRY_H */
 
 /* vi:set tabstop=4 shiftwidth=4: */
