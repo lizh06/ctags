@@ -1,9 +1,12 @@
+.. _chop:
+
 Chop testing
 ---------------------------------------------------------------------
 
 :Maintainer: Masatake YAMATO <yamato@redhat.com>
 
 ----
+
 After reviving many bug reports, we recognized some of them spot
 unexpected EOF. The chop target is developed based on this recognition.
 

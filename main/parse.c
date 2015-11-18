@@ -29,6 +29,7 @@
 #ifdef HAVE_ICONV
 # include "mbcs.h"
 #endif
+#include "xtag.h"
 
 /*
 *   DATA DEFINITIONS
@@ -1074,10 +1075,8 @@ extern void initializeParsing (void)
 				error (FATAL, "parser definition must contain name\n");
 			else if ((def->method & regex_only) == regex_only)
 			{
-#ifdef HAVE_REGEX
 				def->parser = findRegexTags;
 				accepted = TRUE;
-#endif
 			}
 			else if (((!!def->parser) + (!!def->parser2)) != 1)
 				error (FATAL,
@@ -1125,7 +1124,6 @@ extern void freeParserResources (void)
 	LanguageCount = 0;
 }
 
-#ifdef HAVE_REGEX
 static void doNothing (void)
 {
 }
@@ -1142,7 +1140,6 @@ static void lazyInitialize (langType language)
 	if (lang->method & METHOD_REGEX)
 		lang->parser = findRegexTags;
 }
-#endif
 
 /*
 *   Option parsing
@@ -1174,7 +1171,6 @@ static flagDefinition LangDefFlagDef [] = {
 extern void processLanguageDefineOption (
 		const char *const option, const char *const parameter __unused__)
 {
-#ifdef HAVE_REGEX
 	if (parameter [0] == '\0')
 		error (WARNING, "No language specified for \"%s\" option", option);
 	else if (getNamedLanguage (parameter) != LANG_IGNORE)
@@ -1206,10 +1202,6 @@ extern void processLanguageDefineOption (
 
 		eFree (name);
 	}
-#else
-	error (WARNING, "regex support not available; required for --%s option",
-		   option);
-#endif
 }
 
 static kindOption *langKindOption (const langType language, const int flag)
@@ -1567,6 +1559,10 @@ static void printLanguage (const langType language)
 	const parserDefinition* lang;
 	Assert (0 <= language  &&  language < (int) LanguageCount);
 	lang = LanguageTable [language];
+
+	if (lang->invisible)
+		return;
+
 	if (lang->kinds != NULL  ||  (lang->method & METHOD_REGEX) || (lang->method & METHOD_XCMD))
 		printf ("%s%s\n", lang->name, isLanguageEnabled (language) ? "" : " [disabled]");
 }
@@ -1584,14 +1580,15 @@ extern void printLanguageList (void)
 extern void makeFileTag (const char *const fileName)
 {
 	boolean via_line_directive = (strcmp (fileName, getInputFileName()) != 0);
-	if (Option.include.fileNames || Option.include.fileNamesWithTotalLines)
+	if (isXtagEnabled(XTAG_FILE_NAMES)
+	    || isXtagEnabled(XTAG_FILE_NAMES_WITH_TOTAL_LINES))
 	{
 		tagEntryInfo tag;
 		kindOption  *kind;
 
 		kind = getSourceLanguageFileKind();
 		Assert (kind);
-		kind->enabled = Option.include.fileNames;
+		kind->enabled = isXtagEnabled(XTAG_FILE_NAMES);
 
 		/* TODO: you can return here if enabled == FALSE. */
 
@@ -1600,7 +1597,7 @@ extern void makeFileTag (const char *const fileName)
 		tag.isFileEntry     = TRUE;
 		tag.lineNumberEntry = TRUE;
 
-		if (via_line_directive || (!Option.include.fileNamesWithTotalLines))
+		if (via_line_directive || (!isXtagEnabled(XTAG_FILE_NAMES_WITH_TOTAL_LINES)))
 		{
 			tag.lineNumber = 1;
 		}
@@ -1960,6 +1957,7 @@ extern parserDefinition *CTagsSelfTestParser (void)
 	def->kinds = CTST_Kinds;
 	def->kindCount = KIND_COUNT;
 	def->parser = createCTSTTags;
+	def->invisible = TRUE;
 	return def;
 }
 
