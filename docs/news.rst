@@ -20,23 +20,36 @@ New parsers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The following parsers have been added:
 
-* ada
-* clojure
-* coffee *xcmd*
-* css
-* d
-* ctags option library *optlib*
-* falcon
-* go
-* json
-* m4 *optlib*
-* mib *optlib*
-* rust
-* windres
+* Ada
+* Clojure
+* CSS
+* D
+* Diff
+* DTS
+* Falcon
+* Go
+* JSON
+* ObjectiveC
+* Perl6
+* R
+* reStructuredText
+* Rust
 * SystemVerilog
+* WindRes
+* Zephir
+* coffee *xcmd*
+* ctags option library *optlib*
+* m4 *optlib*
 
 See "Option library" about  *optlib*.
 See "External parser command" about *xcmd*.
+
+TIPS: you can list newly introduced parsers if you have
+exuberant-ctags with following command line:
+
+.. code-block:: console
+
+		$ diff -ruN <(universal-ctags --list-languages) <(exuberant-ctags --list-languages)  | grep '^[-+]'
 
 
 Heavily improved language parsers
@@ -59,6 +72,10 @@ Wildcard in options
 
 For the purpose gathering as much as possible information from source
 code "wildcard"(``*``) in option is introduced.
+
+``--extras=*``
+
+	Enables all extra tags.
 
 ``--fields=*``
 
@@ -154,6 +171,29 @@ To enable the option, libiconv is needed in your platform. In addition
 On windows mingw32, you must specify ``WITH_ICONV=yes`` like below::
 
 	C:\dev\ctags>mingw32-make -f mk_mingw.mak WITH_ICONV=yes
+
+Extra tag entries (``--extra``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Following extra tag entries are newly introduced.
+
+``F``
+
+	Equivalent to --file-scope.
+
+``.``
+
+	Do the similar to the ``f`` extra flag but the entry addresses the end line.
+
+``p``
+
+	Include pseudo tags.
+
+
+``--list-...`` options
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``--list-extras``, ``--list-features`` and ``--list-fields`` are added.
+
+
 
 Changes in tags file format
 ---------------------------------------------------------------------
