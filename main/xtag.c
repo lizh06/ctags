@@ -13,6 +13,7 @@
 #include "general.h"  /* must always come first */
 #include "debug.h"
 #include "main.h"
+#include "routines.h"
 #include "xtag.h"
 
 static boolean isPseudoTagsEnabled (xtagDesc *pdesc)
@@ -24,7 +25,7 @@ static xtagDesc xtagDescs [] = {
 	{ TRUE, 'F',
 	  "Include tags of file scope" },
 	{ FALSE, 'f',
-	  "Include an entry for the base file name of every source file"},
+	  "Include an entry for the base file name of every input file"},
 	{ FALSE, 'p',
 	  "Include pseudo tags",
 	  isPseudoTagsEnabled},
@@ -66,7 +67,7 @@ extern void printXtags (void)
 {
 	int i;
 
-	for (i = 0; i < sizeof (xtagDescs) / sizeof (xtagDescs [0]); i++)
+	for (i = 0; i < ARRAY_SIZE (xtagDescs); i++)
 		printXtag (i);
 }
 

@@ -222,7 +222,7 @@ struct p6Ctx {
     enum token  tokens[128 /* unlikely to need more than this */];
     int         n_tokens;
     vString    *name;
-    const char *line;      /* Saved from fileReadLine() */
+    const char *line;      /* Saved from readLineFromInputFile() */
 };
 
 static void
@@ -270,7 +270,7 @@ getNonSpaceStr (struct p6Ctx *ctx, const char **ptok)
     const char *s = ctx->line;
     if (!s) {
 next_line:
-        s = (const char *) fileReadLine();
+        s = (const char *) readLineFromInputFile();
         if (!s)
             return 0;                           /* EOF */
     }
@@ -295,7 +295,7 @@ findPerl6Tags (void)
 #define RESET_TOKENS() do { ctx.n_tokens = 0; } while (0)
 
 #define PUSH_TOKEN(_t_) do {                                            \
-    if (ctx.n_tokens < sizeof(ctx.tokens) / sizeof(ctx.tokens[0])) {    \
+    if (ctx.n_tokens < ARRAY_SIZE(ctx.tokens)) {			\
         ctx.tokens[ ctx.n_tokens ] = _t_;                               \
         ++ctx.n_tokens;                                                 \
     } else {                                                            \
