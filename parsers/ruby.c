@@ -31,7 +31,7 @@
 *   DATA DECLARATIONS
 */
 typedef enum {
-	K_UNDEFINED = -1, K_CLASS, K_METHOD, K_MODULE, K_SINGLETON, K_DESCRIBE, K_CONTEXT
+	K_UNDEFINED = -1, K_CLASS, K_METHOD, K_MODULE, K_SINGLETON,
 } rubyKind;
 
 /*
@@ -42,8 +42,11 @@ static kindOption RubyKinds [] = {
 	{ TRUE, 'f', "method", "methods" },
 	{ TRUE, 'm', "module", "modules" },
 	{ TRUE, 'F', "singletonMethod", "singleton methods" },
-	{ TRUE, 'd', "describe", "describes" },
-	{ TRUE, 'C', "context", "contexts" }
+#if 0
+	/* Following two kinds are reserved. */
+	{ TRUE, 'd', "describe", "describes and contexts for Rspec" },
+	{ TRUE, 'C', "constant", "constants" },
+#endif
 };
 
 static NestingLevels* nesting = NULL;
@@ -215,7 +218,7 @@ static void emitRubyTag (vString* name, rubyKind kind)
 	initTagEntry (&tag, unqualified_name, &(RubyKinds [kind]));
 	if (vStringLength (scope) > 0) {
 		Assert (0 <= parent_kind &&
-		        (size_t) parent_kind < (sizeof RubyKinds / sizeof RubyKinds[0]));
+		        (size_t) parent_kind < (ARRAY_SIZE (RubyKinds)));
 
 		tag.extensionFields.scopeKind = &(RubyKinds [parent_kind]);
 		tag.extensionFields.scopeName = vStringValue (scope);
@@ -264,10 +267,6 @@ static rubyKind parseIdentifier (
 	else if (kind == K_SINGLETON)
 	{
 		also_ok = "?!=";
-	}
-	else if (kind == K_DESCRIBE || kind == K_CONTEXT)
-	{
-		also_ok = " ,\".#?!='/-";
 	}
 	else
 	{
@@ -395,7 +394,7 @@ static void findRubyTags (void)
 	*
 	* if you wished, and this function would fail to recognize anything.
 	*/
-	while ((line = fileReadLine ()) != NULL)
+	while ((line = readLineFromInputFile ()) != NULL)
 	{
 		const unsigned char *cp = line;
 
@@ -472,14 +471,6 @@ static void findRubyTags (void)
 				kind = K_SINGLETON;
 
 			readAndEmitTag (&cp, kind);
-		}
-		else if (canMatchKeyword (&cp, "describe"))
-		{
-			readAndEmitTag (&cp, K_DESCRIBE);
-		}
-		else if (canMatchKeyword (&cp, "context"))
-		{
-			readAndEmitTag (&cp, K_CONTEXT);
 		}
 		while (*cp != '\0')
 		{

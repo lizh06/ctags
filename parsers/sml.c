@@ -141,7 +141,7 @@ static smlKind findNextIdentifier (const unsigned char **cp)
 {
 	smlKind result = K_NONE;
 	vString *const identifier = vStringNew ();
-	unsigned int count = sizeof (SmlKeywordTypes) / sizeof (SmlKeywordTypes [0]);
+	unsigned int count = ARRAY_SIZE (SmlKeywordTypes);
 	unsigned int i;
 	*cp = parseIdentifier (*cp, identifier);
 	for (i = 0  ;  i < count  &&  result == K_NONE ;  ++i)
@@ -160,7 +160,7 @@ static void findSmlTags (void)
 	const unsigned char *line;
 	smlKind lastTag = K_NONE;
 
-	while ((line = fileReadLine ()) != NULL)
+	while ((line = readLineFromInputFile ()) != NULL)
 	{
 		const unsigned char *cp = skipSpace (line);
 		do

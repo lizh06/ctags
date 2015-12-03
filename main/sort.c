@@ -230,7 +230,7 @@ extern void internalSortTags (const boolean toStdout)
 	}
 	for (i = 0  ;  i < numTags  &&  ! feof (fp)  ;  )
 	{
-		line = readLine (vLine, fp);
+		line = readLineRaw (vLine, fp);
 		if (line == NULL)
 		{
 			if (! feof (fp))
