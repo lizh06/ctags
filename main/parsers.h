@@ -14,30 +14,31 @@
 
 /* Add the name of any new parser definition function here */
 #define PARSER_LIST \
-	AdaParser, \
 	AntParser, \
 	AsmParser, \
 	AspParser, \
 	AwkParser, \
 	BasicParser, \
+	CoffeeScriptParser, \
 	CParser, \
 	CppParser, \
 	CssParser, \
 	CsharpParser, \
+	CtagsParser, \
+	CobolParser, \
 	DParser, \
 	DiffParser, \
-	DTSParser, \
 	DosBatchParser, \
-	EiffelParser, \
 	ErlangParser, \
-	FlexParser, \
 	FortranParser, \
+	GdbinitParser, \
+	GoParser, \
 	HtmlParser, \
 	JavaParser, \
 	JavaScriptParser, \
 	JsonParser, \
-	LispParser, \
 	LuaParser, \
+	M4Parser, \
 	MakefileParser, \
 	MatLabParser, \
 	ObjcParser, \
@@ -48,27 +49,19 @@
 	PhpParser, \
 	PythonParser, \
 	RParser, \
-	RexxParser, \
 	RstParser, \
 	RubyParser, \
 	RustParser, \
 	SchemeParser, \
 	ShParser, \
-	SlangParser, \
 	SmlParser, \
 	SqlParser, \
 	TclParser, \
 	TexParser, \
-	VeraParser, \
-	VerilogParser, \
-	SystemVerilogParser, \
-	VhdlParser, \
 	VimParser, \
 	WindResParser, \
 	YaccParser, \
-	ZephirParser, \
-	  \
-	CTagsSelfTestParser
+	ZephirParser
 
 #endif  /* CTAGS_MAIN_PARSERS_H */
 
