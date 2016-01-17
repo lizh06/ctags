@@ -13,6 +13,7 @@
 #include "general.h"  /* must always come first */
 
 #include <string.h>
+#include <stdio.h>
 
 #include "entry.h"
 #include "nestlevel.h"
@@ -22,24 +23,74 @@
 #include "vstring.h"
 #include "routines.h"
 #include "debug.h"
+#include "xtag.h"
 
 /*
 *   DATA DECLARATIONS
 */
 
 typedef enum {
-	K_CLASS, K_FUNCTION, K_MEMBER, K_VARIABLE, K_IMPORT
+	K_CLASS, K_FUNCTION, K_MEMBER, K_VARIABLE, K_NAMESPACE, K_MODULE, K_UNKNOWN,
 } pythonKind;
+
+typedef enum {
+	PYTHON_MODULE_IMPORTED,
+	PYTHON_MODULE_NAMESPACE,
+	PYTHON_MODULE_INDIRECTLY_IMPORTED,
+} pythonModuleRole;
+
+typedef enum {
+	PYTHON_UNKNOWN_IMPORTED,
+	PYTHON_UNKNOWN_INDIRECTLY_IMPORTED,
+} pythonUnknownRole;
 
 /*
 *   DATA DEFINITIONS
 */
+
+/* Roles releated to `import'
+ * ==========================
+ * import X              X = (kind:module, role:imported)
+ *
+ * import X as Y         X = (kind:module, role:indirectly-imported),
+ *                       Y = (kind:namespace, [nameref:X])
+ *                       ------------------------------------------------
+ *                       Don't confuse with namespace role of module kind.
+ *
+ * from X import *       X = (kind:module,  role:namespace)
+ *
+ * from X import Y       X = (kind:module,  role:namespace),
+ *                       Y = (kind:unknown, role:imported, [scope:X])
+ *
+ * from X import Y as Z  X = (kind:module,  role:namespace),
+ *                       Y = (kind:unknown, role:indirectly-imported, [scope:X])
+ *                       Z = (kind:unknown, [nameref:X.Y]) */
+
+static roleDesc PythonModuleRoles [] = {
+	{ TRUE, "imported",
+	  "imported modules" },
+	{ TRUE, "namespace",
+	  "namespace from where classes/variables/functions are imported" },
+	{ TRUE, "indirectly-imported",
+	  "module imported in alternative name" },
+};
+
+static roleDesc PythonUnknownRoles [] = {
+	{ TRUE, "imported",   "imported from the other module" },
+	{ TRUE, "indirectly-imported",
+	  "classes/variables/functions/modules imported in alternative name" },
+};
+
 static kindOption PythonKinds[] = {
 	{TRUE, 'c', "class",    "classes"},
 	{TRUE, 'f', "function", "functions"},
 	{TRUE, 'm', "member",   "class members"},
 	{TRUE, 'v', "variable", "variables"},
-	{TRUE, 'i', "namespace", "imports"}
+	{TRUE, 'I', "namespace", "name referring a module defined in other file"},
+	{TRUE, 'i', "module",    "modules",
+	 .referenceOnly = TRUE,  ATTACH_ROLES(PythonModuleRoles)},
+	{TRUE, 'x', "unknown",   "name referring a classe/variable/function/module defined in other module",
+	 .referenceOnly = FALSE, ATTACH_ROLES(PythonUnknownRoles)},
 };
 
 typedef enum {
@@ -60,6 +111,11 @@ static char const * const doubletriple = "\"\"\"";
 static boolean isIdentifierFirstCharacter (int c)
 {
 	return (boolean) (isalpha (c) || c == '_');
+}
+
+static boolean isIdentifierFirstCharacterCB (int c, void *dummy __unused__)
+{
+	return isIdentifierFirstCharacter (c);
 }
 
 static boolean isIdentifierCharacter (int c)
@@ -112,11 +168,9 @@ static void addAccessFields (tagEntryInfo *const entry,
 /* Given a string with the contents of a line directly after the "def" keyword,
  * extract all relevant information and create a tag.
  */
-static void makeFunctionTag (vString *const function,
-	vString *const parent, int is_class_parent, const char *arglist)
+static void makeFunctionTagFull (tagEntryInfo *tag, vString *const function,
+				 vString *const parent, int is_class_parent, const char *arglist)
 {
-	tagEntryInfo tag;
-
 	if (is_class_parent)
 	{
 		if (!PythonKinds[K_MEMBER].enabled)
@@ -128,29 +182,36 @@ static void makeFunctionTag (vString *const function,
 			return;
 	}
 
-	initTagEntry (&tag, vStringValue (function), &(PythonKinds[K_FUNCTION]));
-
-	tag.extensionFields.signature = arglist;
+	tag->extensionFields.signature = arglist;
 
 	if (vStringLength (parent) > 0)
 	{
 		if (is_class_parent)
 		{
-			tag.kind = &(PythonKinds[K_MEMBER]);
-			tag.extensionFields.scopeKind = &(PythonKinds[K_CLASS]);
-			tag.extensionFields.scopeName = vStringValue (parent);
+			tag->kind = &(PythonKinds[K_MEMBER]);
+			tag->extensionFields.scopeKind = &(PythonKinds[K_CLASS]);
+			tag->extensionFields.scopeName = vStringValue (parent);
 		}
 		else
 		{
-			tag.extensionFields.scopeKind = &(PythonKinds[K_FUNCTION]);
-			tag.extensionFields.scopeName = vStringValue (parent);
+			tag->extensionFields.scopeKind = &(PythonKinds[K_FUNCTION]);
+			tag->extensionFields.scopeName = vStringValue (parent);
 		}
 	}
 
-	addAccessFields (&tag, function, is_class_parent ? K_MEMBER : K_FUNCTION,
+	addAccessFields (tag, function, is_class_parent ? K_MEMBER : K_FUNCTION,
 		vStringLength (parent) > 0, is_class_parent);
 
-	makeTagEntry (&tag);
+	makeTagEntry (tag);
+}
+
+static void makeFunctionTag (vString *const function,
+	vString *const parent, int is_class_parent, const char *arglist)
+{
+	tagEntryInfo tag;
+
+	initTagEntry (&tag, vStringValue (function), &(PythonKinds[K_FUNCTION]));
+	makeFunctionTagFull (&tag, function, parent, is_class_parent, arglist);
 }
 
 /* Given a string with the contents of the line directly after the "class"
@@ -220,8 +281,9 @@ static const char *skipString (const char *cp)
 	return cp;
 }
 
-/* Skip everything up to an identifier start. */
-static const char *skipEverything (const char *cp)
+static const char *skipUntil (const char *cp,
+			      boolean (* isAcceptable) (int, void*),
+			      void *user_data)
 {
 	int match;
 	for (; *cp; cp++)
@@ -261,12 +323,18 @@ static const char *skipEverything (const char *cp)
 			cp = skipString(cp);
 			if (!*cp) break;
 		}
-		if (isIdentifierFirstCharacter ((int) *cp))
+		if (isAcceptable ((int) *cp, user_data))
 			return cp;
 		if (match)
 			cp--; /* avoid jumping over the character after a skipped string */
 	}
 	return cp;
+}
+
+/* Skip everything up to an identifier start. */
+static const char *skipEverything (const char *cp)
+{
+	return skipUntil (cp, isIdentifierFirstCharacterCB, NULL);
 }
 
 /* Skip an identifier. */
@@ -341,17 +409,191 @@ static void parseClass (const char *cp, vString *const class,
 	vStringDelete (inheritance);
 }
 
-static void parseImports (const char *cp)
+static void parseImports (const char *cp, const char* from_module)
 {
-	const char *pos;
-	vString *name, *name_next;
+	const char* cp_next;
+	vString *name, *name_next, *fq;
+	boolean maybe_multiline = FALSE;
+	boolean found_multiline_end = FALSE;
+
+	name = vStringNew ();
+	name_next = vStringNew ();
+	fq = vStringNew ();
+
+	cp = skipSpace (cp);
+	if (from_module && *cp == '(')
+	{
+		maybe_multiline = TRUE;
+		++cp;
+	}
+
+	cp = skipEverything (cp);
+nextLine:
+	while (*cp)
+	{
+		cp = parseIdentifier (cp, name);
+		cp = skipSpace (cp);
+		if (*cp == ')')
+			found_multiline_end = TRUE;
+		cp = skipEverything (cp);
+		cp_next = parseIdentifier (cp, name_next);
+
+		if (strcmp (vStringValue (name_next), "as") == 0)
+		{
+			cp = skipEverything (cp_next);
+			cp = parseIdentifier (cp, name_next);
+			if (from_module)
+			{
+				/* from x import Y as Z
+				   ----------------------------
+				   x = (kind:module,  role:namespace),
+				   Y = (kind:unknown, role:indirectly-imported),
+				   Z = (kind:unknown) */
+
+				/* Y */
+				makeSimpleRefTag (name, PythonKinds, K_UNKNOWN,
+						  PYTHON_UNKNOWN_INDIRECTLY_IMPORTED);
+				/* x.Y */
+				if (isXtagEnabled(XTAG_QUALIFIED_TAGS))
+				{
+					vStringCatS (fq, from_module);
+					vStringPut (fq, '.');
+					vStringCat (fq, name);
+					makeSimpleRefTag (fq, PythonKinds, K_UNKNOWN,
+							  PYTHON_UNKNOWN_INDIRECTLY_IMPORTED);
+					vStringClear(fq);
+				}
+				/* Z */
+				makeSimpleTag (name_next, PythonKinds, K_UNKNOWN);
+			}
+			else
+			{
+				/* import x as Y
+				   ----------------------------
+				   X = (kind:module, role:indirectly-imported)
+				   Y = (kind:namespace)*/
+				/* X */
+				makeSimpleRefTag (name, PythonKinds, K_MODULE,
+						  PYTHON_MODULE_INDIRECTLY_IMPORTED);
+				/* Y */
+				makeSimpleTag (name_next, PythonKinds, K_NAMESPACE);
+			}
+
+			cp = skipSpace (cp);
+			if (*cp == ')')
+			{
+				found_multiline_end = TRUE;
+				cp++;
+			}
+			cp = skipEverything (cp);
+		}
+		else
+		{
+			if (from_module)
+			{
+				/* from x import Y
+				   --------------
+				   x = (kind:module,  role:namespace),
+				   Y = (kind:unknown, role:imported) */
+				/* Y */
+				makeSimpleRefTag (name, PythonKinds, K_UNKNOWN,
+						  PYTHON_MODULE_IMPORTED);
+				/* x.Y */
+				if (isXtagEnabled(XTAG_QUALIFIED_TAGS))
+				{
+					vStringCatS (fq, from_module);
+					vStringPut (fq, '.');
+					vStringCat (fq, name);
+					makeSimpleRefTag (fq, PythonKinds, K_UNKNOWN,
+							  PYTHON_MODULE_IMPORTED);
+					vStringClear(fq);
+				}
+			}
+			else
+			{
+				/* import X
+				   --------------
+				   X = (kind:module, role:imported) */
+				makeSimpleRefTag (name, PythonKinds, K_MODULE,
+						  PYTHON_MODULE_IMPORTED);
+			}
+			/* Don't update cp. Start from the position of name_next. */
+		}
+	}
+
+	if (maybe_multiline && (!found_multiline_end))
+	{
+		if ((cp = (const char *) readLineFromInputFile ()) != NULL)
+		{
+			cp = skipSpace (cp);
+			if (*cp == ')')
+			{
+				cp++;
+				found_multiline_end = TRUE;
+			}
+			else
+				goto nextLine;
+		}
+	}
+
+	vStringDelete (fq);
+	vStringDelete (name);
+	vStringDelete (name_next);
+}
+
+static void parseFromModule (const char *cp, const char* dummy __unused__)
+{
+	vString *from_module;
+	vString *import_keyword;
+
+	/* from X import ...
+	   --------------------
+	   X = (kind:module, role:namespace) */
+
+	from_module = vStringNew ();
+	import_keyword = vStringNew ();
+
+	cp = skipEverything (cp);
+	cp = parseIdentifier (cp, from_module);
+	cp = skipEverything (cp);
+	cp = parseIdentifier (cp, import_keyword);
+
+	if (strcmp (vStringValue (import_keyword), "import") == 0
+	    || strcmp (vStringValue (import_keyword), "cimport") == 0)
+	{
+		makeSimpleRefTag (from_module, PythonKinds, K_MODULE,
+				  PYTHON_MODULE_NAMESPACE);
+		parseImports (cp, vStringValue (from_module));
+	}
+
+	vStringDelete (import_keyword);
+	vStringDelete (from_module);
+}
+
+
+static void parseNamespace (const char *cp)
+{
+	void (* parse_sub) (const char *, const char *);
 
 	cp = skipEverything (cp);
 
-	if ((pos = strstr (cp, "import")) == NULL)
+	if (strncmp (cp, "import", 6) == 0)
+	{
+		cp += 6;
+		parse_sub = parseImports;
+	}
+	else if (strncmp (cp, "cimport", 7) == 0)
+	{
+		cp += 7;
+		parse_sub = parseImports;
+	}
+	else if (strncmp (cp, "from", 4) == 0)
+	{
+		cp += 4;
+		parse_sub = parseFromModule;
+	}
+	else
 		return;
-
-	cp = pos + 6;
 
 	/* continue only if there is some space between the keyword and the identifier */
 	if (! isspace (*cp))
@@ -360,80 +602,108 @@ static void parseImports (const char *cp)
 	cp++;
 	cp = skipSpace (cp);
 
-	name = vStringNew ();
-	name_next = vStringNew ();
-
-	cp = skipEverything (cp);
-	while (*cp)
-	{
-		cp = parseIdentifier (cp, name);
-
-		cp = skipEverything (cp);
-		/* we parse the next possible import statement as well to be able to ignore 'foo' in
-		 * 'import foo as bar' */
-		parseIdentifier (cp, name_next);
-
-		/* take the current tag only if the next one is not "as" */
-		if (strcmp (vStringValue (name_next), "as") != 0 &&
-			strcmp (vStringValue (name), "as") != 0)
-		{
-			makeSimpleTag (name, PythonKinds, K_IMPORT);
-		}
-	}
-	vStringDelete (name);
-	vStringDelete (name_next);
+	parse_sub (cp, NULL);
 }
 
 /* modified from get.c getArglistFromStr().
  * warning: terminates rest of string past arglist!
  * note: does not ignore brackets inside strings! */
-static char *parseArglist(const char *buf)
+struct argParsingState
 {
-	char *start, *end;
+	vString *arglist;
 	int level;
-	char *arglist, *from, *to;
-	int len;
-	if (NULL == buf)
-		return NULL;
-	if (NULL == (start = strchr(buf, '(')))
-		return NULL;
-	for (level = 1, end = start + 1; level > 0; ++end)
-	{
-		if ('\0' == *end)
-			break;
-		else if ('(' == *end)
-			++ level;
-		else if (')' == *end)
-			-- level;
-	}
-	*end = '\0';
+};
 
-	len = strlen(start) + 1;
-	arglist = eMalloc(len);
-	from = start;
-	to = arglist;
-	while (*from != '\0') {
-		if (*from == '\t')
-			; /* tabs are illegal in field values */
-		else
-			*to++ = *from;
-		++from;
+static boolean gatherArglistCB (int c, void *arglist)
+{
+	if (arglist)
+	{
+		if ('\t' == c)
+			c = ' ';
+
+		if (vStringLast ((vString *)arglist) != ' '
+		    || c != ' ')
+			vStringPut ((vString *)arglist, c);
 	}
-	*to = '\0';
-	return arglist;
+
+	if (c == '(' || c == ')')
+		return TRUE;
+	else
+		return FALSE;
+}
+
+static boolean parseArglist(const char* buf, struct argParsingState *state)
+{
+	const char *start, *current;
+
+	start = buf;
+	if (state->level == 0)
+	{
+		if (NULL == (start = strchr(buf, '(')))
+			return FALSE;
+		else
+		{
+			if (state->arglist)
+				vStringPut (state->arglist, *start);
+			state->level = 1;
+			start += 1;
+		}
+	}
+
+	current = skipUntil (start, gatherArglistCB, state->arglist);
+	switch (*current)
+	{
+	case '\0':
+		break;
+	case '(':
+		++ state->level;
+		break;
+	case ')':
+		-- state->level;
+		break;
+	}
+	return TRUE;
+}
+
+static void captureArguments (const char *start, vString *arglist)
+{
+	struct argParsingState state;
+
+	state.level = 0;
+	state.arglist = arglist;
+
+	while (start)
+	{
+		if (parseArglist (start, &state) == FALSE)
+			/* No '(' is found: broken input */
+			break;
+		else if (state.level == 0)
+			break;
+		else
+			start = (const char *) readLineFromInputFile ();
+	}
+}
+
+static void skipParens (const char *start)
+{
+	captureArguments (start, NULL);
 }
 
 static void parseFunction (const char *cp, vString *const def,
 	vString *const parent, int is_class_parent)
 {
-	char *arglist;
+	tagEntryInfo tag;
+	static vString *arglist;
 
 	cp = parseIdentifier (cp, def);
-	arglist = parseArglist (cp);
-	makeFunctionTag (def, parent, is_class_parent, arglist);
-	if (arglist != NULL) {
-		eFree (arglist);
-	}
+	initTagEntry (&tag, vStringValue (def), &(PythonKinds[K_FUNCTION]));
+
+	if (arglist)
+	  vStringClear (arglist);
+	else
+	  arglist = vStringNew ();
+	captureArguments (cp, arglist);
+	makeFunctionTagFull (&tag, def, parent, is_class_parent, vStringValue (arglist));
 }
 
 /* Get the combined name of a nested symbol. Classes are separated with ".",
@@ -570,7 +840,7 @@ static void find_triple_end(char const *string, char const **which)
 	}
 }
 
-static const char *findVariable(const char *line)
+static const char *findVariable(const char *line, const char** lineContinuation)
 {
 	/* Parse global and class variable names (C.x) from assignment statements.
 	 * Object attributes (obj.x) are ignored.
@@ -590,6 +860,9 @@ static const char *findVariable(const char *line)
 			break;	/* allow 'x = func(b=2,y=2,' lines and comments at the end of line */
 		eq++;
 	}
+
+	if (*eq == '(')
+		*lineContinuation = eq;
 
 	/* go backwards to the start of the line, checking we have valid chars */
 	start = cp - 1;
@@ -639,7 +912,7 @@ static const char *skipTypeDecl (const char *cp, boolean *is_class)
 		}
 		if (!*ptr || *ptr == '=') return NULL;
 		if (*ptr == '(') {
-		    return lastStart; /* if we stopped on a '(' we are done */
+			return lastStart; /* if we stopped on a '(' we are done */
 		}
 		ptr = skipSpace(ptr);
 		lastStart = ptr;
@@ -718,6 +991,7 @@ static void findPythonTags (void)
 
 	while ((line = (const char *) readLineFromInputFile ()) != NULL)
 	{
+		const char *variableLineContinuation = NULL;
 		const char *cp = line, *candidate;
 		char const *longstring;
 		char const *keyword, *variable;
@@ -754,11 +1028,11 @@ static void findPythonTags (void)
 			find_triple_end(cp, &longStringLiteral);
 			continue;
 		}
-		
+
 		checkIndent(nesting_levels, indent);
 
 		/* Find global and class variables */
-		variable = findVariable(line);
+		variable = findVariable(line, &variableLineContinuation);
 		if (variable)
 		{
 			const char *start = variable;
@@ -787,6 +1061,9 @@ static void findPythonTags (void)
 				if (parent_is_class || vStringLength(parent) == 0)
 					makeVariableTag (name, parent, parent_is_class);
 			}
+
+			if (variableLineContinuation)
+				skipParens (variableLineContinuation);
 		}
 
 		/* Deal with multiline string start. */
@@ -815,24 +1092,24 @@ static void findPythonTags (void)
 				is_class = TRUE;
 			}
 			else if (matchKeyword ("cdef", keyword, &cp))
-		    {
-		        candidate = skipTypeDecl (cp, &is_class);
-		        if (candidate)
-		        {
-		    		found = TRUE;
-		    		cp = candidate;
-		        }
+			{
+				candidate = skipTypeDecl (cp, &is_class);
+				if (candidate)
+				{
+					found = TRUE;
+					cp = candidate;
+				}
 
-		    }
-    		else if (matchKeyword ("cpdef", keyword, &cp))
-		    {
-		        candidate = skipTypeDecl (cp, &is_class);
-		        if (candidate)
-		        {
-		    		found = TRUE;
-		    		cp = candidate;
-		        }
-		    }
+			}
+			else if (matchKeyword ("cpdef", keyword, &cp))
+			{
+				candidate = skipTypeDecl (cp, &is_class);
+				if (candidate)
+				{
+					found = TRUE;
+					cp = candidate;
+				}
+			}
 
 			if (found)
 			{
@@ -849,8 +1126,8 @@ static void findPythonTags (void)
 				addNestingLevel(nesting_levels, indent, name, is_class);
 			}
 		}
-		/* Find and parse imports */
-		parseImports(line);
+		/* Find and parse namespace releated elements */
+		parseNamespace(line);
 	}
 	/* Clean up all memory we allocated. */
 	vStringDelete (parent);
@@ -861,10 +1138,10 @@ static void findPythonTags (void)
 
 extern parserDefinition *PythonParser (void)
 {
-        static const char *const extensions[] = { "py", "pyx", "pxd", "pxi" ,"scons",
-					      NULL };
+	static const char *const extensions[] = { "py", "pyx", "pxd", "pxi" ,"scons",
+											  NULL };
 	static const char *const aliases[] = { "python[23]*", "scons",
-					      NULL };
+										   NULL };
 	parserDefinition *def = parserNew ("Python");
 	def->kinds = PythonKinds;
 	def->kindCount = ARRAY_SIZE (PythonKinds);
