@@ -196,13 +196,21 @@ static boolean createTagsForWildcardUsingFindfirst (const char *const pattern)
 
 #endif
 
+
 static boolean recurseIntoDirectory (const char *const dirName)
 {
+	static unsigned int recursionDepth = 0;
+
+	recursionDepth++;
+
 	boolean resize = FALSE;
 	if (isRecursiveLink (dirName))
 		verbose ("ignoring \"%s\" (recursive link)\n", dirName);
 	else if (! Option.recurse)
 		verbose ("ignoring \"%s\" (directory)\n", dirName);
+	else if(recursionDepth > Option.maxRecursionDepth)
+		verbose ("not descending in directory \"%s\" (depth %u > %u)\n",
+				dirName, recursionDepth, Option.maxRecursionDepth);
 	else
 	{
 		verbose ("RECURSING into directory \"%s\"\n", dirName);
@@ -219,6 +227,9 @@ static boolean recurseIntoDirectory (const char *const dirName)
 		}
 #endif
 	}
+
+	recursionDepth--;
+
 	return resize;
 }
 
@@ -361,7 +372,7 @@ static void printTotals (const clock_t *const timeStamps)
 	const unsigned long totalTags = TagFile.numTags.added +
 									TagFile.numTags.prev;
 
-	fprintf (errout, "%ld file%s, %ld line%s (%ld kB) scanned",
+	fprintf (stderr, "%ld file%s, %ld line%s (%ld kB) scanned",
 			Totals.files, plural (Totals.files),
 			Totals.lines, plural (Totals.lines),
 			Totals.bytes/1024L);
@@ -370,32 +381,32 @@ static void printTotals (const clock_t *const timeStamps)
 		const double interval = ((double) (timeStamps [1] - timeStamps [0])) /
 								CLOCKS_PER_SEC;
 
-		fprintf (errout, " in %.01f seconds", interval);
+		fprintf (stderr, " in %.01f seconds", interval);
 		if (interval != (double) 0.0)
-			fprintf (errout, " (%lu kB/s)",
+			fprintf (stderr, " (%lu kB/s)",
 					(unsigned long) (Totals.bytes / interval) / 1024L);
 	}
 #endif
-	fputc ('\n', errout);
+	fputc ('\n', stderr);
 
-	fprintf (errout, "%lu tag%s added to tag file",
+	fprintf (stderr, "%lu tag%s added to tag file",
 			TagFile.numTags.added, plural (TagFile.numTags.added));
 	if (Option.append)
-		fprintf (errout, " (now %lu tags)", totalTags);
-	fputc ('\n', errout);
+		fprintf (stderr, " (now %lu tags)", totalTags);
+	fputc ('\n', stderr);
 
 	if (totalTags > 0  &&  Option.sorted != SO_UNSORTED)
 	{
-		fprintf (errout, "%lu tag%s sorted", totalTags, plural (totalTags));
+		fprintf (stderr, "%lu tag%s sorted", totalTags, plural (totalTags));
 #ifdef CLOCK_AVAILABLE
-		fprintf (errout, " in %.02f seconds",
+		fprintf (stderr, " in %.02f seconds",
 				((double) (timeStamps [2] - timeStamps [1])) / CLOCKS_PER_SEC);
 #endif
-		fputc ('\n', errout);
+		fputc ('\n', stderr);
 	}
 
 #ifdef DEBUG
-	fprintf (errout, "longest tag line = %lu\n",
+	fprintf (stderr, "longest tag line = %lu\n",
 			(unsigned long) TagFile.max.line);
 #endif
 }

@@ -33,18 +33,18 @@ typedef enum {
 typedef enum {
 	R_INCLUDE_GENERIC,
 	R_INCLUDE_OPTIONAL,
-} makeIncludeRole;
+} makeMakefileRole;
 
-static roleDesc MakeIncludeRoles [] = {
-	RoleTemplateGeneric,
-	{ TRUE, "optional", "included as an optional makefile"},
+static roleDesc MakeMakefileRoles [] = {
+        { TRUE, "included", "included" },
+	{ TRUE, "optional", "optionally included"},
 };
 
 static kindOption MakeKinds [] = {
 	{ TRUE, 'm', "macro",  "macros"},
 	{ TRUE, 't', "target", "targets"},
-	{ TRUE, 'I', "include", "includes",
-	  .referenceOnly = TRUE, ATTACH_ROLES(MakeIncludeRoles)},
+	{ TRUE, 'I', "makefile", "makefiles",
+	  .referenceOnly = TRUE, ATTACH_ROLES(MakeMakefileRoles)},
 };
 
 /*
@@ -119,9 +119,8 @@ static void newMacro (vString *const name)
 
 static void newInclude (vString *const name, boolean optional)
 {
-	if (isXtagEnabled (XTAG_REFERENCE_TAGS))
-		makeSimpleRefTag (name, MakeKinds, K_INCLUDE,
-				  optional? R_INCLUDE_OPTIONAL: R_INCLUDE_GENERIC);
+	makeSimpleRefTag (name, MakeKinds, K_INCLUDE,
+			  optional? R_INCLUDE_OPTIONAL: R_INCLUDE_GENERIC);
 }
 
 static boolean isAcceptableAsInclude (vString *const name)
