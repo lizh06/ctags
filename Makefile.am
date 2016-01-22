@@ -21,6 +21,11 @@ MAIN_SRCS += $(REGEX_SRCS)
 MAIN_HEADS += $(REGEX_HEADS)
 endif
 
+if HAVE_LIBXML
+PARSER_SRCS += $(XML_SRCS)
+PARSER_HEADS += $(XML_HEADS)
+endif
+
 ctags_CPPFLAGS = -I. -I$(srcdir) -I$(srcdir)/main
 if ENABLE_DEBUGGING
 ctags_CPPFLAGS+= $(DEBUG_CPPFLAGS)
@@ -34,6 +39,10 @@ ctags_CFLAGS  += $(EXTRA_CFLAGS)
 ctags_CFLAGS  += $(WARNING_CFLAGS)
 ctags_CFLAGS  += $(COVERAGE_CFLAGS)
 ctags_CFLAGS  += $(CGCC_CFLAGS)
+ctags_CFLAGS  += $(LIBXML_CFLAGS)
+
+ctags_LDADD  =
+ctags_LDADD += $(LIBXML_LIBS)
 
 nodist_ctags_SOURCES = $(REPOINFO_HEADS)
 BUILT_SOURCES = $(REPOINFO_HEADS)
@@ -48,9 +57,12 @@ $(REPOINFO_HEADS):
 	echo > $@
 endif
 
+optlib2c_verbose = $(optlib2c_verbose_@AM_V@)
+optlib2c_verbose_ = $(optlib2c_verbose_@AM_DEFAULT_V@)
+optlib2c_verbose_0 = @echo OPTLIB2C "  $@";
 OPTLIB2C = $(srcdir)/misc/optlib2c
-.ctags.c: $(OPTLIB2C)
-	$(OPTLIB2C) $< > $@
+%.c: %.ctags $(OPTLIB2C) Makefile
+	$(optlib2c_verbose)$(OPTLIB2C) --transform-xcmd="$(program_transform_name)" $< > $@
 dist_ctags_SOURCES = $(ALL_HEADS) $(ALL_SRCS)
 
 man_MANS = ctags.1
