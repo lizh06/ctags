@@ -27,6 +27,7 @@ fi
 #
 SHELL=/bin/sh
 CTAGS=./ctags
+READTAGS=./readtags
 LIBEXECDIR=./libexec
 WITH_TIMEOUT=
 WITH_VALGRIND=
@@ -714,6 +715,7 @@ run_summary ()
     for t in $L_FAILED_BY_DIFF; do
 	echo "	${t#${_DEFAULT_CATEGORY}/}"
 	if [ "${SHOW_DIFF_OUTPUT}" = yes ]; then
+	    run_show_stderr_output "${build_dir}" "${t#${_DEFAULT_CATEGORY}/}"
 	    run_show_diff_output "${build_dir}" "${t#${_DEFAULT_CATEGORY}/}"
 	fi
     done
@@ -1802,7 +1804,11 @@ tmain_run ()
 	line '-'
 	(
 	    cd ${subdir}
-	    ${SHELL} run.sh ${basedir}/${CTAGS} ${basedir}/${LIBEXECDIR} ${build_subdir}
+	    ${SHELL} run.sh \
+		     ${basedir}/${CTAGS} \
+		     ${basedir}/${LIBEXECDIR} \
+		     ${build_subdir} \
+		     ${basedir}/${READTAGS}
 	) > ${build_subdir}/stdout-actual.txt 2> ${build_subdir}/stderr-actual.txt
 	r=$?
 	echo $r > ${build_subdir}/exit-actual.txt
@@ -1905,6 +1911,10 @@ action_tmain ()
 		;;
 	    --show-diff-output)
 		SHOW_DIFF_OUTPUT=yes
+		shift
+		;;
+	    --readtags=*)
+		READTAGS="${1#--readtags=}"
 		shift
 		;;
 	    -*)
