@@ -297,7 +297,7 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Output list of alias patterns."},
  {1,"  --list-extensions=[language|all]"},
  {1,"       Output list of language extensions in mapping."},
- {1,"  --list-extras"},
+ {1,"  --list-extra"},
  {1,"       Output list of extra tag flags."},
  {1,"  --list-features"},
  {1,"       Output list of features."},
@@ -338,6 +338,10 @@ static optionDescription LongOptionDescription [] = {
  {0,"  --print-language"},
  {0,"       Don't make tags file but just print the guessed language name for"},
  {0,"       input file."},
+ {0,"  --pseudo-tags=[+|-]ptag"},
+ {0,"  --pseudo-tags=*"},
+ {0,"       Enable/disable emitting pseudo tag named ptag."},
+ {0,"       if * is given, enable emitting all pseudo tags."},
  {0,"  --put-field-prefix"},
  {0,"       Put \"" CTAGS_FIELD_PREFIX "\" as prefix for the name of fields newly introduced in"},
  {0,"       universal-ctags."},
@@ -1537,7 +1541,7 @@ static void processListAliasesOption (
 	exit (0);
 }
 
-static void processListExtrasOption (
+static void processListExtraOption (
 		const char *const option, const char *const parameter)
 {
 	int i;
@@ -1807,6 +1811,40 @@ static void processOptionFile (
 	eStatFree (status);
 	if (vpath)
 		vStringDelete (vpath);
+}
+
+static void processPseudoTags (const char *const option,
+			       const char *const parameter)
+{
+	const char *p = parameter;
+	boolean s;
+
+	if (*p == '*')
+	{
+		int i;
+		for (i = 0; i < PTAG_COUNT; i++)
+			enablePtag (i, TRUE);
+		return;
+	}
+
+	if (*p != '+'  &&  *p != '-')
+	{
+		int i;
+		for (i = 0; i < PTAG_COUNT; i++)
+			enablePtag (i, FALSE);
+	}
+	else
+	{
+		ptagType t;
+
+		s = (*p == '+')? TRUE: FALSE;
+		p++;
+		t = getPtagTypeForName (p);
+		if (t == PTAG_UNKNOWN)
+			error (FATAL, "Unknown pseudo tag name: %s", p);
+
+		enablePtag (t, s);
+	}
 }
 
 static void processSortOption (
@@ -2167,7 +2205,7 @@ static parametricOption ParametricOptions [] = {
 	{ "license",                processLicenseOption,           TRUE,   STAGE_ANY },
 	{ "list-aliases",           processListAliasesOption,       TRUE,   STAGE_ANY },
 	{ "list-extensions",        processListExtensionsOption,    TRUE,   STAGE_ANY },
-	{ "list-extras",            processListExtrasOption,        TRUE,   STAGE_ANY },
+	{ "list-extra",             processListExtraOption,        TRUE,   STAGE_ANY },
 	{ "list-features",          processListFeaturesOption,      TRUE,   STAGE_ANY },
 	{ "list-fields",            processListFieldsOption,        TRUE,   STAGE_ANY },
 	{ "list-file-kind",         processListFileKindOption,      TRUE,   STAGE_ANY },
@@ -2181,6 +2219,7 @@ static parametricOption ParametricOptions [] = {
 	{ "_list-roles",            processListRolesOptions,        TRUE,   STAGE_ANY },
 	{ "maxdepth",               processMaxRecursionDepthOption, TRUE,   STAGE_ANY },
 	{ "options",                processOptionFile,              FALSE,  STAGE_ANY },
+	{ "pseudo-tags",            processPseudoTags,              FALSE,  STAGE_ANY },
 	{ "sort",                   processSortOption,              TRUE,   STAGE_ANY },
 	{ "version",                processVersionOption,           TRUE,   STAGE_ANY },
 	{ "_echo",                  processEchoOption,              FALSE,  STAGE_ANY },
