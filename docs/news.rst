@@ -1,7 +1,12 @@
+======================================================================
 Introduced changes
 ======================================================================
 
 :Maintainer: Masatake YAMATO <yamato@redhat.com>
+
+.. contents:: `Table of contents`
+	:depth: 3
+	:local:
 
 ----
 
@@ -38,6 +43,7 @@ The following parsers have been added:
 * reStructuredText
 * Rust
 * SystemVerilog
+* TTCN
 * WindRes
 * Zephir
 * coffee *xcmd*
@@ -117,7 +123,7 @@ There were 3 classes of message in ctags:
 *ignore *notice*. With ``--quiet`` option can be used to turn off the
 printing the *notice* class messages.
 
-``--input-endocing=ENCODING`` and ``--output-endocing=ENCODING`` options
+``--input-encoding=ENCODING`` and ``--output-encoding=ENCODING`` options
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Japanese programmers sometimes use Japanese language in comments in
@@ -248,7 +254,7 @@ All pseudo tags are enabled if `*` is given as the name of ptag like::
 	--pseudo-tags=*
 
 All pseudo tags are disabled if no option value is given to
-``--pseudo-tags` option like::
+``--pseudo-tags`` option like::
 
 	--pseudo-tags=
 
@@ -439,8 +445,7 @@ ctags emits ``TAG_KIND_SEPARATOR`` with following format::
 
 	!_TAG_KIND_SEPARATOR!{parser}	{sep}	/{upper}{lower}/
 
-or
-::
+or ::
 
 	!_TAG_KIND_SEPARATOR!{parser}	{sep}	/{lower}/
 
@@ -473,9 +478,9 @@ Example output:
     ...
 
 The first line means `::` is used when combining something with an
-item of class kind. The second line means `\` is used when a class
+item of class kind. The second line means `\\` is used when a class
 item is at the top level, no upper item for it. The third line
-means `\` is used when for combining a namespace item(upper) and a
+means `\\` is used when for combining a namespace item(upper) and a
 class item(lower). Of course, ctags uses more specific one when
 choosing a separator; the third one has higher priority than the
 first.

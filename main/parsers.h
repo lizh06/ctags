@@ -67,6 +67,11 @@
 	SqlParser, \
 	TclParser, \
 	TexParser, \
+	TTCNParser, \
+	VeraParser, \
+	VerilogParser, \
+	SystemVerilogParser, \
+	VhdlParser, \
 	VimParser, \
 	WindResParser, \
 	YaccParser, \
