@@ -334,7 +334,9 @@ static boolean pushConditional (const boolean firstBranchChosen)
 static boolean popConditional (void)
 {
 	if (Cpp.directive.nestLevel > 0)
+	{
 		--Cpp.directive.nestLevel;
+	}
 
 	return isIgnore ();
 }
@@ -364,6 +366,8 @@ static void makeDefineTag (const char *const name, const char* const signature, 
 			initTagEntry (&e, name, Cpp.defineMacroKind);
 		e.lineNumberEntry = (boolean) (Option.locate == EX_LINENUM);
 		e.isFileScope  = isFileScope;
+		if (isFileScope)
+			markTagExtraBit (&e, XTAG_FILE_SCOPE);
 		e.truncateLine = TRUE;
 		e.extensionFields.signature = signature;
 		makeTagEntry (&e);
