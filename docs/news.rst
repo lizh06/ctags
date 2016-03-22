@@ -21,6 +21,11 @@ importing. Some changes in Fedora and Debian are also imported.
 Parsers related changes
 ---------------------------------------------------------------------
 
+Fully rewritten parsers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* c (see :ref:`The new C/C++ parser <cxx>`)
+* c++ (see :ref:`The new C/C++ parser <cxx>`)
+
 New parsers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The following parsers have been added:
@@ -229,6 +234,64 @@ In this example, ``role`` is prefixed.
 ``--maxdepth`` limits the depth of directory recursion enabled with ``-R``
 option.
 
+``--map-<LANG>`` option
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To control langmap in finer grained than ``--langmap`` option,
+``--map-<LANG>`` is introduced.
+
+An entry of langmap is defined with a pair of an file extension(or a pattern)
+and the name of language. Here we use "spec" as a generic term representing
+file extension and pattern.
+
+``--langmap`` option manipulates exclusive way::
+
+  $ ./ctags --langdef=FOO --langmap=FOO:+.ABC \
+	    --langdef=BAR --langmap=BAR:+.ABC  \
+	    --list-maps | grep '\*.ABC$'
+  BAR      *.ABC
+
+Though `FOO` is added before adding `BAR`,
+only `BAR` are remained as a handler for the spec `*.ABC`.
+
+Universal ctags allows adding multiple parsers for a spec.
+One of them can be chosen for an input file by variety parser
+guessing rules inside ctags(See "Choosing a proper parser in ctags").
+
+For getting the benefits from the parser guessing rules, non-exclusive way
+for manipulating the langmap is needed. ``--map-<LANG>`` option is for the
+purpose.
+
+Let's see how it manipulates non-exclusive way::
+
+    % ./ctags --langdef=FOO --map-FOO=+.ABC \
+	      --langdef=BAR --map-BAR=+.ABC \
+	      --list-maps | grep '\*.ABC$'
+    FOO      *.ABC
+    BAR      *.ABC
+
+Both `FOO` and `BAR` are registered. ``--map-<LANG>`` can be used
+not only for adding a langmap entry but also for removing it.::
+
+    $ ./ctags --langdef=FOO --map-FOO=+.ABC \
+	      --langdef=BAR --map-BAR=+.ABC \
+	      --map-FOO=-.ABC --list-maps | grep '\*.ABC$'
+    BAR      *.ABC
+
+    $ ./ctags --langdef=FOO --map-FOO=+.ABC \
+	      --langdef=BAR --map-BAR=+.ABC \
+	      --map-BAR=-.ABC --list-maps | grep '\*.ABC$'
+    FOO      *.ABC
+
+    $./ctags --langdef=FOO --map-FOO=+.ABC \
+	     --langdef=BAR --map-BAR=+.ABC \
+	     --map-BAR=-.ABC --map-FOO=-.ABC  --list-maps | grep '\*.ABC$'
+    (NOTHING)
+
+``--langmap`` option provides the way to manipulate langmap in spec
+centrist form. ``--map-<LANG>`` option provides the way to manipulate
+langmap in parser centrist form.
+
 
 Guessing parser from file contents (``-G`` option)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -258,6 +321,9 @@ All pseudo tags are disabled if no option value is given to
 
 	--pseudo-tags=
 
+For specifying only one pseudo tag, specify it without sign:
+
+	--pseudo-tags=ptag
 
 
 Changes in tags file format
@@ -426,6 +492,47 @@ To avoid such cases, we try making tags file more self-descriptive.
 The pseudo tags are used for the self description.  We hope some of
 incompatibilities can be overcome in upper layer tools with the pseudo
 tags.
+
+Example output:
+
+.. code-block:: console
+
+    $ ./ctags -o - --extra=p --pseudo-tags='TAG_KIND_DESCRIPTION' foo.c
+    !_TAG_KIND_DESCRIPTION!C	L,label	/goto label/
+    !_TAG_KIND_DESCRIPTION!C	c,class	/classes/
+    !_TAG_KIND_DESCRIPTION!C	d,macro	/macro definitions/
+    !_TAG_KIND_DESCRIPTION!C	e,enumerator	/enumerators (values inside an enumeration)/
+    !_TAG_KIND_DESCRIPTION!C	f,function	/function definitions/
+    !_TAG_KIND_DESCRIPTION!C	g,enum	/enumeration names/
+    !_TAG_KIND_DESCRIPTION!C	h,header	/included header files/
+    !_TAG_KIND_DESCRIPTION!C	l,local	/local variables/
+    !_TAG_KIND_DESCRIPTION!C	m,member	/class, struct, and union members/
+    !_TAG_KIND_DESCRIPTION!C	n,namespace	/namespaces/
+    !_TAG_KIND_DESCRIPTION!C	p,prototype	/function prototypes/
+    !_TAG_KIND_DESCRIPTION!C	s,struct	/structure names/
+    !_TAG_KIND_DESCRIPTION!C	t,typedef	/typedefs/
+    !_TAG_KIND_DESCRIPTION!C	u,union	/union names/
+    !_TAG_KIND_DESCRIPTION!C	v,variable	/variable definitions/
+    !_TAG_KIND_DESCRIPTION!C	x,externvar	/external and forward variable declarations/
+    foo	foo.c	/^foo (int i, int j)$/;"	f
+    main	foo.c	/^main (void)$/;"	f
+
+
+``TAG_KIND_DESCRIPTION``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This is a newly introduced pseudo tag. It is not emitted by default.
+It is emitted only when ``--pseudo-tags=+TAG_KIND_DESCRIPTION`` option
+is given.
+
+This is for describing kinds; their letter, name, and description are
+enumerated in the pseudo tags.
+
+ctags emits ``TAG_KIND_DESCRIPTION`` with following format::
+
+	!_TAG_KIND_SEPARATOR!{parser}	{letter},{name}	/{description}/
+
+A backslash and a slash in {description} is escaped with a backslash.
 
 
 ``TAG_KIND_SEPARATOR``
@@ -628,7 +735,7 @@ Make tags(*foo.tags*) with following command line
 
 for following input (*foo.py*)
 
-.. code-block:: Python
+.. code-block:: python
 
     class Foo:
 	def aq ():
@@ -699,5 +806,3 @@ Examples of filter expressions
 	$ ./readtags  -e -t foo.tags -Q '(and (member "Foo" $inherits) (eq? $kind "class"))' -l
 	Bar	foo.py	/^class Bar (Foo):$/;"	kind:class	language:Python	inherits:Foo	access:public
 	Baz	foo.py	/^class Baz (Foo): $/;"	kind:class	language:Python	inherits:Foo	access:public
-
-

@@ -201,9 +201,12 @@ extern boolean isLanguageKindEnabled (const langType language, char kind);
 extern void installLanguageMapDefault (const langType language);
 extern void installLanguageMapDefaults (void);
 extern void clearLanguageMap (const langType language);
-extern boolean removeLanguageExtensionMap (const char *const extension);
-extern void addLanguageExtensionMap (const langType language, const char* extension, boolean exclusive);
-extern void addLanguagePatternMap (const langType language, const char* ptrn, boolean exclusive);
+extern boolean removeLanguageExtensionMap (const langType language, const char *const extension);
+extern void addLanguageExtensionMap (const langType language, const char* extension,
+				     boolean exclusiveInAllLanguages);
+extern boolean removeLanguagePatternMap (const langType language, const char *const pattern);
+extern void addLanguagePatternMap (const langType language, const char* ptrn,
+				   boolean exclusiveInAllLanguages);
 
 extern void installLanguageAliasesDefault (const langType language);
 extern void installLanguageAliasesDefaults (void);
@@ -242,6 +245,7 @@ extern boolean enableRegexKind (const langType language, const int kind, const b
 extern boolean isRegexKindEnabled (const langType language, const int kind);
 extern boolean hasRegexKind (const langType language, const int kind);
 extern void printRegexKinds (const langType language, boolean allKindFields, boolean indent);
+extern void foreachRegexKinds (const langType language, boolean (* func) (kindOption*, void*), void *data);
 extern void freeRegexResources (void);
 extern boolean checkRegex (void);
 extern void useRegexMethod (const langType language);
@@ -258,6 +262,7 @@ extern boolean enableXcmdKind (const langType language, const int kind, const bo
 extern boolean isXcmdKindEnabled (const langType language, const int kind);
 extern boolean hasXcmdKind (const langType language, const int kind);
 extern void printXcmdKinds (const langType language, boolean allKindFields, boolean indent);
+extern void foreachXcmdKinds (const langType language, boolean (* func) (kindOption*, void*), void *data);
 extern void freeXcmdResources (void);
 extern void useXcmdMethod (const langType language);
 extern void notifyAvailabilityXcmdMethod (const langType language);
@@ -272,6 +277,8 @@ extern void addTagXpath (const langType language, tagXpathTable *xpathTable);
 struct sPtagDesc;
 extern void makeKindSeparatorsPseudoTags (const langType language,
 					  const struct sPtagDesc *pdesc);
+extern void makeKindDescriptionsPseudoTags (const langType language,
+					    const struct sPtagDesc *pdesc);
 
 #endif  /* CTAGS_MAIN_PARSE_H */
 
