@@ -162,7 +162,7 @@ typedef struct sTokenInfoSQL {
 	int         scopeKind;
 	int         begin_end_nest_lvl;
 	unsigned long lineNumber;
-	fpos_t filePosition;
+	MIOPos filePosition;
 } tokenInfo;
 
 /*
@@ -224,7 +224,7 @@ static kindOption SqlKinds [] = {
 	{ TRUE,  'z', "mlprop",		  "MobiLink Properties "   }
 };
 
-static const keywordTable const SqlKeywordTable [] = {
+static const keywordTable SqlKeywordTable [] = {
 	/* keyword		keyword ID */
 	{ "as",								KEYWORD_is				      },
 	{ "is",								KEYWORD_is				      },

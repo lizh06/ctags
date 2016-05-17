@@ -66,6 +66,8 @@
 
 
 #include "debug.h"
+#include "entry.h"
+#include "field.h"
 #include "keyword.h"
 #include "main.h"
 #include "options.h"
@@ -369,8 +371,8 @@ static clock_t clock (void)
 
 static void printTotals (const clock_t *const timeStamps)
 {
-	const unsigned long totalTags = TagFile.numTags.added +
-									TagFile.numTags.prev;
+	const unsigned long totalTags = numTagsTotal();
+	const unsigned long addedTags = numTagsAdded();
 
 	fprintf (stderr, "%ld file%s, %ld line%s (%ld kB) scanned",
 			Totals.files, plural (Totals.files),
@@ -390,7 +392,7 @@ static void printTotals (const clock_t *const timeStamps)
 	fputc ('\n', stderr);
 
 	fprintf (stderr, "%lu tag%s added to tag file",
-			TagFile.numTags.added, plural (TagFile.numTags.added));
+			addedTags, plural(addedTags));
 	if (Option.append)
 		fprintf (stderr, " (now %lu tags)", totalTags);
 	fputc ('\n', stderr);
@@ -407,7 +409,7 @@ static void printTotals (const clock_t *const timeStamps)
 
 #ifdef DEBUG
 	fprintf (stderr, "longest tag line = %lu\n",
-			(unsigned long) TagFile.max.line);
+		 (unsigned long) maxTagsLine ());
 #endif
 }
 
@@ -521,9 +523,6 @@ static void sanitizeEnviron (void)
 	}
 }
 
-extern void cxxParserCleanup(void);
-
-
 /*
  *		Start up code
  */
@@ -536,6 +535,7 @@ extern int main (int __unused__ argc, char **argv)
 	setExecutableName (*argv++);
 	sanitizeEnviron ();
 	checkRegex ();
+	initFieldDescs ();
 
 	args = cArgNewFromArgv (argv);
 	previewFirstOption (args);
@@ -550,7 +550,6 @@ extern int main (int __unused__ argc, char **argv)
 
 	/*  Clean up.
 	 */
-	cxxParserCleanup();
 	cArgDelete (args);
 	freeKeywordTable ();
 	freeRoutineResources ();

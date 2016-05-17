@@ -20,6 +20,8 @@
 
 #include <stdio.h>
 
+#include "mio.h"
+
 /*
 *   MACROS
 */
@@ -75,12 +77,13 @@ extern void vStringCatS (vString *const string, const char *const s);
 extern void vStringNCatS (vString *const string, const char *const s, const size_t length);
 extern vString *vStringNewCopy (const vString *const string);
 extern vString *vStringNewInit (const char *const s);
-extern vString *vStringNewFile (FILE *input);
 extern void vStringCopyS (vString *const string, const char *const s);
 extern void vStringNCopyS (vString *const string, const char *const s, const size_t length);
 extern void vStringCopyToLower (vString *const dest, const vString *const src);
 extern void vStringSetLength (vString *const string);
 extern void vStringTruncate (vString *const string, const size_t length);
+
+extern vString *vStringNewOrClear (vString *const string);
 
 extern vString *vStringNewOwn (char *s);
 extern char    *vStringDeleteUnwrap (vString *const string);

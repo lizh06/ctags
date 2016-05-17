@@ -33,6 +33,7 @@ static void simpleXpathMakeTag (xmlNode *node,
 	tagEntryInfo tag;
 	xmlChar* str;
 	const kindOption *kind;
+	char *path;
 
 	str = xmlNodeGetContent(node);
 	if (str == NULL)
@@ -53,11 +54,16 @@ static void simpleXpathMakeTag (xmlNode *node,
 	tag.lineNumber = xmlGetLineNo (node);
 	tag.filePosition = getInputFilePositionForLine (tag.lineNumber);
 
+	path = (char *)xmlGetNodePath (node);
+	tag.extensionFields.xpath = path;
+
 	if (spec->make)
 		spec->make (node, spec, &tag, userData);
 	else
 		makeTagEntry (&tag);
 
+	if (path)
+		xmlFree (path);
 out:
 	xmlFree (str);
 }
@@ -129,6 +135,29 @@ static void suppressWarning (void *ctx __unused__, const char *msg __unused__, .
 {
 }
 
+static xmlDocPtr makeXMLDoc (void)
+{
+	const unsigned char* data;
+	size_t size;
+	xmlDocPtr doc = NULL;
+
+	doc = getInputFileUserData ();
+	if (doc)
+	{
+		verbose ("reuse xml doc data\n");
+		return doc;
+	}
+
+	data = getInpufFileData (&size);
+	if (data)
+	{
+		xmlLineNumbersDefault (1);
+		doc = xmlParseMemory((const char*)data, size);
+	}
+
+	return doc;
+}
+
 extern void findXMLTags (xmlXPathContext *ctx, xmlNode *root,
 			 const tagXpathTableTable *xpathTableTable,
 			 const kindOption* const kinds,void *userData)
@@ -143,7 +172,9 @@ extern void findXMLTags (xmlXPathContext *ctx, xmlNode *root,
 		findRegexTags ();
 
 		xmlSetGenericErrorFunc (NULL, suppressWarning);
-		doc = xmlParseFile(getInputFileName());
+
+		doc = makeXMLDoc ();
+
 		if (doc == NULL)
 		{
 			verbose ("could not parse %s as a XML file\n", getInputFileName());
@@ -168,7 +199,9 @@ out:
 	if (usedAsEnterPoint)
 	{
 		xmlXPathFreeContext (ctx);
-		xmlFreeDoc (doc);
+
+		if (doc != getInputFileUserData ())
+			xmlFreeDoc (doc);
 	}
 }
 
