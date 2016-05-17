@@ -44,7 +44,7 @@
  */
 typedef enum eKeywordId {
 	KEYWORD_NONE = -1,
-	KEYWORD_alias, KEYWORD_all, KEYWORD_and,
+	KEYWORD_across, KEYWORD_alias, KEYWORD_all, KEYWORD_and,
 	KEYWORD_as, KEYWORD_assign, KEYWORD_attached,
 	KEYWORD_check, KEYWORD_class, KEYWORD_convert, KEYWORD_create,
 	KEYWORD_creation, KEYWORD_Current,
@@ -114,8 +114,9 @@ static kindOption EiffelKinds [] = {
 	{ FALSE, 'l', "local",   "local entities"}
 };
 
-static const keywordTable const EiffelKeywordTable [] = {
+static const keywordTable EiffelKeywordTable [] = {
 	/* keyword          keyword ID */
+	{ "across",         KEYWORD_across     },
 	{ "alias",          KEYWORD_alias      },
 	{ "all",            KEYWORD_all        },
 	{ "and",            KEYWORD_and        },
@@ -806,6 +807,7 @@ static void findFeatureEnd (tokenInfo *const token)
 					case KEYWORD_check:
 					case KEYWORD_debug:
 					case KEYWORD_from:
+					case KEYWORD_across:
 					case KEYWORD_if:
 					case KEYWORD_inspect:
 						++depth;

@@ -40,20 +40,26 @@ The following parsers have been added:
 * Falcon
 * Glade *libxml*
 * Go
+* JavaProperties
 * JSON
+* man *optlib*
 * Maven2 *libxml*
 * ObjectiveC
 * Perl6
+* PropertiyList(plist) *libxml*
 * R
 * reStructuredText
 * Rust
 * SystemVerilog
+* SVG *libxml*
 * TTCN
 * WindRes
+* XSLT v1.0 *libxml*
 * Zephir
 * coffee *xcmd*
 * ctags option library *optlib*
 * m4 *optlib*
+* myrddin
 
 See "Option library" about  *optlib*.
 See "External parser command" about *xcmd*.
@@ -69,9 +75,11 @@ exuberant-ctags with following command line:
 
 Heavily improved language parsers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* ant *libxml*
+* ant (rewritten with *libxml*)
 * php
 * verilog
+* C/C++ (completely rewritten)
+
 
 New options
 ---------------------------------------------------------------------
@@ -123,9 +131,9 @@ There were 3 classes of message in ctags:
 	Mainly for debugging purpose.
 
 
-*notice* is a new class of message. It is less important than warning*
-*but more important for users than *verbose*. Generally the user can
-*ignore *notice*. With ``--quiet`` option can be used to turn off the
+*notice* is a new class of message. It is less important than *warning*
+but more important for users than *verbose*. Generally the user can
+ignore *notice*. With ``--quiet`` option can be used to turn off the
 printing the *notice* class messages.
 
 ``--input-encoding=ENCODING`` and ``--output-encoding=ENCODING`` options
@@ -198,11 +206,34 @@ Following extra tag entries are newly introduced.
 	Include pseudo tags.
 
 
-``--list-...`` options
+Options for inspecting ctags internal
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Exuberant-ctags provides the way to inspect its internal via ``--list-kinds``,
+``--list-languages``, and ``--list-maps``.
+
+This idea is promoted in Universal-ctags more; ``--list-kinds-full``,
 ``--list-extensions``,  ``--list-extra``, ``--list-features``,
 ``--list-fields``, ``--list-patterns``, and ``--list-pseudo-tags`` are added.
+
+The original 3 ``--list-`` options are not changed for keeping the
+compatibility.  Newly introduced ``--list-`` is considered to be used
+in interactively and in scripts.
+
+By default, interactive use is assumed; ctags tries aligning the
+columns of list output for easier to read. When ``--machinable``
+option is given before newly introduced ``--list-`` option, ctags
+works for scripts; it uses tab characters as separators between
+columns.  The alignment of columns are never considered when
+``--machinable``.  Currently only ``--list-extra``, ``--list-fields``
+and ``--list-kinds-full`` support ``--machinable`` output.
+
+These new ``--list-`` options prints column header, a line
+representing the name of each column. The header may help users and
+scripts to understand and recognize the columns.  Ignoring the column
+header is easy because it starts with `#` character.
+
+``--with-list-header=no`` option suppresses the column header.
 
 
 ``--put-field-prefix`` options
@@ -593,6 +624,72 @@ choosing a separator; the third one has higher priority than the
 first.
 
 
+Parser own fields
+---------------------------------------------------------------------
+
+A tag has `name`, `input` file name, and `pattern` as basic information.
+Some fields like `language:`, `signature:`, etc are attached
+to the tag as optional information.
+
+In exuberant-ctags, fields are common in all languages.
+universal-ctags extends the concept of fields; a parser can define its
+own field. This extension is proposed by @pragmaware in #857.
+
+For implementing the parser own fields, the option for listing and
+enabling/disabling fields are also extended.
+
+In `--list-fields` output, the owner of the field is printed at `LANGUAGE`
+column:
+
+.. code-block:: console
+
+	$ ./ctags --list-fields
+	#LETTER NAME            ENABLED LANGUAGE        XFMTCHAR DESCRIPTION
+	...
+	-       end             off     C               TRUE     end lines of various constructs
+	-       properties      off     C               TRUE     properties (static, inline, mutable,...)
+	-       end             off     C++             TRUE     end lines of various constructs
+	-       template        off     C++             TRUE     template parameters
+	-       captures        off     C++             TRUE     lambda capture list
+	-       properties      off     C++             TRUE     properties (static, virtual, inline, mutable,...)
+	-       sectionMarker   off     reStructuredText TRUE     character used for declaring section
+	-       version         off     Maven2          TRUE     version of artifact
+
+e.g. `reStructuredText` is the owner of `sectionMarker` field. Like
+`end` field owned by `C` and `C++`, more than one parsers have a field
+with the same name.
+
+A parser one field has only long name, no letter. For enabling and disabling
+such field, the long name must be passed to `--fields` option. e.g. for
+turning on `sectionMarker` field of `reStructuredText` parser, use following
+command line:
+
+.. code-block:: console
+
+	$ ./ctags --fields=+{sectionMarker} ...
+
+For enabling/disabling a field owned by specified parser, use the parser
+name as prefix for the field name. `.` is for combinator. e.g. for turning
+on `end` field of `C++` parser, use following command line:
+
+.. code-block:: console
+
+	$ ./ctags --fields=+{C++.end} ...
+
+The wild card notation can be used for enabling/disabling parser own
+fields, too. Following example enables all fields owned by `C++`
+parser.
+
+.. code-block:: console
+
+	$ ./ctags --fields=+{C++.*} ...
+
+From the view point of tags file format, nothing is changed with
+introducing parser own fields; `<fieldname>`:`<value>` is used as
+before. The name of field owner is never prefixed. `language:` field
+of the tag tells the owner.
+
+
 Readtags
 ---------------------------------------------------------------------
 
@@ -661,6 +758,7 @@ rejection: readtags doesn't print it.
 	      $inherits
 	    $scope-kind
 	    $scope-name
+	           $end
 
 All symbols started from `$` represent a field of an entry which is
 under judgment with the S expression. Most of all them are evaluated

@@ -1,3 +1,13 @@
-r	UCTAGSrole	Role	format-char	off
-Z	UCTAGSscope	Include the "scope:" key in scope field (use s)	NONE	off
-E	UCTAGSextra	Extra tag type information	format-char	off
+r       UCTAGSrole      off     NONE            TRUE     Role                          
+Z       UCTAGSscope     off     NONE            FALSE    Include the "scope:" key in scope field (use s)
+E       UCTAGSextra     off     NONE            TRUE     Extra tag type information    
+x       UCTAGSxpath     off     NONE            TRUE     xpath for the tag             
+-       UCTAGSend       off     C               TRUE     end lines of various constructs
+-       UCTAGSproperties off     C               TRUE     properties (static, inline, mutable,...)
+-       UCTAGSend       off     C++             TRUE     end lines of various constructs
+-       UCTAGStemplate  off     C++             TRUE     template parameters           
+-       UCTAGScaptures  off     C++             TRUE     lambda capture list           
+-       UCTAGSproperties off     C++             TRUE     properties (static, virtual, inline, mutable,...)
+-       UCTAGSend       off     Python          TRUE     end lines of various constructs
+-       UCTAGSsectionMarker off     reStructuredText TRUE     character used for declaring section
+-       UCTAGSend       off     reStructuredText TRUE     end lines of various constructs

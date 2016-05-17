@@ -204,7 +204,7 @@ typedef struct sTokenInfo {
 	boolean isMethod;
 	struct sTokenInfo *secondary;
 	unsigned long lineNumber;
-	fpos_t filePosition;
+	MIOPos filePosition;
 } tokenInfo;
 
 /*
@@ -248,7 +248,7 @@ static kindOption FortranKinds [] = {
  * http://h18009.www1.hp.com/fortran/docs/lrm/dflrm.htm
  */
 
-static const keywordTable const FortranKeywordTable [] = {
+static const keywordTable FortranKeywordTable [] = {
 	/* keyword          keyword ID */
 	{ "abstract",       KEYWORD_abstract     },
 	{ "allocatable",    KEYWORD_allocatable  },

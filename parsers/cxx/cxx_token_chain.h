@@ -14,13 +14,15 @@
 #include "cxx_token.h"
 #include "cxx_keyword.h"
 
-typedef struct _CXXTokenChain
+struct _CXXTokenChain
 {
 	CXXToken * pHead;
 	CXXToken * pTail;
 	int iCount;
-} CXXTokenChain;
+};
 
+// The struct is typedef'd in cxx_token.h
+// typedef struct _CXXTokenChain CXXTokenChain;
 
 CXXTokenChain * cxxTokenChainCreate(void);
 void cxxTokenChainDestroy(CXXTokenChain * tc);
@@ -34,36 +36,79 @@ void cxxTokenChainClear(CXXTokenChain * tc);
 int cxxTokenChainFindToken(CXXTokenChain * tc,CXXToken * t);
 
 // Find the first token with one of the specified types
-CXXToken * cxxTokenChainFirstTokenOfType(CXXTokenChain * tc,unsigned int uTokenTypes);
+CXXToken * cxxTokenChainFirstTokenOfType(
+		CXXTokenChain * tc,
+		unsigned int uTokenTypes
+	);
 
-// Find the first token with one of the specified types that comes after the specified token
-CXXToken * cxxTokenChainNextTokenOfType(CXXToken * t,unsigned int uTokenTypes);
+// Find the first token with one of the specified types that comes
+// after the specified token
+CXXToken * cxxTokenChainNextTokenOfType(
+		CXXToken * t,
+		unsigned int uTokenTypes
+	);
 
-// Find the first token with one of the specified types that comes before the specified token
-CXXToken * cxxTokenChainPreviousTokenOfType(CXXToken * t,unsigned int uTokenTypes);
+// Find the first token with one of the specified types that comes
+// before the specified token
+CXXToken * cxxTokenChainPreviousTokenOfType(
+		CXXToken * t,
+		unsigned int uTokenTypes
+	);
 
-// Find the first token with that is not one of the specified types that comes before the specified token
-CXXToken * cxxTokenChainPreviousTokenNotOfType(CXXToken * t,unsigned int uTokenTypes);
+// Find the first token with that is not one of the specified types
+// that comes before the specified token
+CXXToken * cxxTokenChainPreviousTokenNotOfType(
+		CXXToken * t,
+		unsigned int uTokenTypes
+	);
 
 // Find the last token with one of the specified types
-CXXToken * cxxTokenChainLastTokenOfType(CXXTokenChain * tc,unsigned int uTokenTypes);
+CXXToken * cxxTokenChainLastTokenOfType(
+		CXXTokenChain * tc,
+		unsigned int uTokenTypes
+	);
 
-// Find the last token with one of the specified types. Look also in nested () chains (only (), not [], {}...)
-CXXToken * cxxTokenChainLastPossiblyNestedTokenOfType(CXXTokenChain * tc,unsigned int uTokenTypes);
+// Find the last token with one of the specified types. Look also
+// in nested () chains (only (), not [], {}...)
+CXXToken * cxxTokenChainLastPossiblyNestedTokenOfType(
+		CXXTokenChain * tc,
+		unsigned int uTokenTypes
+	);
 
 // Find the first token with type that is not one of the specified types
-CXXToken * cxxTokenChainFirstTokenNotOfType(CXXTokenChain * tc,unsigned int uTokenTypes);
+CXXToken * cxxTokenChainFirstTokenNotOfType(
+		CXXTokenChain * tc,
+		unsigned int uTokenTypes
+	);
 
-// Find the first token with type that is not one of the specified types that comes after the specified token
-CXXToken * cxxTokenChainNextTokenNotOfType(CXXToken * t,unsigned int uTokenTypes);
+// Find the first token with type that is not one of the specified types
+// that comes after the specified token
+CXXToken * cxxTokenChainNextTokenNotOfType(
+		CXXToken * t,
+		unsigned int uTokenTypes
+	);
 
 // Find the last token with type that is not one of the specified types
-CXXToken * cxxTokenChainLastTokenNotOfType(CXXTokenChain * tc,unsigned int uTokenTypes);
+CXXToken * cxxTokenChainLastTokenNotOfType(
+		CXXTokenChain * tc,
+		unsigned int uTokenTypes
+	);
 
-// Specialized function to skip from a < to the matching > (used for templates). Nested <> pairs are skipped properly.
+// Specialized function to skip from a < to the matching > (used for
+// templates). Nested <> pairs are skipped properly.
 // Parenthesis chains are assumed to be condensed.
 // Note that the function stops at the ending > and not past it.
-CXXToken * cxxTokenChainSkipToEndOfTemplateAngleBracket(CXXToken * t);
+CXXToken * cxxTokenChainSkipToEndOfTemplateAngleBracket(
+		CXXToken * t
+	);
+
+// Specialized function to skip back from a > to the matching < (used for
+// templates). Nested <> pairs are skipped properly.
+// Parenthesis chains are assumed to be condensed.
+// Note that the function stops at the initial < and not past it.
+CXXToken * cxxTokenChainSkipBackToStartOfTemplateAngleBracket(
+		CXXToken * t
+	);
 
 #define cxxTokenChainFirst(tc) (tc ? tc->pHead : NULL)
 #define cxxTokenChainLast(tc) (tc ? tc->pTail : NULL)
@@ -72,21 +117,36 @@ CXXToken * cxxTokenChainAt(CXXTokenChain * tc,int index);
 
 CXXToken * cxxTokenChainTakeFirst(CXXTokenChain * tc);
 CXXToken * cxxTokenChainTakeLast(CXXTokenChain * tc);
+#if 0
 CXXToken * cxxTokenChainTakeAt(CXXTokenChain * tc,int index);
+#endif
 void cxxTokenChainTake(CXXTokenChain * tc,CXXToken * t);
 boolean cxxTokenChainTakeRecursive(CXXTokenChain * tc,CXXToken * t);
 
 // Destroy the last token
-#define cxxTokenChainDestroyLast(tc) cxxTokenDestroy(cxxTokenChainTakeLast(tc))
+#define cxxTokenChainDestroyLast(tc) \
+		cxxTokenDestroy(cxxTokenChainTakeLast(tc))
 
 // Destroy the first token
-#define cxxTokenChainDestroyFirst(tc) cxxTokenDestroy(cxxTokenChainTakeFirst(tc))
+#define cxxTokenChainDestroyFirst(tc) \
+		cxxTokenDestroy(cxxTokenChainTakeFirst(tc))
+
+void cxxTokenChainDestroyRange(CXXTokenChain * pChain,CXXToken * from,CXXToken * to);
 
 void cxxTokenChainAppend(CXXTokenChain * tc,CXXToken * t);
 void cxxTokenChainPrepend(CXXTokenChain * tc,CXXToken * t);
 
-void cxxTokenChainMoveEntries(CXXTokenChain * src,CXXTokenChain * dest);
-void cxxTokenChainMoveEntryRange(CXXTokenChain * src,CXXToken * start,CXXToken * end,CXXTokenChain * dest);
+void cxxTokenChainMoveEntries(
+		CXXTokenChain * src,
+		CXXTokenChain * dest
+	);
+
+void cxxTokenChainMoveEntryRange(
+		CXXTokenChain * src,
+		CXXToken * start,
+		CXXToken * end,
+		CXXTokenChain * dest
+	);
 
 enum CXXTokenChainJoinFlags
 {
@@ -94,11 +154,31 @@ enum CXXTokenChainJoinFlags
 	CXXTokenChainJoinNoTrailingSpaces = 1
 };
 
-void cxxTokenChainJoinInString(CXXTokenChain * tc,vString * s,const char * szSeparator,unsigned int uFlags);
-vString * cxxTokenChainJoin(CXXTokenChain * tc,const char * szSeparator,unsigned int uFlags);
+void cxxTokenChainJoinInString(
+		CXXTokenChain * tc,
+		vString * s,
+		const char * szSeparator,
+		unsigned int uFlags
+	);
+vString * cxxTokenChainJoin(
+		CXXTokenChain * tc,
+		const char * szSeparator,
+		unsigned int uFlags
+	);
 
-void cxxTokenChainJoinRangeInString(CXXToken * from,CXXToken * to,vString * s,const char * szSeparator,unsigned int uFlags);
-vString * cxxTokenChainJoinRange(CXXToken * from,CXXToken * to,const char * szSeparator,unsigned int uFlags);
+void cxxTokenChainJoinRangeInString(
+		CXXToken * from,
+		CXXToken * to,
+		vString * s,
+		const char * szSeparator,
+		unsigned int uFlags
+	);
+vString * cxxTokenChainJoinRange(
+		CXXToken * from,
+		CXXToken * to,
+		const char * szSeparator,
+		unsigned int uFlags
+	);
 
 
 enum CXXTokenChainCondenseFlags
@@ -114,14 +194,46 @@ enum CXXTokenChainExtractRangeFlags
 	CXXTokenChainExtractRangeNoTrailingSpaces = 1
 };
 
-CXXToken * cxxTokenChainExtractRange(CXXToken * from,CXXToken * to,unsigned int uFlags);
-CXXToken * cxxTokenChainExtractIndexRange(CXXTokenChain * tc,int iFirstIndex,int iLastIndex,unsigned int uFlags);
+CXXToken * cxxTokenChainExtractRange(
+		CXXToken * from,
+		CXXToken * to,
+		unsigned int uFlags
+	);
+CXXToken * cxxTokenChainExtractIndexRange(
+		CXXTokenChain * tc,
+		int iFirstIndex,
+		int iLastIndex,
+		unsigned int uFlags
+	);
 
-CXXToken * cxxTokenChainPreviousKeyword(CXXToken * from,enum CXXKeyword eKeyword);
+CXXToken * cxxTokenChainPreviousKeyword(
+		CXXToken * from,
+		enum CXXKeyword eKeyword
+	);
 
-int cxxTokenChainFirstKeywordIndex(CXXTokenChain * tc,enum CXXKeyword eKeyword);
+CXXToken * cxxTokenChainNextKeyword(
+		CXXToken * from,
+		enum CXXKeyword eKeyword
+	);
 
-// Assuming that pChain contains a type name, attempt to normalize the spacing within the whole chain.
-void cxxTokenChainNormalizeTypeNameSpacing(CXXTokenChain * pChain);
+CXXToken * cxxTokenChainNextIdentifier(
+		CXXToken * from,
+		const char * szIdentifier
+	);
+
+int cxxTokenChainFirstKeywordIndex(
+		CXXTokenChain * tc,
+		enum CXXKeyword eKeyword
+	);
+
+// Assuming that pChain contains a type name, attempt to normalize the
+// spacing within the whole chain.
+void cxxTokenChainNormalizeTypeNameSpacing(
+		CXXTokenChain * pChain
+	);
+void cxxTokenChainNormalizeTypeNameSpacingInRange(
+		CXXToken * pFrom,
+		CXXToken * pTo
+	);
 
 #endif //!ctags_cxx_token_chain_h_

@@ -169,6 +169,8 @@ optionValues Option = {
 	.patternLengthLimit = 96,
 	.putFieldPrefix = FALSE,
 	.maxRecursionDepth = 0xffffffff,
+	.machinable = FALSE,
+	.withListHeader = TRUE,
 #ifdef DEBUG
 	0, 0        /* -D, -b */
 #endif
@@ -302,11 +304,15 @@ static optionDescription LongOptionDescription [] = {
  {1,"  --list-features"},
  {1,"       Output list of features."},
  {1,"  --list-fields"},
- {1,"       Output list of fields."},
+ {1,"       Output list of fields. This works with --machinable."},
  {1,"  --list-file-kind"},
  {1,"       List kind letter for file."},
  {1,"  --list-kinds=[language|all]"},
  {1,"       Output a list of all tag kinds for specified language or all."},
+ {1,"  --list-kinds-full=[language|all]"},
+ {1,"       List the details of all tag kinds for specified language or all"},
+ {1,"       For each line, associated language name is printed when \"all\" is"},
+ {1,"       specified as language. This works with --machinable."},
  {1,"  --list-languages"},
  {1,"       Output list of supported languages."},
  {1,"  --list-maps=[language|all]"},
@@ -317,6 +323,10 @@ static optionDescription LongOptionDescription [] = {
  {0,"       Output list of pseudo tags."},
  {1,"  --list-regex-flags"},
  {1,"       Output list of flags which can be used in a regex parser definition."},
+ {1,"  --machinable=[yes|no]"},
+ {1,"       Use tab separated representation in --list- option output. [no]"},
+ {1,"       --list-extra, --list-fields, and --list-kinds-full support this option."},
+ {1,"       Suitable for scripting. Specify before --list-* option."},
  {1,"  --map-<LANG>=[+|-]pattern|extension"},
  {1,"       Set or add(+) a map for <LANG>."},
  {1,"       Unlike --langmap, only one pattern or one extension can be specified"},
@@ -365,6 +375,11 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Enable verbose messages describing actions on each input file."},
  {1,"  --version"},
  {1,"       Print version identifier to standard output."},
+ {1,"  --with-list-header=[yes|no]"},
+ {1,"       Preprend the column descriptions in --list- output. [yes]"},
+ {1,"       --list-extra, --list-fields, and --list-kinds-full support this option."},
+ {1,"       Specify before --list-* option."},
+ {1,"       --list-fields, and --list-kinds-full support this option."},
 #ifdef HAVE_COPROC
  {1,"  --xcmd-<LANG>=parser_command_path|parser_command_name"},
  {1,"       Define external parser command path or name for specific language."},
@@ -381,14 +396,6 @@ static optionDescription LongOptionDescription [] = {
  {1,"  --_force-quit=[num]"},
  {1,"       Quit when the option is processed. Useful to debug the chain"},
  {1,"       of loading option files."},
- {1,"  --_list-kinds-full=[language|all]"},
- {1,"       Output a list of quadruplet of all tag kinds for specified language or"},
- {1,"       all. The elements of a quadruplet are \"letter\", \"name\", \"description\""},
- {1,"       and \"disabled\". Elements are separated with tab characters."},
- {1,"       If a kind is disabled, its \"disabled\" element is printed as \"off\"."},
- {1,"       If it is enabled, \"on\" is printed."},
- {1,"       For each line, associated language name is printed when \"all\" is"},
- {1,"       specified as language."},
  {1,"  --_list-roles=[[language|all]:[kindletters|*]]"},
  {1,"       Output list of all roles of tag kind(s) specified for language(s)."},
  {1,"       e.g. --_list-roles=Make:I"},
@@ -1079,9 +1086,10 @@ static void processExtraTagsOption (
 static void resetFieldsOption (boolean mode)
 {
 	int i;
-	for (i = 0; i < FIELD_COUNT; ++i)
-		if (!getFieldDesc (i)->basic)
-			getFieldDesc (i)->enabled = mode;
+
+	for (i = 0; i < countFields (); ++i)
+		if (!isFieldFixed (i))
+			enableField (i, mode);
 }
 
 static void processFieldsOption (
@@ -1091,29 +1099,92 @@ static void processFieldsOption (
 	boolean mode = TRUE;
 	int c;
 	fieldType t;
+	unsigned int i;
+
+	static vString * longName;
+	boolean inLongName = FALSE;
+	langType language;
+
+	longName = vStringNewOrClear (longName);
 
 	if (*p == '*')
 	{
+		for (i = 0; i < countParsers(); i++)
+			initializeParser (i);
+
 		resetFieldsOption (TRUE);
 		p++;
 	}
 	else if (*p != '+'  &&  *p != '-')
+	{
+		for (i = 0; i < countParsers(); i++)
+			initializeParser (i);
 		resetFieldsOption (FALSE);
-
+	}
 
 	while ((c = *p++) != '\0') switch (c)
 	{
-		case '+': mode = TRUE;                  break;
-		case '-': mode = FALSE;                 break;
-		default : t = getFieldTypeForOption (c);
-			if (t == FIELD_UNKNOWN)
-				error(WARNING, "Unsupported parameter '%c' for \"%s\" option",
-				      c, option);
-			else if (getFieldDesc (t)->basic && (mode == FALSE))
-				error(WARNING, "Cannot disable basic field: '%c'(%s) for \"%s\" option",
-				      c, getFieldDesc (t)->name, option);
+		case '+':
+			if (inLongName)
+				vStringPut (longName, c);
 			else
-				getFieldDesc (t)->enabled = mode;
+				mode = TRUE;
+			break;
+		case '-':
+			if (inLongName)
+				vStringPut (longName, c);
+			else
+				mode = FALSE;
+			break;
+		case '{':
+			if (inLongName)
+				error(FATAL,
+				      "unexpected character in field specification: \'%c\'",
+				      c);
+			inLongName = TRUE;
+			break;
+		case '}':
+			if (!inLongName)
+				error(FATAL,
+				      "unexpected character in field specification: \'%c\'",
+				      c);
+
+			{
+				const char *f;
+
+				language = getLanguageComponentInFieldName (vStringValue (longName), &f);
+				t = getFieldTypeForNameAndLanguage (f, language);
+			}
+
+			if (t == FIELD_UNKNOWN)
+				error(FATAL, "nosuch field: \'%s\'", vStringValue (longName));
+
+			enableField (t, mode);
+			if (language == LANG_AUTO)
+			{
+				fieldType ftype_next = t;
+				while ((ftype_next = nextFieldSibling (ftype_next)) != FIELD_UNKNOWN)
+					enableField (ftype_next, mode);
+			}
+
+			inLongName = FALSE;
+			vStringClear (longName);
+			break;
+		default :
+			if (inLongName)
+				vStringPut (longName, c);
+			else
+			{
+				t = getFieldTypeForOption (c);
+				if (t == FIELD_UNKNOWN)
+					error(WARNING, "Unsupported parameter '%c' for \"%s\" option",
+					      c, option);
+				else if (isFieldFixed (t) && (mode == FALSE))
+					error(WARNING, "Cannot disable basic field: '%c'(%s) for \"%s\" option",
+					      c, getFieldName (t), option);
+				else
+					enableField (t, mode);
+			}
 			break;
 	}
 }
@@ -1212,6 +1283,9 @@ static void processListFeaturesOption(const char *const option __unused__,
 static void processListFieldsOption(const char *const option __unused__,
 				    const char *const parameter __unused__)
 {
+	unsigned int i;
+	for (i = 0; i < countParsers(); i++)
+		initializeParser (i);
 	printFields ();
 	exit (0);
 }
@@ -1584,9 +1658,7 @@ static void processListAliasesOption (
 static void processListExtraOption (
 		const char *const option __unused__, const char *const parameter __unused__)
 {
-	int i;
-	for (i = 0; i < XTAG_COUNT; i++)
-		printXtag (i);
+	printXtags ();
 	exit (0);
 }
 
@@ -1609,7 +1681,7 @@ static void processListFileKindOption (
 static void processListKindsOption (
 		const char *const option, const char *const parameter)
 {
-	boolean print_all = (strcmp (option, "_list-kinds-full") == 0)? TRUE: FALSE;
+	boolean print_all = (strcmp (option, "list-kinds-full") == 0)? TRUE: FALSE;
 
 	if (parameter [0] == '\0' || strcasecmp (parameter, "all") == 0)
 		printLanguageKinds (LANG_AUTO, print_all);
@@ -2259,7 +2331,7 @@ static parametricOption ParametricOptions [] = {
 	{ "list-fields",            processListFieldsOption,        TRUE,   STAGE_ANY },
 	{ "list-file-kind",         processListFileKindOption,      TRUE,   STAGE_ANY },
 	{ "list-kinds",             processListKindsOption,         TRUE,   STAGE_ANY },
-	{ "_list-kinds-full",       processListKindsOption,         TRUE,   STAGE_ANY },
+	{ "list-kinds-full",       processListKindsOption,         TRUE,   STAGE_ANY },
 	{ "list-languages",         processListLanguagesOption,     TRUE,   STAGE_ANY },
 	{ "list-maps",              processListMapsOption,          TRUE,   STAGE_ANY },
 	{ "list-patterns",          processListPatternsOption,      TRUE,   STAGE_ANY },
@@ -2285,6 +2357,7 @@ static booleanOption BooleanOptions [] = {
 	{ "if0",            &Option.if0,                    FALSE, STAGE_ANY },
 	{ "line-directives",&Option.lineDirectives,         FALSE, STAGE_ANY },
 	{ "links",          &Option.followLinks,            FALSE, STAGE_ANY },
+	{ "machinable",     &Option.machinable,             TRUE,  STAGE_ANY },
 	{ "put-field-prefix", &Option.putFieldPrefix,       FALSE, STAGE_ANY },
 	{ "print-language", &Option.printLanguage,          TRUE,  STAGE_ANY },
 	{ "quiet",          &Option.quiet,                  FALSE, STAGE_ANY },
@@ -2294,6 +2367,7 @@ static booleanOption BooleanOptions [] = {
 	{ "tag-relative",   &Option.tagRelative,            TRUE,  STAGE_ANY },
 	{ "totals",         &Option.printTotals,            TRUE,  STAGE_ANY },
 	{ "verbose",        &Option.verbose,                FALSE, STAGE_ANY },
+	{ "with-list-header", &Option.withListHeader,       TRUE,  STAGE_ANY },
 	{ "_allow-xcmd-in-homedir", &Option.allowXcmdInHomeDir, TRUE, ACCEPT(Etc)|ACCEPT(LocalEtc) },
 	{ "_fatal-warnings",&Option.fatalWarnings,          FALSE, STAGE_ANY },
 };
