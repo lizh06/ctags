@@ -27,6 +27,7 @@
 
 #include "parse.h"
 #include "vstring.h"
+#include "mio.h"
 
 /*
 *   MACROS
@@ -46,6 +47,7 @@
 #define doesInputLanguageAllowNullTag() doesLanguageAllowNullTag (File.input.language)
 #define getInputLanguageFileKind()  getLanguageFileKind (File.input.language)
 
+#define doesInputLanguageRequestAutomaticFQTag() doesLanguageRequestAutomaticFQTag (File.input.language)
 #define getSourceFileTagPath()   vStringValue (File.source.tagPath)
 #define getSourceLanguageName()  getLanguageName (File.source.language)
 #define getSourceLineNumber()    File.source.lineNumber
@@ -84,7 +86,7 @@ typedef struct sInputFileInfo {
 } inputFileInfo;
 
 typedef struct sInputLineFposMap {
-	fpos_t *pos;
+	MIOPos *pos;
 	unsigned int count;
 	unsigned int size;
 } inputLineFposMap;
@@ -93,8 +95,8 @@ typedef struct sInputFile {
 	vString    *path;          /* path of input file (if any) */
 	vString    *line;          /* last line read from file */
 	const unsigned char* currentLine;  /* current line being worked on */
-	FILE       *fp;            /* stream used for reading the file */
-	fpos_t      filePosition;  /* file position of current line */
+	MIO        *fp;            /* stream used for reading the file */
+	MIOPos      filePosition;  /* file position of current line */
 	unsigned int ungetchIdx;
 	int         ungetchBuf[3]; /* characters that were ungotten */
 	boolean     eof;           /* have we reached the end of file? */
@@ -128,8 +130,18 @@ extern CONST_FILE inputFile File;
 
 /* InputFile: reading from fp in inputFile with updating fields in input fields */
 extern void                 freeInputFileResources (void);
-extern boolean              openInputFile (const char *const fileName, const langType language);
+extern const unsigned char *getInpufFileData (size_t *size);
+
+/* Stream opend by getMio can be passed to openInputFile as the 3rd
+   argument. If the 3rd argument is NULL, openInputFile calls getMio
+   internally. The 3rd argument is introduced for reusing mio object
+   created in parser guessing stage. */
+extern boolean              openInputFile (const char *const fileName, const langType language, MIO *mio);
+extern MIO                 *getMio (const char *const fileName, const char *const openMode,
+				    boolean memStreamRequired);
+
 extern void                 closeInputFile (void);
+extern void                *getInputFileUserData(void);
 extern int                  getcFromInputFile (void);
 extern int                  getNthPrevCFromInputFile (unsigned int nth, int def);
 extern int                  skipToCharacterInInputFile (int c);
@@ -137,11 +149,11 @@ extern void                 ungetcToInputFile (int c);
 extern const unsigned char *readLineFromInputFile (void);
 
 /* Raw: reading from given a parameter, fp */
-extern char *readLineRaw           (vString *const vLine, FILE *const fp);
+extern char *readLineRaw           (vString *const vLine, MIO *const fp);
 extern char* readLineRawWithNoSeek (vString *const vline, FILE *const pp);
 
 /* Bypass: reading from fp in inputFile WITHOUT updating fields in input fields */
-extern char *readLineFromBypass (vString *const vLine, fpos_t location, long *const pSeekValue);
+extern char *readLineFromBypass (vString *const vLine, MIOPos location, long *const pSeekValue);
 extern char *readLineFromBypassSlow (vString *const vLine, unsigned long lineNumber,
 				     const char *pattern, long *const pSeekValue);
 

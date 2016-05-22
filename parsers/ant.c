@@ -82,7 +82,7 @@ static tagXpathTable antXpathMainTable [] = {
 static tagXpathTable antXpathProjectTable [] = {
 	{ "target",
 	  LXPATH_TABLE_DO_RECUR,
-	  { .recurSpec= { antFindTagsUnderTask } }
+	  { .recurSpec= { antFindTagsUnderTask, TABLE_TARGET_NAME } }
 	},
 	{ "property/@name",
 	  LXPATH_TABLE_DO_MAKE,
@@ -120,7 +120,7 @@ static tagXpathTableTable antXpathTableTable[] = {
 };
 
 #else
-static const tagRegexTable const antTagRegexTable [] = {
+static const tagRegexTable antTagRegexTable [] = {
 	{"^[ \t]*<[ \t]*project[^>]+name=\"([^\"]+)\".*", "\\1",
 	 "p,project,projects", NULL},
 	{"^[ \t]*<[ \t]*target[^>]+name=\"([^\"]+)\".*", "\\1",
@@ -141,7 +141,7 @@ antFindTagsUnderProject (xmlNode *node,
 			 xmlXPathContext *ctx,
 			 void *userData __unused__)
 {
-	int corkIndex = SCOPE_NIL;
+	int corkIndex = CORK_NIL;
 
 	findXMLTags (ctx, node,
 		     antXpathTableTable + TABLE_MAIN_NAME,
@@ -154,14 +154,14 @@ antFindTagsUnderProject (xmlNode *node,
 }
 
 static void antFindTagsUnderTask (xmlNode *node,
-				  const struct sTagXpathRecurSpec *spec __unused__,
+				  const struct sTagXpathRecurSpec *spec,
 				  xmlXPathContext *ctx,
 				  void *userData)
 {
 	int corkIndex = *(int *)userData;
 
 	findXMLTags (ctx, node,
-		     antXpathTableTable + TABLE_TARGET_NAME,
+		     antXpathTableTable + spec->nextTable,
 		     AntKinds,
 		     &corkIndex);
 }

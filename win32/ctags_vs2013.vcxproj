@@ -127,6 +127,7 @@
     <ClCompile Include="..\main\get.c" />
     <ClCompile Include="..\parsers\go.c" />
     <ClCompile Include="..\parsers\html.c" />
+    <ClCompile Include="..\parsers\jprop.c" />
     <ClCompile Include="..\parsers\jscript.c" />
     <ClCompile Include="..\parsers\json.c" />
     <ClCompile Include="..\main\keyword.c" />
@@ -139,7 +140,9 @@
     <ClCompile Include="..\optlib\m4.c" />
     <ClCompile Include="..\main\main.c" />
     <ClCompile Include="..\parsers\make.c" />
+    <ClCompile Include="..\optlib\man.c" />
     <ClCompile Include="..\parsers\matlab.c" />
+    <ClCompile Include="..\parsers\myrddin.c" />
     <ClCompile Include="..\parsers\objc.c" />
     <ClCompile Include="..\parsers\ocaml.c" />
     <ClCompile Include="..\main\options.c" />
@@ -195,6 +198,7 @@
     <ClCompile Include="..\main\vstring.c" />
     <ClCompile Include="..\parsers\windres.c" />
     <ClCompile Include="..\main\xtag.c" />
+    <ClCompile Include="..\main\mio.c" />
     <ClCompile Include="..\parsers\yacc.c" />
   </ItemGroup>
   <ItemGroup>
@@ -226,6 +230,7 @@
     <ClInclude Include="..\main\strlist.h" />
     <ClInclude Include="..\main\vstring.h" />
     <ClInclude Include="..\main\xtag.h" />
+    <ClInclude Include="..\main\mio.h" />
     <ClInclude Include="..\parsers\cxx\cxx_debug.h" />
     <ClInclude Include="..\parsers\cxx\cxx_keyword.h" />
     <ClInclude Include="..\parsers\cxx\cxx_parser.h" />

@@ -55,7 +55,7 @@ typedef struct {
 /*
  * FUNCTION PROTOTYPES
  */
-static void initializeParser (langType lang);
+
 
 /*
 *   DATA DEFINITIONS
@@ -79,10 +79,15 @@ static kindOption defaultFileKind = {
 *   FUNCTION DEFINITIONS
 */
 
+extern unsigned int countParsers (void)
+{
+	return LanguageCount;
+}
+
 extern int makeSimpleTag (
 		const vString* const name, kindOption* const kinds, const int kind)
 {
-	int r = SCOPE_NIL;
+	int r = CORK_NIL;
 
 	if (kinds [kind].enabled  &&  name != NULL  &&  vStringLength (name) > 0)
 	{
@@ -97,7 +102,7 @@ extern int makeSimpleTag (
 extern int makeSimpleRefTag (const vString* const name, kindOption* const kinds, const int kind,
 			     int roleIndex)
 {
-	int r = SCOPE_NIL;
+	int r = CORK_NIL;
 
 	if (! isXtagEnabled (XTAG_REFERENCE_TAGS))
 		return r;
@@ -170,6 +175,12 @@ extern boolean doesLanguageAllowNullTag (const langType language)
 {
 	Assert (0 <= language  &&  language < (int) LanguageCount);
 	return LanguageTable [language]->allowNullTag;
+}
+
+extern boolean doesLanguageRequestAutomaticFQTag (const langType language)
+{
+	Assert (0 <= language  &&  language < (int) LanguageCount);
+	return LanguageTable [language]->requestAutomaticFQTag;
 }
 
 extern const char *getLanguageName (const langType language)
@@ -386,7 +397,7 @@ nominateLanguageCandidatesForPattern(const char *const baseName, parserCandidate
 	return count;
 }
 
-static vString* extractEmacsModeAtFirstLine(FILE* input);
+static vString* extractEmacsModeAtFirstLine(MIO* input);
 
 /*  The name of the language interpreter, either directly or as the argument
  *  to "env".
@@ -407,7 +418,7 @@ static vString* determineInterpreter (const char* const cmd)
 	return interpreter;
 }
 
-static vString* extractInterpreter (FILE* input)
+static vString* extractInterpreter (MIO* input)
 {
 	vString* const vLine = vStringNew ();
 	const char* const line = readLineRaw (vLine, input);
@@ -484,7 +495,7 @@ out:
 
 }
 
-static vString* extractEmacsModeAtFirstLine(FILE* input)
+static vString* extractEmacsModeAtFirstLine(MIO* input)
 {
 	vString* const vLine = vStringNew ();
 	const char* const line = readLineRaw (vLine, input);
@@ -501,7 +512,7 @@ static vString* extractEmacsModeAtFirstLine(FILE* input)
 	return mode;
 }
 
-static vString* determineEmacsModeAtEOF (FILE* const fp)
+static vString* determineEmacsModeAtEOF (MIO* const fp)
 {
 	vString* const vLine = vStringNew ();
 	const char* line;
@@ -532,7 +543,7 @@ static vString* determineEmacsModeAtEOF (FILE* const fp)
 	return mode;
 }
 
-static vString* extractEmacsModeLanguageAtEOF (FILE* input)
+static vString* extractEmacsModeLanguageAtEOF (MIO* input)
 {
 	vString* mode;
 
@@ -542,7 +553,7 @@ static vString* extractEmacsModeLanguageAtEOF (FILE* input)
 	   variables list" near the end of the file.  The start of the
 	   local variables list should be no more than 3000 characters
 	   from the end of the file, */
-	fseek(input, -3000, SEEK_END);
+	mio_seek(input, -3000, SEEK_END);
 
 	mode = determineEmacsModeAtEOF (input);
 	if (mode && (vStringLength (mode) == 0))
@@ -581,7 +592,7 @@ static vString* determineVimFileType (const char *const modeline)
 	return filetype;
 }
 
-static vString* extractVimFileType(FILE* input)
+static vString* extractVimFileType(MIO* input)
 {
 	/* http://vimdoc.sourceforge.net/htmldoc/options.html#modeline
 
@@ -661,7 +672,7 @@ static vString* determineZshAutoloadTag (const char *const modeline)
 		return NULL;
 }
 
-static vString* extractZshAutoloadTag(FILE* input)
+static vString* extractZshAutoloadTag(MIO* input)
 {
 	vString* const vLine = vStringNew ();
 	const char* const line = readLineRaw (vLine, input);
@@ -676,13 +687,13 @@ static vString* extractZshAutoloadTag(FILE* input)
 
 struct getLangCtx {
     const char *fileName;
-    FILE       *input;
+    MIO        *input;
     boolean     err;
 };
 
-#define GLC_FOPEN_IF_NECESSARY(_glc_, _label_) do {         \
+#define GLC_FOPEN_IF_NECESSARY0(_glc_, _label_) do {        \
     if (!(_glc_)->input) {                                  \
-        (_glc_)->input = fopen((_glc_)->fileName, "rb");    \
+	    (_glc_)->input = getMio((_glc_)->fileName, "rb", FALSE);	\
         if (!(_glc_)->input) {                              \
             (_glc_)->err = TRUE;                            \
             goto _label_;                                   \
@@ -690,15 +701,32 @@ struct getLangCtx {
     }                                                       \
 } while (0)                                                 \
 
+#define GLC_FOPEN_IF_NECESSARY(_glc_, _label_, _doesParserRequireMemoryStream_) \
+	do {								\
+		if (!(_glc_)->input)					\
+			GLC_FOPEN_IF_NECESSARY0 (_glc_, _label_);	\
+		if ((_doesParserRequireMemoryStream_) &&		\
+		    (mio_memory_get_data((_glc_)->input, NULL) == NULL)) \
+		{							\
+			MIO *tmp_ = (_glc_)->input;			\
+			(_glc_)->input = mio_new_mio (tmp_, 0, 0);	\
+			mio_free (tmp_);				\
+			if (!(_glc_)->input) {				\
+				(_glc_)->err = TRUE;			\
+				goto _label_;				\
+			}						\
+		}							\
+	} while (0)
+
 #define GLC_FCLOSE(_glc_) do {                              \
     if ((_glc_)->input) {                                   \
-        fclose((_glc_)->input);                             \
+        mio_free((_glc_)->input);                             \
         (_glc_)->input = NULL;                              \
     }                                                       \
 } while (0)
 
 static const struct taster {
-	vString* (* taste) (FILE *);
+	vString* (* taste) (MIO *);
         const char     *msg;
 } eager_tasters[] = {
         {
@@ -774,7 +802,7 @@ commonSelector (const parserCandidate *candidates, int n_candidates)
  * language associated with the string returned by the selector.
  */
 static int
-pickLanguageBySelection (selectLanguage selector, FILE *input)
+pickLanguageBySelection (selectLanguage selector, MIO *input)
 {
     const char *lang = selector(input);
     if (lang)
@@ -851,6 +879,18 @@ static void verboseReportCandidate (const char *header,
 			 candidates[i].spec);
 }
 
+static boolean doesCandidatesRequireMemoryStream(const parserCandidate *candidates,
+						 int n_candidates)
+{
+	int i;
+
+	for (i = 0; i < n_candidates; i++)
+		if (doesParserRequireMemoryStream (candidates[i].lang))
+			return TRUE;
+
+	return FALSE;
+}
+
 static langType getSpecLanguageCommon (const char *const spec, struct getLangCtx *glc,
 				       unsigned int nominate (const char *const, parserCandidate**),
 				       langType *fallback)
@@ -876,8 +916,11 @@ static langType getSpecLanguageCommon (const char *const spec, struct getLangCtx
 	}
 	else if (n_candidates > 1)
 	{
-		GLC_FOPEN_IF_NECESSARY(glc, fopen_error);
 		selectLanguage selector = commonSelector(candidates, n_candidates);
+		boolean memStreamRequired = doesCandidatesRequireMemoryStream (candidates,
+									       n_candidates);
+
+		GLC_FOPEN_IF_NECESSARY(glc, fopen_error, memStreamRequired);
 		if (selector) {
 			verbose ("	selector: %p\n", selector);
 			language = pickLanguageBySelection(selector, glc->input);
@@ -935,7 +978,7 @@ tasteLanguage (struct getLangCtx *glc, const struct taster *const tasters, int n
         langType language;
         vString* spec;
 
-        rewind(glc->input);
+        mio_rewind(glc->input);
 	spec = tasters[i].taste(glc->input);
 
         if (NULL != spec) {
@@ -952,7 +995,7 @@ tasteLanguage (struct getLangCtx *glc, const struct taster *const tasters, int n
 }
 
 static langType
-getFileLanguageInternal (const char *const fileName)
+getFileLanguageInternal (const char *const fileName, MIO **mio)
 {
     langType language;
 
@@ -1011,8 +1054,8 @@ getFileLanguageInternal (const char *const fileName)
         if (templateBaseName)
         {
             verbose ("	pattern + template(%s): %s\n", tExt, templateBaseName);
-            GLC_FOPEN_IF_NECESSARY(&glc, cleanup);
-            rewind(glc.input);
+            GLC_FOPEN_IF_NECESSARY(&glc, cleanup, FALSE);
+            mio_rewind(glc.input);
             language = getPatternLanguage(templateBaseName, &glc,
 					  fallback + HINT_TEMPLATE);
             if (language != LANG_IGNORE)
@@ -1025,7 +1068,7 @@ getFileLanguageInternal (const char *const fileName)
     {
 	    if (fstatus->isExecutable || Option.guessLanguageEagerly)
 	    {
-		    GLC_FOPEN_IF_NECESSARY (&glc, cleanup);
+		    GLC_FOPEN_IF_NECESSARY (&glc, cleanup, FALSE);
 		    language = tasteLanguage(&glc, eager_tasters, 1,
 					    fallback + HINT_INTERP);
 	    }
@@ -1034,7 +1077,7 @@ getFileLanguageInternal (const char *const fileName)
 
 	    if (Option.guessLanguageEagerly)
 	    {
-		    GLC_FOPEN_IF_NECESSARY(&glc, cleanup);
+		    GLC_FOPEN_IF_NECESSARY(&glc, cleanup, FALSE);
 		    language = tasteLanguage(&glc, 
 					     eager_tasters + 1,
 					     ARRAY_SIZE(eager_tasters) - 1,
@@ -1044,6 +1087,8 @@ getFileLanguageInternal (const char *const fileName)
 
 
   cleanup:
+    if (mio && glc.input)
+	    *mio = mio_ref (glc.input);
     GLC_FCLOSE(&glc);
     if (fstatus)
 	    eStatFree (fstatus);
@@ -1062,12 +1107,15 @@ getFileLanguageInternal (const char *const fileName)
     return language;
 }
 
-extern langType getFileLanguage (const char *const fileName)
+static langType getFileLanguageAndKeepMIO (const char *const fileName, MIO **mio)
 {
 	langType l = Option.language;
 
+	if (mio)
+		*mio = NULL;
+
 	if (l == LANG_AUTO)
-		return getFileLanguageInternal(fileName);
+		return getFileLanguageInternal(fileName, mio);
 	else if (! isLanguageEnabled (l))
 	{
 		error (FATAL,
@@ -1078,6 +1126,11 @@ extern langType getFileLanguage (const char *const fileName)
 	}
 	else
 		return Option.language;
+}
+
+extern langType getFileLanguage (const char *const fileName)
+{
+	return getFileLanguageAndKeepMIO(fileName, NULL);
 }
 
 typedef void (*languageCallback)  (langType language, void* user_data);
@@ -1316,15 +1369,36 @@ static boolean doesParserUseKind (const parserDefinition *const parser, char let
 }
 #endif
 
-static void initializeParser (langType lang)
+static void installFieldSpec (const langType language)
+{
+	unsigned int i;
+	parserDefinition * parser;
+
+	Assert (0 <= language  &&  language < (int) LanguageCount);
+	parser = LanguageTable [language];
+	if (parser->fieldSpecCount > PRE_ALLOCATED_PARSER_FIELDS)
+		error (FATAL,
+		       "INTERNAL ERROR: in a parser, fields are defined more than PRE_ALLOCATED_PARSER_FIELDS\n");
+
+	if ((parser->fieldSpecs != NULL) && (parser->fieldSpecInstalled == FALSE))
+	{
+		for (i = 0; i < parser->fieldSpecCount; i++)
+			defineField (& parser->fieldSpecs [i], language);
+		parser->fieldSpecInstalled = TRUE;
+	}
+}
+
+extern void initializeParser (langType lang)
 {
 	parserDefinition *const parser = LanguageTable [lang];
 
 	installKeywordTable (lang);
 	installTagRegexTable (lang);
 	installTagXpathTable (lang);
+	installFieldSpec     (lang);
 
-	if (hasScopeActionInRegex (lang))
+	if (hasScopeActionInRegex (lang)
+	    || parser->requestAutomaticFQTag)
 		parser->useCork = TRUE;
 
 	if ((parser->initialize != NULL) && (parser->initialized == FALSE))
@@ -1727,12 +1801,12 @@ static void printKinds (langType language, boolean allKindFields, boolean indent
 		for (i = 0  ;  i < lang->kindCount  ;  ++i)
 		{
 			if (allKindFields && indent)
-				printf ("%s", lang->name);
-			printKind (lang->kinds + i, allKindFields, indent);
+				printf (Option.machinable? "%s": PR_KIND_FMT (LANG,s), lang->name);
+			printKind (lang->kinds + i, allKindFields, indent, Option.machinable);
 		}
 	}
-	printRegexKinds (language, allKindFields, indent);
-	printXcmdKinds (language, allKindFields, indent);
+	printRegexKinds (language, allKindFields, indent, Option.machinable);
+	printXcmdKinds (language, allKindFields, indent, Option.machinable);
 }
 
 extern void printLanguageKinds (const langType language, boolean allKindFields)
@@ -1740,6 +1814,10 @@ extern void printLanguageKinds (const langType language, boolean allKindFields)
 	if (language == LANG_AUTO)
 	{
 		unsigned int i;
+
+		if (Option.withListHeader && allKindFields)
+			printKindListHeader (TRUE, Option.machinable);
+
 		for (i = 0  ;  i < LanguageCount  ;  ++i)
 		{
 			const parserDefinition* const lang = LanguageTable [i];
@@ -1747,16 +1825,18 @@ extern void printLanguageKinds (const langType language, boolean allKindFields)
 			if (lang->invisible)
 				continue;
 
-			if (lang->method & METHOD_XCMD)
-				initializeParser (i);
-
 			if (!allKindFields)
 				printf ("%s%s\n", lang->name, isLanguageEnabled (i) ? "" : " [disabled]");
 			printKinds (i, allKindFields, TRUE);
 		}
 	}
 	else
+	{
+		if (Option.withListHeader && allKindFields)
+			printKindListHeader (FALSE, Option.machinable);
+
 		printKinds (language, allKindFields, FALSE);
+	}
 }
 
 static void processLangAliasOption (const langType language,
@@ -1910,11 +1990,12 @@ extern void printLanguageList (void)
 
 static rescanReason createTagsForFile (
 		const char *const fileName, const langType language,
-		const unsigned int passCount)
+		const unsigned int passCount,
+		MIO *mio)
 {
 	rescanReason rescan = RESCAN_NONE;
 	Assert (0 <= language  &&  language < (int) LanguageCount);
-	if (openInputFile (fileName, language))
+	if (openInputFile (fileName, language, mio))
 	{
 		parserDefinition *const lang = LanguageTable [language];
 
@@ -1940,31 +2021,32 @@ static rescanReason createTagsForFile (
 }
 
 static boolean createTagsWithFallback (
-		const char *const fileName, const langType language)
+	const char *const fileName, const langType language,
+	MIO *mio)
 {
-	unsigned long numTags	= TagFile.numTags.added;
-	fpos_t tagFilePosition;
+	unsigned long numTags	= numTagsAdded ();
+	MIOPos tagfpos;
 	unsigned int passCount = 0;
 	boolean tagFileResized = FALSE;
 	rescanReason whyRescan;
 
-	fgetpos (TagFile.fp, &tagFilePosition);
+	tagFilePosition (&tagfpos);
 	while ( ( whyRescan =
-	            createTagsForFile (fileName, language, ++passCount) )
+	            createTagsForFile (fileName, language, ++passCount, mio) )
 	                != RESCAN_NONE)
 	{
 		if (whyRescan == RESCAN_FAILED)
 		{
 			/*  Restore prior state of tag file.
 			*/
-			fsetpos (TagFile.fp, &tagFilePosition);
-			TagFile.numTags.added = numTags;
+			setTagFilePosition (&tagfpos);
+			setNumTagsAdded (numTags);
 			tagFileResized = TRUE;
 		}
 		else if (whyRescan == RESCAN_APPEND)
 		{
-			fgetpos(TagFile.fp, &tagFilePosition);
-			numTags = TagFile.numTags.added;
+			tagFilePosition (&tagfpos);
+			numTags = numTagsAdded ();
 		}
 	}
 	return tagFileResized;
@@ -1972,11 +2054,12 @@ static boolean createTagsWithFallback (
 
 #ifdef HAVE_COPROC
 static boolean createTagsWithXcmd (
-		const char *const fileName, const langType language)
+		const char *const fileName, const langType language,
+		MIO *mio)
 {
 	boolean tagFileResized = FALSE;
 
-	if (openInputFile (fileName, language))
+	if (openInputFile (fileName, language, mio))
 	{
 		tagFileResized = invokeXcmd (fileName, language);
 
@@ -2071,13 +2154,21 @@ static void addParserPseudoTags (langType language)
 	}
 }
 
+extern boolean doesParserRequireMemoryStream (const langType language)
+{
+	Assert (0 <= language  &&  language < (int) LanguageCount);
+	parserDefinition *const lang = LanguageTable [language];
+
+	return (lang->tagXpathTableCount > 0)? TRUE: FALSE;
+}
+
 extern boolean parseFile (const char *const fileName)
 {
 	boolean tagFileResized = FALSE;
 	langType language;
+	MIO *mio;
 
-
-	language = getFileLanguage (fileName);
+	language = getFileLanguageAndKeepMIO (fileName, &mio);
 	Assert (language != LANG_AUTO);
 
 	if (Option.printLanguage)
@@ -2117,10 +2208,10 @@ extern boolean parseFile (const char *const fileName)
 
 		addParserPseudoTags (language);
 
-		tagFileResized = createTagsWithFallback (fileName, language);
+		tagFileResized = createTagsWithFallback (fileName, language, mio);
 #ifdef HAVE_COPROC
 		if (LanguageTable [language]->method & METHOD_XCMD_AVAILABLE)
-			tagFileResized = createTagsWithXcmd (fileName, language)? TRUE: tagFileResized;
+			tagFileResized = createTagsWithXcmd (fileName, language, mio)? TRUE: tagFileResized;
 #endif
 
 		if (Option.etags)
@@ -2132,9 +2223,13 @@ extern boolean parseFile (const char *const fileName)
 #ifdef HAVE_ICONV
 		closeConverter ();
 #endif
-
+		if (mio)
+			mio_free (mio);
 		return tagFileResized;
 	}
+
+	if (mio)
+		mio_free (mio);
 	return tagFileResized;
 }
 
@@ -2227,6 +2322,7 @@ extern void installTagXpathTable (const langType language)
 			for (j = 0; j < lang->tagXpathTableTable[i].count; ++j)
 				addTagXpath (language, lang->tagXpathTableTable[i].table + j);
 		lang->tagXpathInstalled = TRUE;
+		useXpathMethod (language);
 	}
 }
 

@@ -93,6 +93,9 @@
     <ClCompile Include="..\parsers\html.c">
       <Filter>Source Files\Parsers</Filter>
     </ClCompile>
+    <ClCompile Include="..\parsers\jprop.c">
+      <Filter>Source Files\Parsers</Filter>
+    </ClCompile>
     <ClCompile Include="..\parsers\jscript.c">
       <Filter>Source Files\Parsers</Filter>
     </ClCompile>
@@ -111,7 +114,13 @@
     <ClCompile Include="..\parsers\make.c">
       <Filter>Source Files\Parsers</Filter>
     </ClCompile>
+    <ClCompile Include="..\parsers\man.c">
+      <Filter>Source Files\Parsers</Filter>
+    </ClCompile>
     <ClCompile Include="..\parsers\matlab.c">
+      <Filter>Source Files\Parsers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parsers\myrddin.c">
       <Filter>Source Files\Parsers</Filter>
     </ClCompile>
     <ClCompile Include="..\parsers\objc.c">
@@ -268,6 +277,9 @@
     <ClCompile Include="..\main\xtag.c">
       <Filter>Source Files\Main</Filter>
     </ClCompile>
+    <ClCompile Include="..\main\mio.c">
+      <Filter>Source Files\Main</Filter>
+    </ClCompile>
     <ClCompile Include="..\main\repoinfo.c">
       <Filter>Source Files\Main</Filter>
     </ClCompile>
@@ -403,6 +415,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
    <ClInclude Include="..\main\xtag.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\main\mio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
    <ClInclude Include="..\main\ptag.h">

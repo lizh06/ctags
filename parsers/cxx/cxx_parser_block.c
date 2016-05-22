@@ -28,34 +28,70 @@ static boolean cxxParserParseBlockHandleOpeningBracket(void)
 {
 	CXX_DEBUG_ENTER();
 
-	CXX_DEBUG_ASSERT(g_cxx.pToken->eType == CXXTokenTypeOpeningBracket,"This must be called when pointing at an opening bracket!");
+	CXX_DEBUG_ASSERT(
+			g_cxx.pToken->eType == CXXTokenTypeOpeningBracket,
+			"This must be called when pointing at an opening bracket!"
+		);
 
 	enum CXXTagKind eScopeKind = cxxScopeGetKind();
+	boolean bIsCPP = cxxParserCurrentLanguageIsCPP();
 
 	if(
-			(g_cxx.pToken->pPrev) &&
-			cxxTokenTypeIs(g_cxx.pToken->pPrev,CXXTokenTypeAssignment) &&
 			(
-				(eScopeKind == CXXTagKindFUNCTION) ||
-				(eScopeKind == CXXTagKindNAMESPACE)
+				// something = {...}
+				(g_cxx.pToken->pPrev) &&
+				cxxTokenTypeIs(g_cxx.pToken->pPrev,CXXTokenTypeAssignment) &&
+				(
+					(eScopeKind == CXXTagKindFUNCTION) ||
+					(eScopeKind == CXXTagKindNAMESPACE)
+				)
+			) || (
+				// T { arg1, arg2, ... } (1)
+				// T object { arg1, arg2, ... } (2)
+				// new T { arg1, arg2, ... } (3)
+				// Class::Class() : member { arg1, arg2, ... } { (4)
+				bIsCPP &&
+				(g_cxx.pToken->pPrev) &&
+				cxxTokenTypeIs(g_cxx.pToken->pPrev,CXXTokenTypeIdentifier) &&
+				(
+					(!g_cxx.pToken->pPrev->pPrev) ||
+					(cxxTokenTypeIsOneOf(
+							g_cxx.pToken->pPrev->pPrev,
+							CXXTokenTypeIdentifier | CXXTokenTypeStar | CXXTokenTypeAnd |
+							CXXTokenTypeGreaterThanSign | CXXTokenTypeKeyword |
+							// FIXME: This check could be made stricter?
+							CXXTokenTypeSingleColon | CXXTokenTypeComma
+					))
+				)
+			) || (
+				// return { }
+				(!g_cxx.pToken->pPrev) &&
+				(g_cxx.uKeywordState & CXXParserKeywordStateSeenReturn)
 			)
 		)
 	{
-		// array or C++11-list-like initialisation
+		// array or list-like initialisation
 		boolean bRet = cxxParserParseAndCondenseCurrentSubchain(
-				CXXTokenTypeOpeningBracket | CXXTokenTypeOpeningParenthesis | CXXTokenTypeOpeningSquareParenthesis,
+				CXXTokenTypeOpeningBracket | CXXTokenTypeOpeningParenthesis |
+					CXXTokenTypeOpeningSquareParenthesis,
 				FALSE
 			);
 
-		CXX_DEBUG_LEAVE_TEXT("Handled array or C++11-list-like initialisation");
+		CXX_DEBUG_LEAVE_TEXT("Handled array or list-like initialisation or return");
 		return bRet;
 	}
 
 	int iScopes;
+	// FIXME: Why the invalid cork queue entry index is CORK_NIL?
+	int iCorkQueueIndex = CORK_NIL;
+	
 	if(eScopeKind != CXXTagKindFUNCTION)
 	{
 		// very likely a function definition
-		iScopes = cxxParserExtractFunctionSignatureBeforeOpeningBracket();
+		iScopes = cxxParserExtractFunctionSignatureBeforeOpeningBracket(&iCorkQueueIndex);
+
+		// FIXME: Handle syntax (5) of list initialization:
+		//        Class::Class() : member { arg1, arg2, ... } {...
 	} else {
 		// some kind of other block:
 		// - anonymous block
@@ -66,7 +102,7 @@ static boolean cxxParserParseBlockHandleOpeningBracket(void)
 		CXXToken * pParenthesis;
 
 		if(
-			cxxParserCurrentLanguageIsCPP() &&
+			bIsCPP &&
 			(pParenthesis = cxxParserOpeningBracketIsLambda())
 		)
 		{
@@ -84,6 +120,9 @@ static boolean cxxParserParseBlockHandleOpeningBracket(void)
 		CXX_DEBUG_LEAVE_TEXT("Failed to parse nested block");
 		return FALSE;
 	}
+
+	if(iCorkQueueIndex > CORK_NIL)
+		cxxParserMarkEndLineForTagInCorkQueue(iCorkQueueIndex);
 
 	while(iScopes > 0)
 	{
@@ -113,7 +152,11 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 	cxxParserNewStatement();
 
 	if(bExpectClosingBracket)
-		cppBeginStatement(); // FIXME: this cpp handling is broken: it works only because the moon is in the correct phase.
+	{
+		// FIXME: this cpp handling is kind of broken:
+		//        it works only because the moon is in the correct phase.
+		cppBeginStatement();
+	}
 
 	for(;;)
 	{
@@ -121,14 +164,21 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 		{
 			if(bExpectClosingBracket)
 			{
-				CXX_DEBUG_LEAVE_TEXT("Syntax error: found EOF in block but a closing bracket was expected!");
+				CXX_DEBUG_LEAVE_TEXT(
+						"Syntax error: found EOF in block but a closing " \
+							"bracket was expected!"
+					);
 				return FALSE;
 			}
 			CXX_DEBUG_LEAVE_TEXT("EOF in main block");
 			return TRUE; // EOF
 		}
 
-		CXX_DEBUG_PRINT("Token '%s' of type 0x%02x",vStringValue(g_cxx.pToken->pszWord),g_cxx.pToken->eType);
+		CXX_DEBUG_PRINT(
+				"Token '%s' of type 0x%02x",
+				vStringValue(g_cxx.pToken->pszWord),
+				g_cxx.pToken->eType
+			);
 
 		switch(g_cxx.pToken->eType)
 		{
@@ -149,7 +199,9 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 							}
 						} else {
 							// hm... syntax error?
-							CXX_DEBUG_LEAVE_TEXT("Found namespace in a wrong place: we're probably out of sync");
+							CXX_DEBUG_LEAVE_TEXT(
+								"Found namespace in a wrong place: we're probably out of sync"
+							);
 							return FALSE;
 						}
 
@@ -200,7 +252,8 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 					case CXXKeywordPUBLIC:
 					case CXXKeywordPROTECTED:
 					case CXXKeywordPRIVATE:
-						// Note that the class keyword has its own handler so the only possibility here is an access specifier
+						// Note that the class keyword has its own handler
+						// so the only possibility here is an access specifier
 						if(!cxxParserParseAccessSpecifier())
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse access specifier");
@@ -225,12 +278,16 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 							return FALSE;
 						}
 						cxxParserNewStatement();
+						// Force the cpp preprocessor to think that we're in the middle of a statement.
+						cppBeginStatement();
 					break;
 					case CXXKeywordTRY:
 					case CXXKeywordELSE:
 					case CXXKeywordDO:
 						// parse as normal statement/block
 						cxxParserNewStatement();
+						// Force the cpp preprocessor to think that we're in the middle of a statement.
+						cppBeginStatement();
 					break;
 					case CXXKeywordRETURN:
 						if(cxxParserCurrentLanguageIsCPP())
@@ -274,7 +331,9 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 					break;
 					case CXXKeywordCASE:
 						// ignore
-						if(!cxxParserParseUpToOneOf(CXXTokenTypeSemicolon | CXXTokenTypeEOF | CXXTokenTypeSingleColon))
+						if(!cxxParserParseUpToOneOf(
+								CXXTokenTypeSemicolon | CXXTokenTypeEOF | CXXTokenTypeSingleColon
+							))
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse case keyword");
 							return FALSE;
@@ -283,25 +342,35 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 					break;
 					case CXXKeywordEXTERN:
 						g_cxx.uKeywordState |= CXXParserKeywordStateSeenExtern;
-						cxxTokenChainClear(g_cxx.pTokenChain);
+						cxxTokenChainDestroyLast(g_cxx.pTokenChain);
 					break;
 					case CXXKeywordSTATIC:
 						g_cxx.uKeywordState |= CXXParserKeywordStateSeenStatic;
-						cxxTokenChainClear(g_cxx.pTokenChain);
+						cxxTokenChainDestroyLast(g_cxx.pTokenChain);
 					break;
 					case CXXKeywordINLINE:
 						g_cxx.uKeywordState |= CXXParserKeywordStateSeenInline;
-						cxxTokenChainClear(g_cxx.pTokenChain);
+						cxxTokenChainDestroyLast(g_cxx.pTokenChain);
 					break;
 					case CXXKeywordEXPLICIT:
 						g_cxx.uKeywordState |= CXXParserKeywordStateSeenExplicit;
-						cxxTokenChainClear(g_cxx.pTokenChain);
+						cxxTokenChainDestroyLast(g_cxx.pTokenChain);
 					break;
 					case CXXKeywordOPERATOR:
 						g_cxx.uKeywordState |= CXXParserKeywordStateSeenOperator;
 					break;
 					case CXXKeywordVIRTUAL:
 						g_cxx.uKeywordState |= CXXParserKeywordStateSeenVirtual;
+						cxxTokenChainDestroyLast(g_cxx.pTokenChain);
+					break;
+					//case CXXKeywordVOLATILE:
+					// Volatile is actually part of the type!
+					//	g_cxx.uKeywordState |= CXXParserKeywordStateSeenVolatile;
+					//	cxxTokenChainDestroyLast(g_cxx.pTokenChain);
+					//break;
+					case CXXKeywordMUTABLE:
+						g_cxx.uKeywordState |= CXXParserKeywordStateSeenMutable;
+						cxxTokenChainDestroyLast(g_cxx.pTokenChain);
 					break;
 					default:
 						if(g_cxx.uKeywordState & CXXParserKeywordStateSeenTypedef)
@@ -333,7 +402,8 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 					//  type whatever fname(par1,par2) int par1; int par2; {
 					//                                        ^
 					//
-					switch(cxxParserMaybeExtractKnRStyleFunctionDefinition())
+					int iCorkQueueIndex = CORK_NIL;
+					switch(cxxParserMaybeExtractKnRStyleFunctionDefinition(&iCorkQueueIndex))
 					{
 						case 1:
 							// got K&R style function definition, one scope was pushed.
@@ -343,6 +413,8 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 								CXX_DEBUG_LEAVE_TEXT("Failed to parse nested block");
 								return FALSE;
 							}
+							if(iCorkQueueIndex > CORK_NIL)
+								cxxParserMarkEndLineForTagInCorkQueue(iCorkQueueIndex);
 							cxxScopePop();
 						break;
 						case 0:
@@ -364,7 +436,13 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 			case CXXTokenTypeSingleColon:
 			{
 				// label ?
-				if((g_cxx.pTokenChain->iCount == 2) && cxxTokenTypeIs(cxxTokenChainFirst(g_cxx.pTokenChain),CXXTokenTypeIdentifier))
+				if(
+						(g_cxx.pTokenChain->iCount == 2) &&
+						cxxTokenTypeIs(
+								cxxTokenChainFirst(g_cxx.pTokenChain),
+								CXXTokenTypeIdentifier
+							)
+					)
 				{
 					CXXToken * pFirst = cxxTokenChainFirst(g_cxx.pTokenChain);
 					// assume it's label
@@ -396,7 +474,8 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 			case CXXTokenTypeOpeningParenthesis:
 			case CXXTokenTypeOpeningSquareParenthesis:
 				if(!cxxParserParseAndCondenseCurrentSubchain(
-						CXXTokenTypeOpeningBracket | CXXTokenTypeOpeningParenthesis | CXXTokenTypeOpeningSquareParenthesis,
+						CXXTokenTypeOpeningBracket | CXXTokenTypeOpeningParenthesis |
+							CXXTokenTypeOpeningSquareParenthesis,
 						TRUE
 					))
 				{
@@ -408,7 +487,9 @@ boolean cxxParserParseBlock(boolean bExpectClosingBracket)
 				{
 					if(bExpectClosingBracket)
 					{
-						CXX_DEBUG_LEAVE_TEXT("Syntax error: found EOF in block but a closing bracket was expected!");
+						CXX_DEBUG_LEAVE_TEXT(
+								"Syntax error: found EOF in block but a closing bracket was expected!"
+							);
 						return FALSE;
 					}
 					return TRUE; // EOF
