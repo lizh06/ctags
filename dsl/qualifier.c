@@ -17,6 +17,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 /*
  * Types
@@ -72,6 +73,7 @@ static EsObject* value_pattern (EsObject *args, tagEntry *entry);
 static EsObject* value_inherits (EsObject *args, tagEntry *entry);
 static EsObject* value_scope_kind (EsObject *args, tagEntry *entry);
 static EsObject* value_scope_name (EsObject *args, tagEntry *entry);
+static EsObject* value_end (EsObject *args, tagEntry *entry);
 
 
 struct sCode {
@@ -117,7 +119,8 @@ struct sCode {
 	{ "$inherits",       value_inherits,       NULL, MEMORABLE, 0UL,
 	  .helpstr = "<list>" },
 	{ "$scope-kind",     value_scope_kind,     NULL, MEMORABLE, 0UL },
-	{ "$scope-name",     value_scope_name,     NULL, MEMORABLE, 0UL }
+	{ "$scope-name",     value_scope_name,     NULL, MEMORABLE, 0UL },
+	{ "$end",            value_end,            NULL, MEMORABLE, 0UL },
 };
 
 static void define (Code *code)
@@ -361,7 +364,6 @@ static EsObject* builtin_prefix (EsObject* args, tagEntry *entry)
 	const char *ps;
 	size_t tl;
 	size_t pl;
-	unsigned int d;
 
 	if ((! es_string_p (target))
 	    || (! es_string_p (prefix)))
@@ -374,7 +376,6 @@ static EsObject* builtin_prefix (EsObject* args, tagEntry *entry)
 	pl = strlen (ps);
 	if (tl < pl)
 		return es_false;
-	d = tl - pl;
 	return (strncmp (ts, ps, pl) == 0)? es_true: es_false;
 }
 
@@ -516,6 +517,23 @@ static EsObject* value_line (EsObject *args, tagEntry *entry)
 		return es_false;
 	else
 		return es_object_autounref (es_integer_new (ln));
+}
+
+static EsObject* value_end (EsObject *args, tagEntry *entry)
+{
+	const char *end_str = entry_xget(entry, "end");
+	EsObject *o;
+
+	if (end_str)
+	{
+		o = es_read_from_string (end_str, NULL);
+		if (es_error_p (o))
+			return es_false;
+		else
+			return es_object_autounref (o);
+	}
+	else
+		return es_false;
 }
 
 static EsObject* value_kind (EsObject *args, tagEntry *entry)
@@ -661,11 +679,15 @@ enum QRESULT q_is_acceptable  (QCode *code, tagEntry *entry)
 		i = Q_REJECT;
 	else if (es_error_p (r))
 	{
+		MIO  *mioerr = mio_new_fp (stderr, NULL);;
+
 		fprintf(stderr, "GOT ERROR in QUALIFYING: %s: ",
 			 es_error_name (r));
-		es_print(es_error_get_object(r), stderr);
+		es_print(es_error_get_object(r), mioerr);
 		putc('\n', stderr);
 		i = Q_ERROR;
+
+		mio_free(mioerr);
 	}
 	else
 		i = Q_ACCEPT;

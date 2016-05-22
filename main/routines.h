@@ -13,7 +13,10 @@
 *   INCLUDE FILES
 */
 #include "general.h"  /* must always come first */
+
 #include <stdio.h>
+
+#include "mio.h"
 
 /*
 *   MACROS
@@ -24,6 +27,9 @@
 
 #define ARRAY_SIZE(X)      (sizeof (X) / sizeof (X[0]))
 #define ARRAY_AND_SIZE(X)  (X), ARRAY_SIZE(X)
+
+#define STRINGIFY(X) STRINGIFY_(X)
+#define STRINGIFY_(X) #X
 
 /*
  *  Portability macros
@@ -122,10 +128,6 @@ extern boolean doesFileExist (const char *const fileName);
 extern boolean doesExecutableExist (const char *const fileName);
 extern boolean isRecursiveLink (const char* const dirName);
 extern boolean isSameFile (const char *const name1, const char *const name2);
-#if defined(NEED_PROTO_FGETPOS)
-extern int fgetpos  (FILE *stream, fpos_t *pos);
-extern int fsetpos  (FILE *stream, fpos_t *pos);
-#endif
 extern const char *baseFilename (const char *const filePath);
 extern const char *fileExtension (const char *const fileName);
 extern boolean isAbsolutePath (const char *const path);
@@ -133,7 +135,7 @@ extern char *combinePathAndFile (const char *const path, const char *const file)
 extern char* absoluteFilename (const char *file);
 extern char* absoluteDirname (char *file);
 extern char* relativeFilename (const char *file, const char *dir);
-extern FILE *tempFile (const char *const mode, char **const pName);
+extern MIO *tempFile (const char *const mode, char **const pName);
 
 extern char* baseFilenameSansExtensionNew (const char *const fileName, const char *const templateExt);
 

@@ -8,6 +8,9 @@ REPOINFO_HEADS = main/repoinfo.h
 REPOINFO_SRCS  = main/repoinfo.c
 REPOINFO_OBJS  = $(REPOINFO_SRCS:.c=.$(OBJEXT))
 
+MIO_HEADS = main/mio.h
+MIO_SRCS  = main/mio.c
+
 MAIN_HEADS =			\
 	main/args.h		\
 	main/ctags.h		\
@@ -34,7 +37,9 @@ MAIN_HEADS =			\
 	main/sort.h		\
 	main/strlist.h		\
 	main/vstring.h		\
-	main/xtag.h
+	main/xtag.h		\
+	\
+	$(MIO_HEADS)
 
 MAIN_SRCS =				\
 	main/args.c			\
@@ -65,6 +70,7 @@ MAIN_SRCS =				\
 	main/xtag.c			\
 	\
 	$(REPOINFO_SRCS) \
+	$(MIO_SRCS)      \
 	\
 	$(NULL)
 
@@ -120,12 +126,14 @@ PARSER_SRCS =				\
 	parsers/fortran.c		\
 	parsers/go.c			\
 	parsers/html.c			\
+	parsers/jprop.c			\
 	parsers/jscript.c		\
 	parsers/json.c			\
 	parsers/lisp.c			\
 	parsers/lua.c			\
 	parsers/make.c			\
 	parsers/matlab.c		\
+	parsers/myrddin.c		\
 	parsers/objc.c			\
 	parsers/ocaml.c			\
 	parsers/pascal.c		\
@@ -161,6 +169,9 @@ XML_SRCS = \
 	 parsers/maven2.c		\
 	 parsers/dbusintrospect.c	\
 	 parsers/glade.c		\
+	 parsers/svg.c			\
+	 parsers/plist.c		\
+	 parsers/xslt.c			\
 	 \
 	 $(NULL)
 
@@ -181,14 +192,33 @@ FNMATCH_HEADS = fnmatch/fnmatch.h
 FNMATCH_SRCS = fnmatch/fnmatch.c
 FNMATCH_OBJS = $(FNMATCH_SRCS:.c=.$(OBJEXT))
 
-QUALIFIER_HEAD = dsl/es-lang-c-stdc99.h \
-		 dsl/qualifier.h
+QUALIFIER_HEADS = dsl/es-lang-c-stdc99.h \
+		 dsl/qualifier.h \
+		 \
+		 $(MIO_HEADS) \
+		 \
+		 $(NULL)
+
 QUALIFIER_SRCS = dsl/es-lang-c-stdc99.c \
-		 dsl/qualifier.c
+		 dsl/qualifier.c \
+		 \
+		 $(MIO_SRCS) \
+		 \
+		 $(NULL)
+
 QUALIFIER_OBJS = $(QUALIFIER_SRCS:.c=.$(OBJEXT))
 
 ALL_OBJS = \
 	$(ALL_SRCS:.c=.$(OBJEXT)) \
 	$(LIBOBJS)
+
+
+READTAGS_SRCS  = \
+	       read/readtags.c      \
+	       read/readtags-cmd.c  \
+	       \
+	       $(NULL)
+READTAGS_HEADS = read/readtags.h
+READTAGS_OBJS  = $(READTAGS_SRCS:.c=.$(OBJEXT))
 
 # vim: ts=8

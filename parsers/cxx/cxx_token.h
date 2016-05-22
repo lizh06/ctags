@@ -40,7 +40,7 @@ enum CXXTokenType
 
 	// These must come in pairs. Note that the opening
 	// tokens can be shifted by 4 to get the matching closing
-	// tokens and by 8 to get the matching subchain marker below
+	// tokens can be shiftet by 8 to get the matching subchain marker below
 	CXXTokenTypeOpeningBracket = (1 << 19), // {
 	CXXTokenTypeOpeningParenthesis = (1 << 20), // (
 	CXXTokenTypeOpeningSquareParenthesis = (1 << 21), // [
@@ -51,7 +51,7 @@ enum CXXTokenType
 	CXXTokenTypeClosingSquareParenthesis = (1 << 25), // ]
 	CXXTokenTypeGreaterThanSign = (1 << 26), // >
 
-	// Subchains (caution: read the comment above about CXXTokenTypeOpeningBracket
+	// Subchains (caution: read the comment above about CXXTokenTypeOpeningBracket)
 	CXXTokenTypeBracketChain = (1 << 27), // {...}
 	CXXTokenTypeParenthesisChain = (1 << 28), // (...)
 	CXXTokenTypeSquareParenthesisChain = (1 << 29), // [...]
@@ -68,17 +68,18 @@ typedef struct _CXXToken
 	enum CXXTokenType eType;
 	vString * pszWord;
 	enum CXXKeyword eKeyword;
-	CXXTokenChain * pChain;
+	CXXTokenChain * pChain; // this is NOT the parent chain!
 	boolean bFollowedBySpace;
 
 	int iLineNumber;
-	fpos_t oFilePosition;
+	MIOPos oFilePosition;
 
 	struct _CXXToken * pNext;
 	struct _CXXToken * pPrev;
 
-	// These members are used by the scope management functions to store the scope informations.
-	// Only cxxScope* functions can make sense of it. In other contexts these are simply left
+	// These members are used by the scope management functions to store
+	// scope information. Only cxxScope* functions can make sense of it.
+	// In other contexts these are simply left
 	// uninitialized and must be treated as undefined.
 	unsigned char uInternalScopeKind;
 	unsigned char uInternalScopeAccess;
@@ -88,10 +89,16 @@ CXXToken * cxxTokenCreate(void);
 void cxxTokenDestroy(CXXToken * t);
 
 enum CXXTagKind;
+
 CXXToken * cxxTokenCreateAnonymousIdentifier(enum CXXTagKind k);
 
 #define cxxTokenTypeIsOneOf(_pToken,_uTypes) (_pToken->eType & (_uTypes))
 #define cxxTokenTypeIs(_pToken,_eType) (_pToken->eType == _eType)
+#define cxxTokenIsKeyword(_pToken,_eKeyword) \
+		( \
+			(_pToken->eType == CXXTokenTypeKeyword) && \
+			(_pToken->eKeyword == _eKeyword) \
+		)
 
 // FIXME: Bad argument order
 void cxxTokenAppendToString(vString * s,CXXToken * t);

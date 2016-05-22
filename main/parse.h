@@ -13,6 +13,7 @@
 *   INCLUDE FILES
 */
 #include "general.h"  /* must always come first */
+#include "field.h"
 #include "kind.h"
 #include "parsers.h"  /* contains list of parsers */
 #include "strlist.h"
@@ -59,7 +60,7 @@ typedef void (*parserInitialize) (langType language);
    is called. */
 typedef void (*parserFinalize) (langType language, boolean initialized);
 
-typedef const char * (*selectLanguage) (FILE *);
+typedef const char * (*selectLanguage) (MIO *);
 
 typedef enum {
 	METHOD_NOT_CRAFTED    = 1 << 0,
@@ -92,6 +93,10 @@ typedef struct sTagXpathRecurSpec {
 		       const struct sTagXpathRecurSpec *spec,
 		       xmlXPathContext *ctx,
 		       void *userData);
+
+	int  nextTable;		/* A parser can use this field any purpose.
+				   main/lxpath part doesn't touch this. */
+
 } tagXpathRecurSpec;
 
 typedef struct sTagXpathTable
@@ -133,6 +138,7 @@ typedef struct {
 	unsigned int method;           /* See PARSE__... definitions above */
 	boolean useCork;
 	boolean allowNullTag;
+	boolean requestAutomaticFQTag;
 	const tagRegexTable *tagRegexTable;
 	unsigned int tagRegexCount;
 	const keywordTable *keywordTable;
@@ -140,6 +146,8 @@ typedef struct {
 	tagXpathTableTable *tagXpathTableTable;
 	unsigned int tagXpathTableCount;
 	boolean invisible;
+	fieldSpec *fieldSpecs;
+	unsigned int fieldSpecCount;
 
 	/* used internally */
 	unsigned int id;               /* id assigned to language */
@@ -150,6 +158,7 @@ typedef struct {
 	unsigned int tagXpathInstalled:1;  /* tagXpathTable is installed or not. */
 	unsigned int pseudoTagPrinted:1;   /* pseudo tags about this parser
 					      is emitted or not. */
+	unsigned int fieldSpecInstalled:1; /* fieldSpecs is installed or not. */
 
 	stringList* currentPatterns;   /* current list of file name patterns */
 	stringList* currentExtensions; /* current list of extensions */
@@ -191,6 +200,7 @@ extern int makeSimpleRefTag (const vString* const name, kindOption* const kinds,
 extern parserDefinition* parserNew (const char* name);
 extern parserDefinition* parserNewFull (const char* name, char fileKind);
 extern boolean doesLanguageAllowNullTag (const langType language);
+extern boolean doesLanguageRequestAutomaticFQTag (const langType language);
 extern const char *getLanguageName (const langType language);
 extern kindOption* getLanguageFileKind (const langType language);
 extern langType getNamedLanguage (const char *const name, size_t len);
@@ -218,12 +228,15 @@ extern void printLanguageMaps (const langType language, langmapType type);
 extern void enableLanguages (const boolean state);
 extern void enableLanguage (const langType language, const boolean state);
 extern void initializeParsing (void);
+extern void initializeParser (langType language);
+extern unsigned int countParsers (void);
 extern void freeParserResources (void);
 extern void printLanguageFileKind (const langType language);
 extern void printLanguageKinds (const langType language, boolean allKindFields);
 extern void printLanguageRoles (const langType language, const char* letters);
 extern void printLanguageAliases (const langType language);
 extern void printLanguageList (void);
+extern boolean doesParserRequireMemoryStream (const langType language);
 extern boolean parseFile (const char *const fileName);
 
 #ifdef HAVE_ICONV
@@ -244,7 +257,8 @@ extern void resetRegexKinds (const langType language, boolean mode);
 extern boolean enableRegexKind (const langType language, const int kind, const boolean mode);
 extern boolean isRegexKindEnabled (const langType language, const int kind);
 extern boolean hasRegexKind (const langType language, const int kind);
-extern void printRegexKinds (const langType language, boolean allKindFields, boolean indent);
+extern void printRegexKinds (const langType language, boolean allKindFields, boolean indent,
+			     boolean tabSeparated);
 extern void foreachRegexKinds (const langType language, boolean (* func) (kindOption*, void*), void *data);
 extern void freeRegexResources (void);
 extern boolean checkRegex (void);
@@ -261,7 +275,8 @@ extern void resetXcmdKinds (const langType language, boolean mode);
 extern boolean enableXcmdKind (const langType language, const int kind, const boolean mode);
 extern boolean isXcmdKindEnabled (const langType language, const int kind);
 extern boolean hasXcmdKind (const langType language, const int kind);
-extern void printXcmdKinds (const langType language, boolean allKindFields, boolean indent);
+extern void printXcmdKinds (const langType language, boolean allKindFields, boolean indent,
+			    boolean tabSeparated);
 extern void foreachXcmdKinds (const langType language, boolean (* func) (kindOption*, void*), void *data);
 extern void freeXcmdResources (void);
 extern void useXcmdMethod (const langType language);

@@ -25,7 +25,7 @@ a parser. Ctags uses a global variable `File` having type `inputFile`
 for maintaining the input file and stream.
 
 `fp` and `line` are the essential fields of `File`. `fp` having type
-well known `FILE` of stdio. By calling functions of input group
+well known `MIO` declared in main/mio.h. By calling functions of input group
 (`getcFromInputFile` and `readLineFromInputFile`), a parser gets input
 text from `fp`.
 
@@ -60,7 +60,7 @@ fields of tags file, for example.
 The functions of raw group
 ......................................................................
 The functions of this group(`readLineRaw` and `readLineRawWithNoSeek`)
-take a parameter having type `FILE *`; and don't touch `File` global
+take a parameter having type `MIO`; and don't touch `File` global
 variable.
 
 Parsers may not need the functions of this group.  The functions are
@@ -90,12 +90,12 @@ Output tag stream
 	    :scale: 80%
 
 Ctags provides `makeTagEntry` to parsers as an entry point for writing
-tag informations to FILE. `makeTagEntry` calls `writeTagEntry` if the
+tag informations to MIO. `makeTagEntry` calls `writeTagEntry` if the
 parser does not set `useCork` field. `writeTagEntry` calls one of
 three functions, `writeTagsEntry`, `writeXrefEntry` or `writeCtagsEntry`.
 One of them is chosen depending on the arguments passed to ctags.
 
-If `useCork` is set, the tag informations goes to a queue on memory.
+If `useCork` is set, the tag information goes to a queue on memory.
 The queue is flushed when `useCork` in unset. See `cork API` for more
 details.
 
@@ -121,7 +121,7 @@ Following code is taken from clojure.c(with modifications).
 		makeTagEntry (&current);
 
 `parent`, values stored to `scope [0]` and `scope [1]` are all
-something string.
+kind of strings.
 
 cork API provides more solid way to hold scope information. cork API
 expects `parent`, which represents scope of a tag(`current`)
@@ -179,7 +179,7 @@ the object after calling.
 
 .. code-block:: c
 
-		static int parent = SCOPE_NIL;
+		static int parent = CORK_NIL;
 		...
 		parent = makeTagEntry (&e);
 
@@ -193,9 +193,34 @@ field of `current` tag, which is in the scope of `parent`.
 When passing `current` to `makeTagEntry`, the `scopeIndex` is
 refereed for emitting the scope information of `current`.
 
-`scopeIndex` must be set to `SCOPE_NIL` if a tag is not in any scope.
+`scopeIndex` must be set to `CORK_NIL` if a tag is not in any scope.
 When using `scopeIndex` of `current`, `NULL` must be assigned to both
 `current.extensionFields.scope[0]` and
 `current.extensionFields.scope[1]`.  `initTagEntry` function does this
 initialization internally, so you generally you don't have to write
 the initialization explicitly.
+
+Automatic full qualified tag generation
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+If a parser uses the cork for recording and emitting scope
+information, ctags can reuse it for generating full qualified(FQ)
+tags. Set `requestAutomaticFQTag` field of `parserDefinition` to
+`TRUE` then the main part of ctags emits FQ tags on behalf of the parser
+if `--extra=+q` is given.
+
+An example can be found in DTS parser:
+
+.. code-block:: c
+
+    extern parserDefinition* DTSParser (void)
+    {
+	    static const char *const extensions [] = { "dts", "dtsi", NULL };
+	    parserDefinition* const def = parserNew ("DTS");
+	    ...
+	    def->requestAutomaticFQTag = TRUE;
+	    return def;
+    }
+
+Setting `requestAutomaticFQTag` to `TRUE` implies setting
+`useCork` to `TRUE`.

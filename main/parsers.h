@@ -15,8 +15,11 @@
 #ifdef HAVE_LIBXML
 #define XML_PARSER_LIST \
 	DbusIntrospectParser, \
-	GladeParser, \
-	Maven2Parser
+	GladeParser,  \
+	Maven2Parser, \
+	PlistXMLParser, \
+	SvgParser, \
+	XsltParser
 #else
 #define XML_PARSER_LIST
 #endif
@@ -51,13 +54,16 @@
 	GoParser, \
 	HtmlParser, \
 	JavaParser, \
+	JavaPropertiesParser, \
 	JavaScriptParser, \
 	JsonParser, \
 	LispParser, \
 	LuaParser, \
 	M4Parser, \
+	ManParser, \
 	MakefileParser, \
 	MatLabParser, \
+	MyrddinParser, \
 	ObjcParser, \
 	OldCppParser, \
 	OldCParser, \

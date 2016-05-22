@@ -67,7 +67,7 @@ typedef struct sTokenInfo {
 	keywordId keyword;
 	vString *string;		/* the name of the token */
 	unsigned long lineNumber;	/* line number of tag */
-	fpos_t filePosition;		/* file position of line containing name */
+	MIOPos filePosition;		/* file position of line containing name */
 } tokenInfo;
 
 /*
@@ -101,7 +101,7 @@ static kindOption GoKinds[] = {
 	{TRUE, 'm', "member", "struct members"}
 };
 
-static const keywordTable const GoKeywordTable[] = {
+static const keywordTable GoKeywordTable[] = {
 	{"package", KEYWORD_package},
 	{"import", KEYWORD_import},
 	{"const", KEYWORD_const},
