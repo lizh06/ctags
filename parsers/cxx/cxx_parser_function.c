@@ -529,6 +529,7 @@ boolean cxxParserLookForFunctionSignature(
 
 	pInfo->uFlags = 0;
 	pInfo->pParenthesis = NULL;
+	pInfo->pTrailingComma = NULL;
 
 	CXXToken * pIdentifierStart = NULL;
 	CXXToken * pIdentifierEnd = NULL;
@@ -553,7 +554,7 @@ boolean cxxParserLookForFunctionSignature(
 
 			while(pToken)
 			{
-				if(pToken->eType == CXXTokenTypeParenthesisChain)
+				if(cxxTokenTypeIs(pToken,CXXTokenTypeParenthesisChain))
 				{
 					// check for operator ()()
 					if(
@@ -561,10 +562,19 @@ boolean cxxParserLookForFunctionSignature(
 							cxxTokenTypeIs(pToken->pNext,CXXTokenTypeParenthesisChain)
 						)
 						pToken = pToken->pNext;
-					break;
-				}
 
-				if(!cxxTokenTypeIsOneOf(
+					break;
+				} else if(cxxTokenTypeIs(pToken,CXXTokenTypeKeyword))
+				{
+					if(
+							(!cxxTokenIsKeyword(pToken,CXXKeywordNEW)) &&
+							(!cxxTokenIsKeyword(pToken,CXXKeywordDELETE))
+						)
+					{
+						CXX_DEBUG_LEAVE_TEXT("Unexpected token after the operator keyword");
+						return FALSE;
+					}
+				} else if(!cxxTokenTypeIsOneOf(
 						pToken,
 						CXXTokenTypeAnd | CXXTokenTypeAssignment |
 							CXXTokenTypeComma | CXXTokenTypeDotOperator |
@@ -615,6 +625,15 @@ boolean cxxParserLookForFunctionSignature(
 			))
 		{
 			// reached end
+			bStopScanning = TRUE;
+			break;
+		} else if(cxxTokenTypeIs(
+				pToken,
+				CXXTokenTypeComma
+			))
+		{
+			// reached end, but we have a trailing comma.
+			pInfo->pTrailingComma = pToken;
 			bStopScanning = TRUE;
 			break;
 		} else if(
