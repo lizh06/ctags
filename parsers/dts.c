@@ -47,7 +47,7 @@ static kindOption DTSKinds [] = {
 	  .referenceOnly = FALSE, ATTACH_ROLES(DTSHeaderRoles)},
 };
 
-static const tagRegexTable dtsTagRegexTable [] = {
+static tagRegexTable dtsTagRegexTable [] = {
 	/* phandle = <0x00> */
 	{"^[ \t]*phandle[ \t]+=[ \t]+<(0x[a-fA-F0-9]+)>", "\\1",
 	 "p,phandler,phandlers", "{scope=ref}"},
@@ -89,6 +89,7 @@ extern parserDefinition* DTSParser (void)
 	def->tagRegexTable = dtsTagRegexTable;
 	def->tagRegexCount = ARRAY_SIZE (dtsTagRegexTable);
 	def->method     = METHOD_REGEX;
+	def->requestAutomaticFQTag = TRUE;
 	return def;
 }
 

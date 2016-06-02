@@ -870,11 +870,6 @@ boolean cxxParserParseNextToken(void)
 
 	cxxTokenChainAppend(g_cxx.pTokenChain,t);
 
-	// More than 256 tokens is something like a big table, we
-	// don't need it (for now).
-	if(g_cxx.pTokenChain->iCount > 256)
-		cxxTokenChainDestroyFirst(g_cxx.pTokenChain);
-
 	g_cxx.pToken = t;
 
 	cxxParserSkipToNonWhiteSpace();
@@ -952,8 +947,17 @@ boolean cxxParserParseNextToken(void)
 		if(iCXXKeyword >= 0)
 		{
 			if(
-					(iCXXKeyword == CXXKeywordFINAL) &&
-					(!g_cxx.bParsingClassStructOrUnionDeclaration)
+					(
+						(iCXXKeyword == CXXKeywordFINAL) &&
+						(!g_cxx.bParsingClassStructOrUnionDeclaration)
+					) || (
+						(
+							(iCXXKeyword == CXXKeywordPUBLIC) ||
+							(iCXXKeyword == CXXKeywordPROTECTED) ||
+							(iCXXKeyword == CXXKeywordPRIVATE)
+						) &&
+						(!g_cxx.bEnablePublicProtectedPrivateKeywords)
+					)
 				)
 			{
 				t->eType = CXXTokenTypeIdentifier;

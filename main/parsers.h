@@ -30,6 +30,7 @@
 	AntParser, \
 	AsmParser, \
 	AspParser, \
+	AutomakeParser, \
 	AwkParser, \
 	BasicParser, \
 	BetaParser, \
@@ -75,6 +76,7 @@
 	PythonParser, \
 	RParser, \
 	RexxParser, \
+	RpmSpecParser, \
 	RstParser, \
 	RubyParser, \
 	RustParser, \

@@ -31,6 +31,7 @@ New parsers
 The following parsers have been added:
 
 * Ada
+* Automake  
 * Clojure
 * CSS
 * D
@@ -49,6 +50,7 @@ The following parsers have been added:
 * PropertiyList(plist) *libxml*
 * R
 * reStructuredText
+* RpmSpec
 * Rust
 * SystemVerilog
 * SVG *libxml*

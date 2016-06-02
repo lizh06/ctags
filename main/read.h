@@ -47,6 +47,7 @@
 #define doesInputLanguageAllowNullTag() doesLanguageAllowNullTag (File.input.language)
 #define getInputLanguageFileKind()  getLanguageFileKind (File.input.language)
 
+#define doesInputLanguageRequestAutomaticFQTag() doesLanguageRequestAutomaticFQTag (File.input.language)
 #define getSourceFileTagPath()   vStringValue (File.source.tagPath)
 #define getSourceLanguageName()  getLanguageName (File.source.language)
 #define getSourceLineNumber()    File.source.lineNumber
@@ -129,7 +130,7 @@ extern CONST_FILE inputFile File;
 
 /* InputFile: reading from fp in inputFile with updating fields in input fields */
 extern void                 freeInputFileResources (void);
-extern const unsigned char *getInpufFileData (size_t *size);
+extern const unsigned char *getInputFileData (size_t *size);
 
 /* Stream opend by getMio can be passed to openInputFile as the 3rd
    argument. If the 3rd argument is NULL, openInputFile calls getMio
