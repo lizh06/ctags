@@ -29,6 +29,7 @@
 	AntParser, \
 	AsmParser, \
 	AspParser, \
+	AutomakeParser, \
 	AwkParser, \
 	BasicParser, \
 	CoffeeScriptParser, \
