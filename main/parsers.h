@@ -67,6 +67,8 @@
 	PhpParser, \
 	PythonParser, \
 	RParser, \
+	RexxParser, \
+	RpmSpecParser, \
 	RstParser, \
 	RubyParser, \
 	RustParser, \
