@@ -274,6 +274,8 @@ int cxxParserMaybeExtractKnRStyleFunctionDefinition(int * piCorkQueueIndex)
 	{
 		if(pParenthesis->pChain->pTail)
 		{
+			// normalize signature
+			cxxTokenChainNormalizeTypeNameSpacing(pParenthesis->pChain);
 			// make sure we don't emit the trailing space
 			pParenthesis->pChain->pTail->bFollowedBySpace = FALSE;
 		}
@@ -349,8 +351,8 @@ boolean cxxParserTokenChainLooksLikeFunctionCallParameterSet(
 			"The token chain should start with an opening parenthesis/bracket"
 		);
 	CXX_DEBUG_ASSERT(
-			cxxTokenTypeIsOneOf(pLast,CXXTokenTypeOpeningParenthesis | CXXTokenTypeClosingBracket),
-			"The token chain should end with an opening parenthesis/bracket"
+			cxxTokenTypeIsOneOf(pLast,CXXTokenTypeClosingParenthesis | CXXTokenTypeClosingBracket),
+			"The token chain should end with an closing parenthesis/bracket"
 		);
 
 	unsigned int uTerminator = t->eType << 4;
@@ -1053,6 +1055,8 @@ int cxxParserEmitFunctionTags(
 	{
 		if(pInfo->pParenthesis->pChain->pTail)
 		{
+			// normalize signature
+			cxxTokenChainNormalizeTypeNameSpacing(pInfo->pParenthesis->pChain);
 			// make sure we don't emit the trailing space
 			pInfo->pParenthesis->pChain->pTail->bFollowedBySpace = FALSE;
 		}

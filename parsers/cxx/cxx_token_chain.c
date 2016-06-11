@@ -771,6 +771,31 @@ int cxxTokenChainFirstKeywordIndex(
 	return -1;
 }
 
+#if 0
+// This is working code but it's unused and coveralls complains.. sigh.
+// Remove the #if above if needed.
+CXXToken * cxxTokenChainFirstKeyword(
+		CXXTokenChain * tc,
+		enum CXXKeyword eKeyword
+	)
+{
+	if(!tc)
+		return NULL;
+	if(tc->iCount < 1)
+		return NULL;
+
+	CXXToken * pToken = tc->pHead;
+	while(pToken)
+	{
+		if(cxxTokenIsKeyword(pToken,eKeyword))
+			return pToken;
+		pToken = pToken->pNext;
+	}
+
+	return NULL;
+}
+#endif
+
 CXXToken * cxxTokenChainNextIdentifier(
 		CXXToken * from,
 		const char * szIdentifier
@@ -827,6 +852,7 @@ CXXToken * cxxTokenChainExtractRange(
 	CXXToken * pRet = cxxTokenCreate();
 	pRet->iLineNumber = pToken->iLineNumber;
 	pRet->oFilePosition = pToken->oFilePosition;
+	pRet->eType = pToken->eType;
 
 	cxxTokenAppendToString(pRet->pszWord,pToken);
 	if(
@@ -881,6 +907,7 @@ CXXToken * cxxTokenChainExtractIndexRange(
 	CXXToken * pRet = cxxTokenCreate();
 	pRet->iLineNumber = pToken->iLineNumber;
 	pRet->oFilePosition = pToken->oFilePosition;
+	pRet->eType = pToken->eType;
 
 	cxxTokenAppendToString(pRet->pszWord,pToken);
 	if(

@@ -75,6 +75,7 @@ typedef struct {
 	const char* const name;
 	const char* const kinds;
 	const char *const flags;
+	boolean    *disabled;
 } tagRegexTable;
 
 struct sTagEntryInfo;
@@ -139,7 +140,7 @@ typedef struct {
 	boolean useCork;
 	boolean allowNullTag;
 	boolean requestAutomaticFQTag;
-	const tagRegexTable *tagRegexTable;
+	tagRegexTable *tagRegexTable;
 	unsigned int tagRegexCount;
 	const keywordTable *keywordTable;
 	unsigned int keywordCount;
@@ -163,6 +164,7 @@ typedef struct {
 	stringList* currentPatterns;   /* current list of file name patterns */
 	stringList* currentExtensions; /* current list of extensions */
 	stringList* currentAliaes;     /* current list of aliases */
+	unsigned int anonumousIdentiferId; /* managed by anon* functions */
 } parserDefinition;
 
 typedef parserDefinition* (parserDefinitionFunc) (void);
@@ -172,7 +174,8 @@ typedef struct {
 	size_t length;  /* length of match */
 } regexMatch;
 
-typedef void (*regexCallback) (const char *line, const regexMatch *matches, unsigned int count);
+typedef void (*regexCallback) (const char *line, const regexMatch *matches, unsigned int count,
+			       void *userData);
 
 typedef enum {
 	LMAP_PATTERN   = 1 << 0,
@@ -251,8 +254,11 @@ extern void findRegexTagsMainloop (int (* driver)(void));
 extern boolean matchRegex (const vString* const line, const langType language);
 extern void addLanguageRegex (const langType language, const char* const regex);
 extern void installTagRegexTable (const langType language);
-extern void addTagRegex (const langType language, const char* const regex, const char* const name, const char* const kinds, const char* const flags);
-extern void addCallbackRegex (const langType language, const char *const regexo, const char *const flags, const regexCallback callback);
+extern void addTagRegex (const langType language, const char* const regex,
+			 const char* const name, const char* const kinds, const char* const flags,
+			 boolean *disabled);
+extern void addCallbackRegex (const langType language, const char *const regexo, const char *const flags,
+			      const regexCallback callback, boolean *disabled, void *userData);
 extern void resetRegexKinds (const langType language, boolean mode);
 extern boolean enableRegexKind (const langType language, const int kind, const boolean mode);
 extern boolean isRegexKindEnabled (const langType language, const int kind);
@@ -294,6 +300,9 @@ extern void makeKindSeparatorsPseudoTags (const langType language,
 					  const struct sPtagDesc *pdesc);
 extern void makeKindDescriptionsPseudoTags (const langType language,
 					    const struct sPtagDesc *pdesc);
+
+extern void anonReset (void);
+extern void anonGenerate (vString *buffer, const char *prefix, int kind);
 
 #endif  /* CTAGS_MAIN_PARSE_H */
 
