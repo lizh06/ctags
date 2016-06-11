@@ -270,14 +270,46 @@ void cxxParserMarkEndLineForTagInCorkQueue(int iCorkQueueIndex)
 	cxxTagSetCorkQueueCField(iCorkQueueIndex,CXXTagCFieldEndLine,buf);
 }
 
+// Make sure that the token chain contains only the specified keyword and eventually
+// the "const" or "volatile" type modifiers.
+static void cxxParserCleanupEnumStructClassOrUnionPrefixChain(enum CXXKeyword eKeyword)
+{
+	CXXToken * pToken = cxxTokenChainFirst(g_cxx.pTokenChain);
+	while(pToken)
+	{
+		if(
+				cxxTokenTypeIs(pToken,CXXTokenTypeKeyword) &&
+				(
+					(pToken->eKeyword == eKeyword) ||
+					(pToken->eKeyword == CXXKeywordCONST) ||
+					(pToken->eKeyword == CXXKeywordVOLATILE)
+				)
+			)
+		{
+			// keep
+			pToken = pToken->pNext;
+		} else {
+			CXXToken * pPrev = pToken->pPrev;
+			if(pPrev)
+			{
+				cxxTokenChainTake(g_cxx.pTokenChain,pToken);
+				cxxTokenDestroy(pToken);
+				pToken = pPrev->pNext;
+			} else {
+				cxxTokenChainDestroyFirst(g_cxx.pTokenChain);
+				pToken = cxxTokenChainFirst(g_cxx.pTokenChain);
+			}
+		}
+	}
+}
+
 //
 // This is called after a full enum/struct/class/union declaration
 // that ends with a closing bracket.
 //
 static boolean cxxParserParseEnumStructClassOrUnionFullDeclarationTrailer(
-		boolean bParsingTypedef,
+		unsigned int uKeywordState,
 		enum CXXKeyword eTagKeyword,
-		enum CXXTagKind eTagKind,
 		const char * szTypeName
 	)
 {
@@ -321,16 +353,28 @@ static boolean cxxParserParseEnumStructClassOrUnionFullDeclarationTrailer(
 	vStringCatS(pIdentifier->pszWord,szTypeName);
 	cxxTokenChainPrepend(g_cxx.pTokenChain,pIdentifier);
 
-	CXXToken * pKeyword = cxxTokenCreate();
-	pKeyword->oFilePosition = oFilePosition;
-	pKeyword->iLineNumber = iFileLine;
-	pKeyword->eType = CXXTokenTypeKeyword;
-	pKeyword->eKeyword = eTagKeyword;
-	pKeyword->bFollowedBySpace = TRUE;
-	vStringCatS(pKeyword->pszWord,cxxTagGetKindOptions()[eTagKind].name);
-	cxxTokenChainPrepend(g_cxx.pTokenChain,pKeyword);
+	cxxTokenChainPrepend(
+			g_cxx.pTokenChain,
+			cxxTokenCreateKeyword(iFileLine,oFilePosition,eTagKeyword)
+		);
+	
+	if(uKeywordState & CXXParserKeywordStateSeenConst)
+	{
+		cxxTokenChainPrepend(
+				g_cxx.pTokenChain,
+				cxxTokenCreateKeyword(iFileLine,oFilePosition,CXXKeywordCONST)
+			);
+	}
 
-	if(bParsingTypedef)
+	if(uKeywordState & CXXParserKeywordStateSeenVolatile)
+	{
+		cxxTokenChainPrepend(
+				g_cxx.pTokenChain,
+				cxxTokenCreateKeyword(iFileLine,oFilePosition,CXXKeywordVOLATILE)
+			);
+	}
+
+	if(uKeywordState & CXXParserKeywordStateSeenTypedef)
 		cxxParserExtractTypedef(g_cxx.pTokenChain,TRUE);
 	else
 		cxxParserExtractVariableDeclarations(g_cxx.pTokenChain,0);
@@ -343,8 +387,10 @@ boolean cxxParserParseEnum(void)
 {
 	CXX_DEBUG_ENTER();
 
-	// may be cleared below
-	boolean bParsingTypedef = (g_cxx.uKeywordState & CXXParserKeywordStateSeenTypedef);
+	unsigned int uInitialKeywordState = g_cxx.uKeywordState;
+
+	if(g_cxx.pTokenChain->iCount > 1)
+		cxxParserCleanupEnumStructClassOrUnionPrefixChain(CXXKeywordENUM);
 
 	/*
 		Spec is:
@@ -512,9 +558,8 @@ boolean cxxParserParseEnum(void)
 	}
 
 	boolean bRet = cxxParserParseEnumStructClassOrUnionFullDeclarationTrailer(
-			bParsingTypedef,
+			uInitialKeywordState,
 			CXXKeywordENUM,
-			CXXTagKindENUM,
 			vStringValue(pScopeName)
 		);
 
@@ -526,20 +571,17 @@ boolean cxxParserParseEnum(void)
 	return bRet;
 };
 
-
-boolean cxxParserParseClassStructOrUnion(
+static boolean cxxParserParseClassStructOrUnionInternal(
 		enum CXXKeyword eKeyword,
 		enum CXXTagKind eTagKind
 	)
 {
 	CXX_DEBUG_ENTER();
 
-	// make sure that there is only the class/struct/union keyword in the chain
-	while(g_cxx.pTokenChain->iCount > 1)
-		cxxTokenChainDestroyFirst(g_cxx.pTokenChain);
+	unsigned int uInitialKeywordState = g_cxx.uKeywordState;
 
-	// this may be cleared below
-	boolean bParsingTypedef = (g_cxx.uKeywordState & CXXParserKeywordStateSeenTypedef);
+	if(g_cxx.pTokenChain->iCount > 1)
+		cxxParserCleanupEnumStructClassOrUnionPrefixChain(eKeyword);
 
 	/*
 		Spec is:
@@ -628,7 +670,7 @@ boolean cxxParserParseClassStructOrUnion(
 		if(g_cxx.pTokenChain->iCount > 3)
 		{
 			// [typedef] struct X Y; <-- typedef has been removed!
-			if(bParsingTypedef)
+			if(uInitialKeywordState & CXXParserKeywordStateSeenTypedef)
 				cxxParserExtractTypedef(g_cxx.pTokenChain,TRUE);
 			else
 				cxxParserExtractVariableDeclarations(g_cxx.pTokenChain,0);
@@ -837,9 +879,8 @@ boolean cxxParserParseClassStructOrUnion(
 	}
 
 	bRet = cxxParserParseEnumStructClassOrUnionFullDeclarationTrailer(
-			bParsingTypedef,
+			uInitialKeywordState,
 			eKeyword,
-			eTagKind,
 			vStringValue(pScopeName)
 		);
 
@@ -849,7 +890,38 @@ boolean cxxParserParseClassStructOrUnion(
 	cxxParserNewStatement();
 	CXX_DEBUG_LEAVE();
 	return bRet;
-};
+}
+
+boolean cxxParserParseClassStructOrUnion(
+		enum CXXKeyword eKeyword,
+		enum CXXTagKind eTagKind
+	)
+{
+	// Trick for "smart" handling of public/protected/private keywords in .h files parsed as C++.
+	// See the declaration of bEnablePublicProtectedPrivateKeywords for more info.
+
+	// Save the state
+	boolean bEnablePublicProtectedPrivateKeywords = g_cxx.bEnablePublicProtectedPrivateKeywords;
+
+	// If parsing of the keywords was disabled, we're in C++ mode and the keyword is "class" then
+	// we're fairly certain that the source code is *really* C++.
+	if(
+			(!bEnablePublicProtectedPrivateKeywords) &&
+			(eKeyword == CXXKeywordCLASS) &&
+			cxxParserCurrentLanguageIsCPP()
+		)
+		bEnablePublicProtectedPrivateKeywords = TRUE; // leave it on for good.
+
+	// Enable public/protected/private keywords
+	g_cxx.bEnablePublicProtectedPrivateKeywords = TRUE;
+
+	boolean bRet = cxxParserParseClassStructOrUnionInternal(eKeyword,eTagKind);
+
+	g_cxx.bEnablePublicProtectedPrivateKeywords = bEnablePublicProtectedPrivateKeywords;
+
+	return bRet;
+}
+
 
 //
 // This is called at block level, upon encountering a semicolon, an unbalanced
@@ -949,7 +1021,7 @@ void cxxParserAnalyzeOtherStatement(void)
 
 	// prefer function.
 check_function_signature:
-	
+
 	if(cxxParserLookForFunctionSignature(g_cxx.pTokenChain,&oInfo,NULL))
 	{
 		int iScopesPushed = cxxParserEmitFunctionTags(&oInfo,CXXTagKindPROTOTYPE,CXXEmitFunctionTagsPushScopes,NULL);
@@ -959,7 +1031,7 @@ check_function_signature:
 			iScopesPushed--;
 		}
 		CXX_DEBUG_LEAVE_TEXT("Found function prototype");
-		
+
 		if(oInfo.pTrailingComma)
 		{
 			// got a trailing comma after the function signature.
@@ -972,7 +1044,7 @@ check_function_signature:
 			cxxTokenChainDestroyRange(g_cxx.pTokenChain,oInfo.pIdentifierStart,oInfo.pTrailingComma);
 			goto check_function_signature;
 		}
-		
+
 		return;
 	}
 
@@ -1104,7 +1176,7 @@ boolean cxxParserParseIfForWhileSwitch(void)
 			t->eType = CXXTokenTypeSemicolon;
 			vStringClear(t->pszWord);
 			vStringPut(t->pszWord,';');
-	
+
 			// and extract variable declarations if possible
 			cxxParserExtractVariableDeclarations(pChain,0);
 		}
@@ -1184,6 +1256,14 @@ rescanReason cxxCppParserMain(const unsigned int passCount)
 {
 	CXX_DEBUG_ENTER();
 	g_cxx.eLanguage = g_cxx.eCPPLanguage;
+
+	// In header files we disable processing of public/protected/private keywords
+	// until we either figure out that this is really C++ or we're start parsing
+	// a struct/union.
+	g_cxx.bEnablePublicProtectedPrivateKeywords = !isInputHeaderFile();
+
+	CXX_DEBUG_PRINT("Parsing of public/protected/private is %d",g_cxx.bEnablePublicProtectedPrivateKeywords);
+
 	rescanReason r = cxxParserMain(passCount);
 	CXX_DEBUG_LEAVE();
 	return r;

@@ -15,12 +15,12 @@
 
 #include "cxx_token_chain.h"
 #include "cxx_debug.h"
+#include "cxx_keyword.h"
 #include "cxx_tag.h"
 
 #define CXX_TOKEN_POOL_MAXIMUM_SIZE 8192
 
 static CXXTokenChain * g_pTokenPool = NULL;
-static unsigned int g_uNextAnonumousIdentiferId = 0;
 
 void cxxTokenForceDestroy(CXXToken * t);
 
@@ -31,7 +31,7 @@ void cxxTokenAPIInit(void)
 
 void cxxTokenAPINewFile(void)
 {
-	g_uNextAnonumousIdentiferId = 0;
+	anonReset ();
 }
 
 void cxxTokenAPIDone(void)
@@ -111,40 +111,25 @@ void cxxTokenForceDestroy(CXXToken * t)
 	eFree(t);
 }
 
-
-static unsigned int hash(const unsigned char *str)
+CXXToken * cxxTokenCreateKeyword(int iLineNumber,MIOPos oFilePosition,enum CXXKeyword eKeyword)
 {
-	unsigned int hash = 5381;
-	int c;
+	CXXToken * pToken = cxxTokenCreate();
+	pToken->iLineNumber = iLineNumber;
+	pToken->oFilePosition = oFilePosition;
+	pToken->eType = CXXTokenTypeKeyword;
+	pToken->eKeyword = eKeyword;
+	pToken->bFollowedBySpace = TRUE;
+	vStringCatS(pToken->pszWord,cxxKeywordName(eKeyword));
 
-	while((c = *str++))
-		hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-
-	return hash ;
+	return pToken;
 }
 
 
 CXXToken * cxxTokenCreateAnonymousIdentifier(enum CXXTagKind k)
 {
-	g_uNextAnonumousIdentiferId++;
-
-	char szNum[32];
-
 	CXXToken * t = cxxTokenCreate();
 
-
-	t->eType = CXXTokenTypeIdentifier;
-	vStringCopyS(t->pszWord, "__anon");
-
-	// The names of anonymous structures depend on the name of
-	// the file being processed so the identifiers won't collide across
-	// multiple ctags runs with different file sets.
-
-	unsigned int uHash = hash((const unsigned char *)getInputFileName());
-
-	sprintf(szNum,"%08x%02x%02x",uHash,g_uNextAnonumousIdentiferId, k);
-
-	vStringCatS(t->pszWord,szNum);
+	anonGenerate (t->pszWord, "__anon", k);
 	t->bFollowedBySpace = TRUE;
 	t->iLineNumber = getInputLineNumber();
 	t->oFilePosition = getInputFilePosition();
