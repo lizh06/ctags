@@ -47,8 +47,10 @@ The following parsers have been added:
 * Maven2 *libxml*
 * ObjectiveC
 * Perl6
+* Pod *optlib*
 * PropertiyList(plist) *libxml*
 * R
+* RelaxNG *libxml*
 * reStructuredText
 * RpmSpec
 * Rust
@@ -57,6 +59,7 @@ The following parsers have been added:
 * TTCN
 * WindRes
 * XSLT v1.0 *libxml*
+* Yacc
 * Zephir
 * coffee *xcmd*
 * ctags option library *optlib*
