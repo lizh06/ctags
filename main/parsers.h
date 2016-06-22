@@ -18,6 +18,7 @@
 	GladeParser,  \
 	Maven2Parser, \
 	PlistXMLParser, \
+	RelaxNGParser, \
 	SvgParser, \
 	XsltParser
 #else
@@ -65,6 +66,7 @@
 	PerlParser, \
 	Perl6Parser, \
 	PhpParser, \
+	PodParser, \
 	PythonParser, \
 	RParser, \
 	RexxParser, \
