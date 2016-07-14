@@ -74,7 +74,6 @@ typedef struct sCppState {
 	const kindOption  *headerKind;
 	int headerSystemRoleIndex;
 	int headerLocalRoleIndex;
-	int endFieldType;
 
 	struct sDirective {
 		enum eState state;       /* current directive being processed */
@@ -104,7 +103,6 @@ static cppState Cpp = {
 	NULL,	     /* headerKind */
 	.headerSystemRoleIndex = ROLE_INDEX_DEFINITION,
 	.headerLocalRoleIndex = ROLE_INDEX_DEFINITION,
-	.endFieldType = FIELD_UNKNOWN,
 	{
 		DRCTV_NONE,  /* state */
 		FALSE,       /* accept */
@@ -131,11 +129,10 @@ extern unsigned int getDirectiveNestLevel (void)
 extern void cppInit (const boolean state, const boolean hasAtLiteralStrings,
 		     const boolean hasCxxRawLiteralStrings,
 		     const boolean hasSingleQuoteLiteralNumbers,
-		     const struct sKindOption *defineMacroKind,
+		     const kindOption *defineMacroKind,
 		     int macroUndefRoleIndex,
-		     const struct sKindOption *headerKind,
-		     int headerSystemRoleIndex, int headerLocalRoleIndex,
-		     int endFieldType)
+		     const kindOption *headerKind,
+		     int headerSystemRoleIndex, int headerLocalRoleIndex)
 {
 	BraceFormat = state;
 
@@ -150,7 +147,6 @@ extern void cppInit (const boolean state, const boolean hasAtLiteralStrings,
 	Cpp.headerKind  = headerKind;
 	Cpp.headerSystemRoleIndex = headerSystemRoleIndex;
 	Cpp.headerLocalRoleIndex = headerLocalRoleIndex;
-	Cpp.endFieldType = endFieldType;
 
 	Cpp.directive.state     = DRCTV_NONE;
 	Cpp.directive.accept    = TRUE;
@@ -750,15 +746,12 @@ static int skipToEndOfChar (void)
 
 static void attachEndFieldMaybe (int macroCorkIndex)
 {
-	char buf[16];
-
-	if (Cpp.endFieldType != FIELD_UNKNOWN
-	    && macroCorkIndex != CORK_NIL)
+	if (macroCorkIndex != CORK_NIL)
 	{
-		sprintf(buf, "%ld", getInputLineNumber ());
-		attachParserFieldToCorkEntry (macroCorkIndex,
-					      Cpp.endFieldType,
-					      buf);
+		tagEntryInfo *tag;
+
+		tag = getEntryInCorkQueue (macroCorkIndex);
+		tag->extensionFields.endLine = getInputLineNumber ();
 	}
 }
 

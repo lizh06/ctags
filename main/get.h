@@ -13,7 +13,7 @@
 *   INCLUDE FILES
 */
 #include "general.h"  /* must always come first */
-#include "kind.h"
+#include "types.h"
 
 /*
 *   MACROS
@@ -64,11 +64,10 @@ extern void cppInit (const boolean state,
 		     const boolean hasAtLiteralStrings,
 		     const boolean hasCxxRawLiteralStrings,
 		     const boolean hasSingleQuoteLiteralNumbers,
-		     const struct sKindOption *defineMacroKind,
+		     const kindOption *defineMacroKind,
 		     int macroUndefRoleIndex,
-		     const struct sKindOption *headerKind,
-		     int headerSystemRoleIndex, int headerLocalRoleIndex,
-		     int endFieldType);
+		     const kindOption *headerKind,
+		     int headerSystemRoleIndex, int headerLocalRoleIndex);
 extern void cppTerminate (void);
 extern void cppBeginStatement (void);
 extern void cppEndStatement (void);
