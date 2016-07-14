@@ -59,18 +59,6 @@ static kindOption VimKinds [] = {
 	{ TRUE,  'n', "filename", "vimball filename" },
 };
 
-typedef enum {
-	F_END,
-} vimField;
-
-static fieldSpec VimFields [] = {
-	{
-		.name = "end",
-		.description = "end lines of functions",
-		.enabled = FALSE,
-	}
-};
-
 
 /*
  *	 DATA DECLARATIONS
@@ -283,12 +271,12 @@ static void parseFunction (const unsigned char *line)
 	{
 		if (wordMatchLen (line, "endfunction", 4))
 		{
-			char end[16];
-			snprintf(end, sizeof(end), "%ld", (getInputLineNumber()));
+			tagEntryInfo *e;
 			if (index != CORK_NIL)
-				attachParserFieldToCorkEntry (index,
-							      VimFields [F_END].ftype,
-							      end);
+			{
+				e = getEntryInCorkQueue (index);
+				e->extensionFields.endLine = getInputLineNumber();
+			}
 			break;
 		}
 
@@ -520,7 +508,7 @@ static boolean parseMap (const unsigned char *line)
 
 	/*
 	 * Maps follow this basic format
-	 *     map 
+	 *    map
      *    nnoremap <silent> <F8> :Tlist<CR>
      *    map <unique> <Leader>scdt <Plug>GetColumnDataType
      *    inoremap ,,, <esc>diwi<<esc>pa><cr></<esc>pa><esc>kA
@@ -529,6 +517,7 @@ static boolean parseMap (const unsigned char *line)
 	 * The Vim help shows the various special arguments available to a map:
 	 * 1.2 SPECIAL ARGUMENTS					*:map-arguments*
      *    <buffer>
+	 *    <nowait>
 	 *    <silent>
 	 *    <script>
 	 *    <unique>
@@ -549,6 +538,7 @@ static boolean parseMap (const unsigned char *line)
 	
 		if (
 				strncmp ((const char*) cp, "<buffer>", (size_t) 8) == 0 ||
+				strncmp ((const char*) cp, "<nowait>", (size_t) 8) == 0 ||
 				strncmp ((const char*) cp, "<silent>", (size_t) 8) == 0 ||
 				strncmp ((const char*) cp, "<script>", (size_t) 8) == 0 ||
 				strncmp ((const char*) cp, "<unique>", (size_t) 8) == 0
@@ -740,8 +730,6 @@ extern parserDefinition* VimParser (void)
 	def->extensions = extensions;
 	def->patterns   = patterns;
 	def->parser		= findVimTags;
-	def->fieldSpecs = VimFields;
-	def->fieldSpecCount = ARRAY_SIZE (VimFields);
 	def->useCork    = TRUE;
 	return def;
 }
