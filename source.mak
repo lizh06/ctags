@@ -20,13 +20,15 @@ MAIN_HEADS =			\
 	main/field.h		\
 	main/flags.h		\
 	main/fmt.h		\
+	main/gcc-attr.h		\
 	main/general.h		\
-	main/get.h		\
 	main/htable.h		\
 	main/keyword.h		\
 	main/kind.h		\
+	main/lcpp.h		\
 	main/main.h		\
 	main/mbcs.h		\
+	main/mybool.h		\
 	main/nestlevel.h	\
 	main/options.h		\
 	main/output.h		\
@@ -54,10 +56,10 @@ MAIN_SRCS =				\
 	main/field.c			\
 	main/flags.c			\
 	main/fmt.c			\
-	main/get.c			\
 	main/htable.c			\
 	main/keyword.c			\
 	main/kind.c			\
+	main/lcpp.c			\
 	main/lregex.c			\
 	main/lxcmd.c			\
 	main/lxpath.c			\
