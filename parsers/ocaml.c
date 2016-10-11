@@ -21,16 +21,6 @@
 #include "routines.h"
 #include "vstring.h"
 
-/* To get rid of unused parameter warning in
- * -Wextra */
-#ifdef UNUSED
-#elif defined(__GNUC__)
-# define UNUSED(x) UNUSED_ ## x __attribute__((unused))
-#elif defined(__LCLINT__)
-# define UNUSED(x) /*@unused@*/ x
-#else
-# define UNUSED(x) x
-#endif
 #define OCAML_MAX_STACK_SIZE 256
 
 typedef enum {
@@ -48,17 +38,17 @@ typedef enum {
 } ocamlKind;
 
 static kindOption OcamlKinds[] = {
-	{TRUE, 'c', "class", "classes"},
-	{TRUE, 'm', "method", "Object's method"},
-	{TRUE, 'M', "module", "Module or functor"},
-	{TRUE, 'v', "var", "Global variable"},
-	{TRUE, 't', "type", "Type name"},
-	{TRUE, 'f', "function", "A function"},
-	{TRUE, 'C', "Constructor", "A constructor"},
-	{TRUE, 'r', "RecordField", "A 'structure' field"},
-	{TRUE, 'e', "Exception", "An exception"},
-	{TRUE, 'V', "value", "A value ???"},
-	{TRUE, 'B', "beginEnd", "A begin end ???"},
+	{true, 'c', "class", "classes"},
+	{true, 'm', "method", "Object's method"},
+	{true, 'M', "module", "Module or functor"},
+	{true, 'v', "var", "Global variable"},
+	{true, 't', "type", "Type name"},
+	{true, 'f', "function", "A function"},
+	{true, 'C', "Constructor", "A constructor"},
+	{true, 'r', "RecordField", "A 'structure' field"},
+	{true, 'e', "Exception", "An exception"},
+	{true, 'V', "value", "A value ???"},
+	{true, 'B', "beginEnd", "A begin end ???"},
 };
 
 typedef enum {
@@ -170,7 +160,7 @@ static const keywordTable OcamlKeywordTable[] = {
 
 static langType Lang_Ocaml;
 
-static boolean exportLocalInfo = FALSE;
+static bool exportLocalInfo = false;
 
 /*//////////////////////////////////////////////////////////////////
 //// lexingInit             */
@@ -180,7 +170,7 @@ typedef struct _lexingState {
 } lexingState;
 
 /* array of the size of all possible value for a char */
-static boolean isOperator[1 << (8 * sizeof (char))] = { FALSE };
+static bool isOperator[1 << (8 * sizeof (char))] = { false };
 
 /* definition of all the operator in OCaml,
  * /!\ certain operator get special treatment
@@ -188,53 +178,53 @@ static boolean isOperator[1 << (8 * sizeof (char))] = { FALSE };
  * '|' ':' '=' '~' and '?' */
 static void initOperatorTable ( void )
 {
-	isOperator['!'] = TRUE;
-	isOperator['$'] = TRUE;
-	isOperator['%'] = TRUE;
-	isOperator['&'] = TRUE;
-	isOperator['*'] = TRUE;
-	isOperator['+'] = TRUE;
-	isOperator['-'] = TRUE;
-	isOperator['.'] = TRUE;
-	isOperator['/'] = TRUE;
-	isOperator[':'] = TRUE;
-	isOperator['<'] = TRUE;
-	isOperator['='] = TRUE;
-	isOperator['>'] = TRUE;
-	isOperator['?'] = TRUE;
-	isOperator['@'] = TRUE;
-	isOperator['^'] = TRUE;
-	isOperator['~'] = TRUE;
-	isOperator['|'] = TRUE;
+	isOperator['!'] = true;
+	isOperator['$'] = true;
+	isOperator['%'] = true;
+	isOperator['&'] = true;
+	isOperator['*'] = true;
+	isOperator['+'] = true;
+	isOperator['-'] = true;
+	isOperator['.'] = true;
+	isOperator['/'] = true;
+	isOperator[':'] = true;
+	isOperator['<'] = true;
+	isOperator['='] = true;
+	isOperator['>'] = true;
+	isOperator['?'] = true;
+	isOperator['@'] = true;
+	isOperator['^'] = true;
+	isOperator['~'] = true;
+	isOperator['|'] = true;
 }
 
 /*//////////////////////////////////////////////////////////////////////
 //// Lexing                                     */
-static boolean isNum (char c)
+static bool isNum (char c)
 {
 	return c >= '0' && c <= '9';
 }
-static boolean isLowerAlpha (char c)
+static bool isLowerAlpha (char c)
 {
 	return c >= 'a' && c <= 'z';
 }
 
-static boolean isUpperAlpha (char c)
+static bool isUpperAlpha (char c)
 {
 	return c >= 'A' && c <= 'Z';
 }
 
-static boolean isAlpha (char c)
+static bool isAlpha (char c)
 {
 	return isLowerAlpha (c) || isUpperAlpha (c);
 }
 
-static boolean isIdent (char c)
+static bool isIdent (char c)
 {
 	return isNum (c) || isAlpha (c) || c == '_' || c == '\'';
 }
 
-static boolean isSpace (char c)
+static bool isSpace (char c)
 {
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
@@ -250,8 +240,8 @@ static void eatWhiteSpace (lexingState * st)
 
 static void eatString (lexingState * st)
 {
-	boolean lastIsBackSlash = FALSE;
-	boolean unfinished = TRUE;
+	bool lastIsBackSlash = false;
+	bool unfinished = true;
 	const unsigned char *c = st->cp + 1;
 
 	while (unfinished)
@@ -261,7 +251,7 @@ static void eatString (lexingState * st)
 		if (c == NULL || c[0] == '\0')
 			break;
 		else if (*c == '"' && !lastIsBackSlash)
-			unfinished = FALSE;
+			unfinished = false;
 		else
 			lastIsBackSlash = *c == '\\';
 
@@ -273,8 +263,8 @@ static void eatString (lexingState * st)
 
 static void eatComment (lexingState * st)
 {
-	boolean unfinished = TRUE;
-	boolean lastIsStar = FALSE;
+	bool unfinished = true;
+	bool lastIsStar = false;
 	const unsigned char *c = st->cp + 2;
 
 	while (unfinished)
@@ -293,7 +283,7 @@ static void eatComment (lexingState * st)
 		}
 		/* we've reached the end of the comment */
 		else if (*c == ')' && lastIsStar)
-			unfinished = FALSE;
+			unfinished = false;
 		/* here we deal with imbricated comment, which
 		 * are allowed in OCaml */
 		else if (c[0] == '(' && c[1] == '*')
@@ -305,7 +295,7 @@ static void eatComment (lexingState * st)
 			if (c == NULL)
 			    return;
 
-			lastIsStar = FALSE;
+			lastIsStar = false;
             c++;
 		}
 		/* OCaml has a rule which says :
@@ -346,8 +336,6 @@ static void readIdentifier (lexingState * st)
 		vStringPut (st->name, (int) *p);
 
 	st->cp = p;
-
-	vStringTerminate (st->name);
 }
 
 static ocamlKeyword eatNumber (lexingState * st)
@@ -371,8 +359,6 @@ static ocamlKeyword eatOperator (lexingState * st)
 		vStringPut (st->name, st->cp[count]);
 		count++;
 	}
-
-	vStringTerminate (st->name);
 
 	st->cp += count;
 	if (count <= 1)
@@ -744,7 +730,7 @@ static contextType popStrongContext ( void )
 /* Ignore everything till waitedToken and jump to comeAfter.
  * If the "end" keyword is encountered break, doesn't remember
  * why though. */
-static void tillToken (vString * const UNUSED (ident), ocaToken what)
+static void tillToken (vString * const ident CTAGS_ATTR_UNUSED, ocaToken what)
 {
 	if (what == waitedToken)
 		toDoNext = comeAfter;
@@ -757,7 +743,7 @@ static void tillToken (vString * const UNUSED (ident), ocaToken what)
 
 /* Ignore everything till a waitedToken is seen, but
  * take care of balanced parentheses/bracket use */
-static void contextualTillToken (vString * const UNUSED (ident), ocaToken what)
+static void contextualTillToken (vString * const ident CTAGS_ATTR_UNUSED, ocaToken what)
 {
 	static int parentheses = 0;
 	static int bracket = 0;
@@ -824,7 +810,7 @@ static void tillTokenOrTerminatingOrFallback (vString * const ident,
 
 /* ignore the next token in the stream and jump to the
  * given comeAfter state */
-static void ignoreToken (vString * const UNUSED (ident), ocaToken UNUSED (what))
+static void ignoreToken (vString * const ident CTAGS_ATTR_UNUSED, ocaToken what CTAGS_ATTR_UNUSED)
 {
 	toDoNext = comeAfter;
 }
@@ -877,7 +863,7 @@ static void prepareTag (tagEntryInfo * tag, vString const *name, ocamlKind kind)
 
 	if (kind == K_MODULE)
 	{
-		tag->lineNumberEntry = TRUE;
+		tag->lineNumberEntry = true;
 		tag->lineNumber = 1;
 	}
 	parentIndex = getLastNamedIndex ();
@@ -902,17 +888,17 @@ static void addTag (vString * const ident, int kind)
 	}
 }
 
-static boolean needStrongPoping = FALSE;
+static bool needStrongPoping = false;
 static void requestStrongPoping ( void )
 {
-	needStrongPoping = TRUE;
+	needStrongPoping = true;
 }
 
 static void cleanupPreviousParser ( void )
 {
 	if (needStrongPoping)
 	{
-		needStrongPoping = FALSE;
+		needStrongPoping = false;
 		popStrongContext ();
 	}
 }
@@ -985,7 +971,7 @@ static void constructorValidation (vString * const ident, ocaToken what)
 	case Tok_Op:	/* if we got a '.' which is an operator */
 		toDoNext = &globalScope;
 		popStrongContext ();
-		needStrongPoping = FALSE;
+		needStrongPoping = false;
 		break;
 
 	case OcaKEYWORD_of:	/* OK, it must be a constructor :) */
@@ -1119,7 +1105,7 @@ static void typeSpecification (vString * const ident, ocaToken what)
 }
 
 
-static boolean dirtySpecialParam = FALSE;
+static bool dirtySpecialParam = false;
 
 
 /* parse the ~label and ~label:type parameter */
@@ -1136,7 +1122,7 @@ static void parseLabel (vString * const ident, ocaToken what)
 			if (exportLocalInfo)
 				addTag (ident, K_VAR);
 
-			dirtySpecialParam = TRUE;
+			dirtySpecialParam = true;
 		}
 		break;
 
@@ -1189,7 +1175,7 @@ static void parseOptionnal (vString * const ident, ocaToken what)
 			if (exportLocalInfo)
 				addTag (ident, K_VAR);
 
-			dirtySpecialParam = TRUE;
+			dirtySpecialParam = true;
 
 			if (parCount == 0)
 				toDoNext = &letParam;
@@ -1328,7 +1314,7 @@ static void mayRedeclare (vString * const ident, ocaToken what)
 		vStringClear (lastClass);
 		pushContext (ContextStrong, ContextClass,
 			&localScope, NULL /*voidName */ );
-		needStrongPoping = FALSE;
+		needStrongPoping = false;
 		toDoNext = &globalScope;
 		break;
 
@@ -1393,7 +1379,7 @@ static void letParam (vString * const ident, ocaToken what)
 			 * ~(varname: long type) */
 		case '~':
 			toDoNext = &parseLabel;
-			dirtySpecialParam = FALSE;
+			dirtySpecialParam = false;
 			break;
 
 			/* Optional argument with syntax like this :
@@ -1402,7 +1388,7 @@ static void letParam (vString * const ident, ocaToken what)
 			 * ?bla */
 		case '?':
 			toDoNext = &parseOptionnal;
-			dirtySpecialParam = FALSE;
+			dirtySpecialParam = false;
 			break;
 
 		default:
@@ -1419,7 +1405,7 @@ static void letParam (vString * const ident, ocaToken what)
 /* parse object ...
  * used to be sure the class definition is not a type
  * alias */
-static void classSpecif (vString * const UNUSED (ident), ocaToken what)
+static void classSpecif (vString * const ident CTAGS_ATTR_UNUSED, ocaToken what)
 {
 	switch (what)
 	{
@@ -1614,7 +1600,7 @@ static void globalLet (vString * const ident, ocaToken what)
 
 /* Handle the "strong" top levels, all 'big' declarations
  * happen here */
-static void globalScope (vString * const UNUSED (ident), ocaToken what)
+static void globalScope (vString * const ident CTAGS_ATTR_UNUSED, ocaToken what)
 {
 	/* Do not touch, this is used only by the global scope
 	 * to handle an 'and' */
@@ -1646,7 +1632,7 @@ static void globalScope (vString * const UNUSED (ident), ocaToken what)
 		break;
 
 	case OcaKEYWORD_end:
-		needStrongPoping = FALSE;
+		needStrongPoping = false;
 		killCurrentState ();
 		/*popStrongContext(); */
 		break;
@@ -1823,7 +1809,6 @@ static void computeModuleName ( void )
 	}
 
 	vStringNCopyS (moduleName, &filename[beginIndex], endIndex - beginIndex);
-	vStringTerminate (moduleName);
 
 	if (isLowerAlpha (moduleName->buffer[0]))
 		moduleName->buffer[0] += ('A' - 'a');

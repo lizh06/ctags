@@ -14,14 +14,29 @@
 #include "read.h" 
 #include "routines.h"
 
+#define isSelectorChar(c) \
+	/* attribute selectors are handled separately */ \
+	(isalnum (c) || \
+		(c) == '_' || /* allowed char */ \
+		(c) == '-' || /* allowed char */ \
+		(c) == '+' || /* allow all sibling in a single tag */ \
+		(c) == '>' || /* allow all child in a single tag */ \
+		(c) == '|' || /* allow namespace separator */ \
+		(c) == '(' || /* allow pseudo-class arguments */ \
+		(c) == ')' || \
+		(c) == '.' || /* allow classes and selectors */ \
+		(c) == ':' || /* allow pseudo classes */ \
+		(c) == '*' || /* allow globs as P + * */ \
+		(c) == '#')   /* allow ids */
+
 typedef enum eCssKinds {
 	K_CLASS, K_SELECTOR, K_ID
 } cssKind;
 
 static kindOption CssKinds [] = {
-	{ TRUE, 'c', "class",		"classes" },
-	{ TRUE, 's', "selector",	"selectors" },
-	{ TRUE, 'i', "id",			"identities" }
+	{ true, 'c', "class",		"classes" },
+	{ true, 's', "selector",	"selectors" },
+	{ true, 'i', "id",			"identities" }
 };
 
 typedef enum {
@@ -37,23 +52,6 @@ typedef struct {
 } tokenInfo;
 
 
-static boolean isSelectorChar (const int c)
-{
-	/* attribute selectors are handled separately */
-	return (isalnum (c) ||
-			c == '_' || // allowed char
-			c == '-' || // allowed char
-			c == '+' || // allow all sibling in a single tag
-			c == '>' || // allow all child in a single tag
-			c == '|' || // allow namespace separator
-			c == '(' || // allow pseudo-class arguments
-			c == ')' ||
-			c == '.' || // allow classes and selectors
-			c == ':' || // allow pseudo classes
-			c == '*' || // allow globs as P + *
-			c == '#');  // allow ids
-}
-
 static void parseSelector (vString *const string, const int firstChar)
 {
 	int c = firstChar;
@@ -63,7 +61,6 @@ static void parseSelector (vString *const string, const int firstChar)
 		c = getcFromInputFile ();
 	} while (isSelectorChar (c));
 	ungetcToInputFile (c);
-	vStringTerminate (string);
 }
 
 static void readToken (tokenInfo *const token)
@@ -157,7 +154,7 @@ static cssKind classifySelector (const vString *const selector)
 
 static void findCssTags (void)
 {
-	boolean readNextToken = TRUE;
+	bool readNextToken = true;
 	tokenInfo token;
 
 	token.string = vStringNew ();
@@ -167,11 +164,11 @@ static void findCssTags (void)
 		if (readNextToken)
 			readToken (&token);
 
-		readNextToken = TRUE;
+		readNextToken = true;
 
 		if (token.type == '@')
 		{ /* At-rules, from the "@" to the next block or semicolon */
-			boolean useContents;
+			bool useContents;
 			readToken (&token);
 			useContents = (strcmp (vStringValue (token.string), "media") == 0 ||
 						   strcmp (vStringValue (token.string), "supports") == 0);
@@ -222,9 +219,8 @@ static void findCssTags (void)
 			}
 			while (token.type == TOKEN_SELECTOR);
 			/* we already consumed the next token, don't read it twice */
-			readNextToken = FALSE;
+			readNextToken = false;
 
-			vStringTerminate (selector);
 			if (CssKinds[kind].enabled)
 			{
 				tagEntryInfo e;
@@ -258,12 +254,12 @@ static void findCssTags (void)
 /* parser definition */
 extern parserDefinition* CssParser (void)
 {
-    static const char *const extensions [] = { "css", NULL };
-    parserDefinition* def = parserNew ("CSS");
-    def->kinds      = CssKinds;
-    def->kindCount  = ARRAY_SIZE (CssKinds);
-    def->extensions = extensions;
-    def->parser     = findCssTags;
-    return def;
+	static const char *const extensions [] = { "css", NULL };
+	parserDefinition* def = parserNew ("CSS");
+	def->kinds      = CssKinds;
+	def->kindCount  = ARRAY_SIZE (CssKinds);
+	def->extensions = extensions;
+	def->parser     = findCssTags;
+	return def;
 }
 

@@ -27,7 +27,7 @@ typedef enum {
 } plistKind;
 
 static kindOption PlistKinds [] = {
-	{ TRUE,  'k', "key",	  "keys" },
+	{ true,  'k', "key",	  "keys" },
 };
 
 static void plistFindTagsUnderKey (xmlNode *node,
@@ -43,7 +43,7 @@ static void makeTagWithScope (xmlNode *node,
 static tagXpathTable plistXpathMainTable[] = {
 	{ "///plist//dict/key",
 	  LXPATH_TABLE_DO_RECUR,
-	  .recurSpec = {
+	  .spec.recurSpec = {
 			plistFindTagsUnderKey
 		}
 	},
@@ -52,7 +52,7 @@ static tagXpathTable plistXpathMainTable[] = {
 static tagXpathTable plistXpathTextTable[] = {
 	{ "text()",
 	  LXPATH_TABLE_DO_MAKE,
-	  .makeTagSpec = {
+	  .spec.makeTagSpec = {
 			K_KEY,  ROLE_INDEX_DEFINITION,
 			makeTagWithScope
 		}
@@ -170,5 +170,3 @@ PlistXMLParser (void)
 	def->tagXpathTableCount  = ARRAY_SIZE (plistXpathTableTable);
 	return def;
 }
-
-/* vi:set tabstop=4 shiftwidth=4: */

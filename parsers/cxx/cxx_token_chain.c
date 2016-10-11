@@ -148,10 +148,10 @@ void cxxTokenChainTake(CXXTokenChain * tc,CXXToken * t)
 	Assert(tc->iCount > 1);
 }
 
-boolean cxxTokenChainTakeRecursive(CXXTokenChain * tc,CXXToken * t)
+bool cxxTokenChainTakeRecursive(CXXTokenChain * tc,CXXToken * t)
 {
 	if(!tc)
-		return FALSE;
+		return false;
 
 	CXXToken * aux = tc->pHead;
 	while(aux)
@@ -159,7 +159,7 @@ boolean cxxTokenChainTakeRecursive(CXXTokenChain * tc,CXXToken * t)
 		if(t == aux)
 		{
 			cxxTokenChainTake(tc,aux);
-			return TRUE;
+			return true;
 		}
 
 		if(cxxTokenTypeIsOneOf(
@@ -169,13 +169,13 @@ boolean cxxTokenChainTakeRecursive(CXXTokenChain * tc,CXXToken * t)
 			))
 		{
 			if(cxxTokenChainTakeRecursive(aux->pChain,t))
-				return TRUE;
+				return true;
 		}
 
 		aux = aux->pNext;
 	}
 
-	return FALSE;
+	return false;
 }
 
 #if 0
@@ -208,6 +208,26 @@ void cxxTokenChainClear(CXXTokenChain * tc)
 	Assert(tc->iCount == 0);
 	Assert(tc->pHead == NULL);
 	Assert(tc->pTail == NULL);
+}
+
+void cxxTokenChainInsertAfter(CXXTokenChain * tc,CXXToken * before,CXXToken * t)
+{
+	if(!before)
+	{
+		cxxTokenChainPrepend(tc,t);
+		return;
+	}
+	
+	if(!before->pNext)
+	{
+		cxxTokenChainAppend(tc,t);
+		return;
+	}
+	
+	t->pNext = before->pNext;
+	t->pPrev = before;
+	before->pNext = t;
+	t->pNext->pPrev = t;
 }
 
 void cxxTokenChainAppend(CXXTokenChain * tc,CXXToken * t)
@@ -634,6 +654,39 @@ CXXToken * cxxTokenChainLastPossiblyNestedTokenOfType(
 
 }
 
+CXXToken * cxxTokenChainFirstPossiblyNestedTokenOfType(
+		CXXTokenChain * tc,
+		unsigned int uTokenTypes,
+		CXXTokenChain ** ppParentChain
+	)
+{
+	if(!tc)
+		return NULL;
+	CXXToken * t = tc->pHead;
+	while(t)
+	{
+		if(t->eType & uTokenTypes)
+		{
+			if(ppParentChain)
+				*ppParentChain = tc;
+			return t;
+		}
+		if(t->eType == CXXTokenTypeParenthesisChain)
+		{
+			CXXToken * tmp = cxxTokenChainFirstPossiblyNestedTokenOfType(
+					t->pChain,
+					uTokenTypes,
+					ppParentChain
+				);
+			if(tmp)
+				return tmp; // ppParentChain is already set
+		}
+		t = t->pNext;
+	}
+	return NULL;
+
+}
+
 
 CXXToken * cxxTokenChainFirstTokenNotOfType(
 		CXXTokenChain * tc,
@@ -879,6 +932,7 @@ CXXToken * cxxTokenChainExtractRange(
 	return pRet;
 }
 
+
 CXXToken * cxxTokenChainExtractIndexRange(
 		CXXTokenChain * tc,
 		int iFirstIndex,
@@ -974,7 +1028,7 @@ void cxxTokenChainNormalizeTypeNameSpacingInRange(CXXToken * pFrom,CXXToken * pT
 			))
 		{
 			cxxTokenChainNormalizeTypeNameSpacing(t->pChain);
-			t->bFollowedBySpace = FALSE;
+			t->bFollowedBySpace = false;
 		} else if(cxxTokenTypeIsOneOf(t,
 					CXXTokenTypeIdentifier | CXXTokenTypeKeyword |
 						CXXTokenTypeGreaterThanSign |
@@ -997,7 +1051,7 @@ void cxxTokenChainNormalizeTypeNameSpacingInRange(CXXToken * pFrom,CXXToken * pT
 							CXXTokenTypeClosingParenthesis
 					));
 		} else {
-			t->bFollowedBySpace = FALSE;
+			t->bFollowedBySpace = false;
 		}
 
 		if(t == pTo)
@@ -1007,5 +1061,5 @@ void cxxTokenChainNormalizeTypeNameSpacingInRange(CXXToken * pFrom,CXXToken * pT
 	}
 
 	// Finally the chain has no space at end
-	pTo->bFollowedBySpace = FALSE;
+	pTo->bFollowedBySpace = false;
 }

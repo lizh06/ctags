@@ -28,8 +28,8 @@ MAIN_HEADS =			\
 	main/lcpp.h		\
 	main/main.h		\
 	main/mbcs.h		\
-	main/mybool.h		\
 	main/nestlevel.h	\
+	main/objpool.h		\
 	main/options.h		\
 	main/output.h		\
 	main/parse.h		\
@@ -37,6 +37,7 @@ MAIN_HEADS =			\
 	main/pcoproc.h		\
 	main/promise.h		\
 	main/ptag.h		\
+	main/ptrarray.h		\
 	main/read.h		\
 	main/routines.h		\
 	main/selectors.h	\
@@ -66,6 +67,7 @@ MAIN_SRCS =				\
 	main/main.c			\
 	main/mbcs.c			\
 	main/nestlevel.c		\
+	main/objpool.c			\
 	main/options.c			\
 	main/output-etags.c		\
 	main/output-ctags.c		\
@@ -75,6 +77,7 @@ MAIN_SRCS =				\
 	main/pcoproc.c			\
 	main/promise.c			\
 	main/ptag.c			\
+	main/ptrarray.c			\
 	main/read.c			\
 	main/routines.c			\
 	main/selectors.c		\
@@ -99,13 +102,21 @@ PARSER_HEADS = \
 	parsers/cxx/cxx_scope.h \
 	parsers/cxx/cxx_tag.h \
 	parsers/cxx/cxx_token.h \
-	parsers/cxx/cxx_token_chain.h
-	
+	parsers/cxx/cxx_token_chain.h \
+	\
+	parsers/meta-iniconf.h \
+	parsers/meta-m4.h \
+	parsers/meta-make.h \
+	\
+	$(NULL)
+
 PARSER_SRCS =				\
 	parsers/ada.c			\
 	parsers/ant.c			\
 	parsers/asm.c			\
 	parsers/asp.c			\
+	parsers/autoconf.c		\
+	parsers/automake.c		\
 	parsers/awk.c			\
 	parsers/basic.c			\
 	parsers/beta.c			\
@@ -140,11 +151,13 @@ PARSER_SRCS =				\
 	parsers/fortran.c		\
 	parsers/go.c			\
 	parsers/html.c			\
+	parsers/iniconf.c		\
 	parsers/jprop.c			\
 	parsers/jscript.c		\
 	parsers/json.c			\
 	parsers/lisp.c			\
 	parsers/lua.c			\
+	parsers/m4.c			\
 	parsers/make.c			\
 	parsers/matlab.c		\
 	parsers/myrddin.c		\
@@ -154,7 +167,9 @@ PARSER_SRCS =				\
 	parsers/perl.c			\
 	parsers/perl6.c			\
 	parsers/php.c			\
+	parsers/protobuf.c		\
 	parsers/python.c		\
+	parsers/pythonloggingconfig.c	\
 	parsers/r.c			\
 	parsers/rexx.c			\
 	parsers/rpmspec.c		\
@@ -166,6 +181,7 @@ PARSER_SRCS =				\
 	parsers/slang.c			\
 	parsers/sml.c			\
 	parsers/sql.c			\
+	parsers/systemdunit.c		\
 	parsers/tcl.c			\
 	parsers/tex.c			\
 	parsers/ttcn.c			\
@@ -174,6 +190,7 @@ PARSER_SRCS =				\
 	parsers/vim.c			\
 	parsers/windres.c		\
 	parsers/yacc.c			\
+	parsers/yumrepo.c		\
 	\
 	$(TRANSLATED_SRCS)		\
 	\
@@ -190,6 +207,14 @@ XML_SRCS = \
 	 parsers/xslt.c			\
 	 \
 	 $(NULL)
+
+YAML_HEAD = parsers/meta-yaml.h
+YAML_SRCS = \
+	  parsers/yaml.c		\
+	  \
+	  parsers/ansibleplaybook.c	\
+	  \
+	  $(NULL)
 
 DEBUG_HEADS = main/debug.h
 DEBUG_SRCS = main/debug.c

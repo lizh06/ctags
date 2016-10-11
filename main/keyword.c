@@ -13,6 +13,7 @@
 #include "general.h"  /* must always come first */
 
 #include <string.h>
+#include <ctype.h>
 
 #include "debug.h"
 #include "keyword.h"
@@ -41,7 +42,7 @@ static hashEntry **HashTable = NULL;
 
 static hashEntry **getHashTable (void)
 {
-	static boolean allocated = FALSE;
+	static bool allocated = false;
 
 	if (! allocated)
 	{
@@ -52,7 +53,7 @@ static hashEntry **getHashTable (void)
 		for (i = 0  ;  i < TableSize  ;  ++i)
 			HashTable [i] = NULL;
 
-		allocated = TRUE;
+		allocated = true;
 	}
 	return HashTable;
 }
@@ -77,7 +78,7 @@ static unsigned int hashValue (const char *const string, langType language)
 
 	/* "djb" hash as used in g_str_hash() in glib */
 	for (p = (const signed char *)string; *p != '\0'; p++)
-		h = (h << 5) + h + *p;
+		h = (h << 5) + h + tolower (*p);
 
 	/* consider language as an extra "character" and add it to the hash */
 	h = (h << 5) + h + language;
@@ -135,15 +136,17 @@ extern void addKeyword (const char *const string, langType language, int value)
 	}
 }
 
-extern int lookupKeyword (const char *const string, langType language)
+static int lookupKeywordFull (const char *const string, bool caseSensitive, langType language)
 {
 	const unsigned int index = hashValue (string, language) % TableSize;
 	hashEntry *entry = getHashTableEntry (index);
-	int result = -1;
+	int result = KEYWORD_NONE;
 
 	while (entry != NULL)
 	{
-		if (language == entry->language  &&  strcmp (string, entry->string) == 0)
+		if (language == entry->language &&
+			((caseSensitive && strcmp (string, entry->string) == 0) ||
+			 (!caseSensitive && strcasecmp (string, entry->string) == 0)))
 		{
 			result = entry->value;
 			break;
@@ -151,6 +154,16 @@ extern int lookupKeyword (const char *const string, langType language)
 		entry = entry->next;
 	}
 	return result;
+}
+
+extern int lookupKeyword (const char *const string, langType language)
+{
+	return lookupKeywordFull (string, true, language);
+}
+
+extern int lookupCaseKeyword (const char *const string, langType language)
+{
+	return lookupKeywordFull (string, false, language);
 }
 
 extern void freeKeywordTable (void)
@@ -174,16 +187,6 @@ extern void freeKeywordTable (void)
 	}
 }
 
-extern int analyzeToken (vString *const name, langType language)
-{
-	vString *keyword = vStringNew ();
-	int result;
-	vStringCopyToLower (keyword, name);
-	result = lookupKeyword (vStringValue (keyword), language);
-	vStringDelete (keyword);
-	return result;
-}
-
 #ifdef DEBUG
 
 static void printEntry (const hashEntry *const entry)
@@ -196,7 +199,7 @@ static unsigned int printBucket (const unsigned int i)
 	hashEntry **const table = getHashTable ();
 	hashEntry *entry = table [i];
 	unsigned int measure = 1;
-	boolean first = TRUE;
+	bool first = true;
 
 	printf ("%2d:", i);
 	if (entry == NULL)
@@ -208,7 +211,7 @@ static unsigned int printBucket (const unsigned int i)
 		else
 		{
 			printf (" ");
-			first = FALSE;
+			first = false;
 		}
 		printEntry (entry);
 		entry = entry->next;
@@ -237,5 +240,3 @@ extern void printKeywordTable (void)
 }
 
 #endif
-
-/* vi:set tabstop=4 shiftwidth=4: */

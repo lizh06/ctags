@@ -23,8 +23,8 @@ typedef enum {
 } clojureKind;
 
 static kindOption ClojureKinds[] = {
-	{TRUE, 'f', "function", "functions"},
-	{TRUE, 'n', "namespace", "namespaces"}
+	{true, 'f', "function", "functions"},
+	{true, 'n', "namespace", "namespaces"}
 };
 
 static int isNamespace (const char *strp)
@@ -58,7 +58,6 @@ static void functionName (vString * const name, const char *dbp)
 	for (p = dbp; *p != '\0' && *p != '(' && !isspace ((int) *p) && *p != ')';
 		p++)
 		vStringPut (name, *p);
-	vStringTerminate (name);
 }
 
 static int makeNamespaceTag (vString * const name, const char *dbp)
@@ -133,7 +132,7 @@ static void findClojureTags (void)
 extern parserDefinition *ClojureParser (void)
 {
 	static const char *const extensions[] = {
-		"clj", NULL
+		"clj", "cljs", "cljc", NULL
 	};
 	static const char *const aliases[] = {
 		NULL
@@ -145,8 +144,6 @@ extern parserDefinition *ClojureParser (void)
 	def->extensions = extensions;
 	def->aliases = aliases;
 	def->parser = findClojureTags;
-	def->useCork = TRUE;
+	def->useCork = true;
 	return def;
 }
-
-/* vi:set tabstop=4 shiftwidth=4: */

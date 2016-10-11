@@ -71,7 +71,7 @@ int cxxTagGetCPPFieldSpecifierCount(void);
 fieldSpec * cxxTagGetCFieldSpecifiers(void);
 int cxxTagGetCFieldSpecifierCount(void);
 
-boolean cxxTagFieldEnabled(unsigned int uField);
+bool cxxTagFieldEnabled(unsigned int uField);
 
 kindOption * cxxTagGetCKindOptions(void);
 int cxxTagGetCKindOptionCount(void);
@@ -80,7 +80,7 @@ kindOption * cxxTagGetCPPKindOptions(void);
 int cxxTagGetCPPKindOptionCount(void);
 
 // Returns true if the specified tag kind is enabled in the current language
-boolean cxxTagKindEnabled(unsigned int uTagKind);
+bool cxxTagKindEnabled(unsigned int uTagKind);
 
 // Begin composing a tag. The tag kind must correspond to the current language.
 // Returns NULL if the tag should *not* be included in the output
@@ -91,9 +91,12 @@ tagEntryInfo * cxxTagBegin(unsigned int uKind,CXXToken * pToken);
 
 // Set the type of the current tag from the specified token sequence
 // (which must belong to the same chain!).
-// Returns a token that must be destroyed after cxxTagCommit() has
-// been called.
-CXXToken * cxxTagSetTypeField(
+// Before setting the type this function will check that the specified
+// range of tokens looks reasonable for a type name and if it looks
+// suspicious will refuse to emit it.
+// If the type is effectively set then the return value is a token that must
+// be destroyed after cxxTagCommit() has been called.
+CXXToken * cxxTagCheckAndSetTypeField(
 		CXXToken * pTypeStart,
 		CXXToken * pTypeEnd
 	);

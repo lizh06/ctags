@@ -11,52 +11,40 @@
 
 #include "general.h"  /* must always come first */
 
-/* preFuc and Postfunc can be NULL.
-   The value returned from preWriteEntryFunc is passed to writeEntryFunc,
-   and postWriteEntryFunc. If resource is a resource is allocated in
-   preWriteEntryFunc, it should be freed in postWriteEntryFunc. */
+/* Other than writeEntry can be NULL.
+   The value returned from preWriteEntry is passed to writeEntry,
+   and postWriteEntry. If a resource is allocated in
+   preWriteEntry, postWriteEntry should free it. */
 
-typedef int (* writeEntryFunc) (MIO * mio, const tagEntryInfo *const tag, void *data);
-typedef int (* writePtagEntryFunc) (MIO * mio, const ptagDesc *desc,
-				    const char *const fileName,
-				    const char *const pattern,
-				    const char *const parserName, void *data);
-typedef void * (* preWriteEntryFunc) (MIO * mio);
-typedef void (* postWriteEntryFunc)  (MIO * mio, const char* filename, void *data);
+struct sTagWriter;
+typedef struct sTagWriter tagWriter;
+struct sTagWriter {
+	int (* writeEntry) (MIO * mio, const tagEntryInfo *const tag, void *data);
+	int (* writePtagEntry) (MIO * mio, const ptagDesc *desc,
+							const char *const fileName,
+							const char *const pattern,
+							const char *const parserName, void *data);
+	void * (* preWriteEntry) (MIO * mio);
+	void (* postWriteEntry)  (MIO * mio, const char* filename, void *data);
+	bool useStdoutByDefault;
+};
 
-extern void setTagWriter (writeEntryFunc func,
-			  preWriteEntryFunc preFunc,
-			  postWriteEntryFunc postFunc,
-			  writePtagEntryFunc ptagFunc,
-			  boolean useStdout);
+extern void setTagWriter (tagWriter *tagWriter);
+extern tagWriter etagsWriter;
+extern tagWriter ctagsWriter;
+extern tagWriter xrefWriter;
+extern tagWriter jsonWriter;
 
-extern boolean outpuFormatUsedStdoutByDefault (void);
-
-extern int writeEtagsEntry (MIO * mio, const tagEntryInfo *const tag, void *data);
-extern void *beginEtagsFile (MIO * mio);
-extern void  endEtagsFile   (MIO * mio, const char* filename, void *data);
-
-extern int writeCtagsEntry (MIO * mio, const tagEntryInfo *const tag, void *data __unused__);
-extern int writeXrefEntry  (MIO * mio, const tagEntryInfo *const tag, void *data __unused__);
-extern int writeJsonEntry  (MIO * mio, const tagEntryInfo *const tag, void *data __unused__);
-
-extern int writeCtagsPtagEntry (MIO * mio, const ptagDesc *desc,
-				const char *const fileName,
-				const char *const pattern,
-				const char *const parserName, void *data __unused__);
-extern int writeJsonPtagEntry (MIO * mio, const ptagDesc *desc,
-				const char *const fileName,
-				const char *const pattern,
-				const char *const parserName, void *data __unused__);
+extern bool outpuFormatUsedStdoutByDefault (void);
 
 extern int makePatternStringCommon (const tagEntryInfo *const tag,
 				    int putc_func (char , void *),
 				    int puts_func (const char* , void *),
 				    void *output);
 extern void truncateTagLine (char *const line, const char *const token,
-			     const boolean discardNewline);
+			     const bool discardNewline);
 extern void abort_if_ferror(MIO *const fp);
 
-extern boolean ptagMakeJsonOutputVersion (ptagDesc *desc, void *data __unused__);
+extern bool ptagMakeJsonOutputVersion (ptagDesc *desc, void *data CTAGS_ATTR_UNUSED);
 
-#endif 
+#endif

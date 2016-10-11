@@ -24,14 +24,14 @@
 //
 
 // cxx_parser_tokenizer.c
-boolean cxxParserParseNextToken(void);
+bool cxxParserParseNextToken(void);
 
 // cxx_parser_lambda.c
 CXXToken * cxxParserOpeningBracketIsLambda(void);
-boolean cxxParserHandleLambda(CXXToken * pParenthesis);
+bool cxxParserHandleLambda(CXXToken * pParenthesis);
 
 // cxx_parser_block.c
-boolean cxxParserParseBlock(boolean bExpectClosingBracket);
+bool cxxParserParseBlock(bool bExpectClosingBracket);
 
 enum CXXExtractVariableDeclarationsFlags
 {
@@ -40,17 +40,17 @@ enum CXXExtractVariableDeclarationsFlags
 };
 
 // cxx_parser_variable.c
-boolean cxxParserExtractVariableDeclarations(
+bool cxxParserExtractVariableDeclarations(
 		CXXTokenChain * pChain,
 		unsigned int uFlags
 	);
 
 // cxx_parser_function.c
 
-boolean cxxParserTokenChainLooksLikeFunctionCallParameterSet(
+bool cxxParserTokenChainLooksLikeFunctionCallParameterSet(
 		CXXTokenChain * pChain
 	);
-boolean cxxParserTokenChainLooksLikeConstructorParameterSet(
+bool cxxParserTokenChainLooksLikeConstructorParameterSet(
 		CXXTokenChain * pChain
 	);
 
@@ -80,26 +80,45 @@ typedef enum _CXXFunctionSignatureInfoFlag
 //
 typedef struct _CXXFunctionSignatureInfo
 {
-	// The parenthesis token. Note that in some special cases it may
-	// belong to a subchain.
+	// The parenthesis token.
+	// It is always contained in the chain pointed by pParenthesisContainerChain
 	CXXToken * pParenthesis;
+	
+	// The token chain that contains the parenthesis above. May or may not
+	// be the toplevel chain.
+	CXXTokenChain * pParenthesisContainerChain;
 
 	// The identifier. It's either a single token (so both pIdentifierStart
 	// and pIdentifierEnd point to the same token) or multiple tokens starting
 	// with the "operator" keyword. Spacing of the tokens is adjusted.
+	// The identifier is always contained in the chain pointed by pIdentifierChain.
 	CXXToken * pIdentifierStart;
 	CXXToken * pIdentifierEnd;
+	
+	// The chain that pIdentifierStart, pIdentifierEnd and pScopeStart
+	// belong to. It MAY be a nested chain and it may even be included in the
+	// range specified by pTypeStart / pTypeEnd below!
+	CXXTokenChain * pIdentifierChain;
 
 	// Non-NULL if the signature is followed by the "const" keyword
 	CXXToken * pSignatureConst;
 
 	// Non-NULL if there is a scope before the identifier.
 	// The scope ends at pIdentifierStart.
+	// The scope start is always in the chain pointed by pIdentifierChain.
 	CXXToken * pScopeStart;
 
-	// Non-NULL if a return type has been identified
+	// Non-NULL if a return type has been identified.
 	CXXToken * pTypeStart;
 	CXXToken * pTypeEnd;
+	// There are cases in that the type range defined above may
+	// contain the identifier, scope and signature ranges.
+	// This happens, for example, with functions returning
+	// nasty things, like:
+	//     int (*foo(void))[2]
+	// It is granted that the scope and identifier are either
+	// completly included or completly excluded from the type range.
+	bool bTypeContainsIdentifierScopeAndSignature;
 	
 	// Non-NULL if there is a trailing comma after the function.
 	// This is used for the special case of multiple prototypes in a single
@@ -132,11 +151,11 @@ typedef struct _CXXFunctionParameterInfo
 	CXXToken * aIdentifiers[CXX_MAX_EXTRACTED_PARAMETERS];
 } CXXFunctionParameterInfo;
 
-boolean cxxParserTokenChainLooksLikeFunctionParameterList(
+bool cxxParserTokenChainLooksLikeFunctionParameterList(
 		CXXTokenChain * tc,
 		CXXFunctionParameterInfo * pParamInfo
 	);
-boolean cxxParserLookForFunctionSignature(
+bool cxxParserLookForFunctionSignature(
 		CXXTokenChain * pChain,
 		CXXFunctionSignatureInfo * pInfo,
 		CXXFunctionParameterInfo * pParamInfo
@@ -158,36 +177,36 @@ int cxxParserEmitFunctionTags(
 void cxxParserEmitFunctionParameterTags(CXXFunctionParameterInfo * pInfo);
 
 // cxx_parser_typedef.c
-boolean cxxParserParseGenericTypedef(void);
+bool cxxParserParseGenericTypedef(void);
 void cxxParserExtractTypedef(
 		CXXTokenChain * pChain,
-		boolean bExpectTerminatorAtEnd
+		bool bExpectTerminatorAtEnd
 	);
 
 // cxx_parser_namespace.c
-boolean cxxParserParseNamespace(void);
+bool cxxParserParseNamespace(void);
 
 // cxx_parser.c
 void cxxParserNewStatement(void);
-boolean cxxParserSkipToSemicolonOrEOF(void);
-boolean cxxParserParseToEndOfQualifedName(void);
-boolean cxxParserParseEnum(void);
-boolean cxxParserParseClassStructOrUnion(
+bool cxxParserSkipToSemicolonOrEOF(void);
+bool cxxParserParseToEndOfQualifedName(void);
+bool cxxParserParseEnum(void);
+bool cxxParserParseClassStructOrUnion(
 		enum CXXKeyword eKeyword,
 		unsigned int uTagKind,
 		unsigned int uScopeType
 	);
-boolean cxxParserParseAndCondenseCurrentSubchain(
+bool cxxParserParseAndCondenseCurrentSubchain(
 		unsigned int uInitialSubchainMarkerTypes,
-		boolean bAcceptEOF
+		bool bAcceptEOF
 	);
-boolean cxxParserParseUpToOneOf(unsigned int uTokenTypes);
-boolean cxxParserParseIfForWhileSwitch(void);
-boolean cxxParserParseTemplatePrefix(void);
-boolean cxxParserParseUsingClause(void);
-boolean cxxParserParseAccessSpecifier(void);
+bool cxxParserParseUpToOneOf(unsigned int uTokenTypes);
+bool cxxParserParseIfForWhileSwitch(void);
+bool cxxParserParseTemplatePrefix(void);
+bool cxxParserParseUsingClause(void);
+bool cxxParserParseAccessSpecifier(void);
 void cxxParserAnalyzeOtherStatement(void);
-boolean cxxParserParseAndCondenseSubchainsUpToOneOf(
+bool cxxParserParseAndCondenseSubchainsUpToOneOf(
 		unsigned int uTokenTypes,
 		unsigned int uInitialSubchainMarkerTypes
 	);
@@ -264,7 +283,7 @@ typedef struct _CXXParserState
 
 	// This is used to handle the special case of "final" which is a keyword
 	// in class/struct/union declarations but not anywhere else
-	boolean bParsingClassStructOrUnionDeclaration;
+	bool bParsingClassStructOrUnionDeclaration;
 	
 	// public, protected and private keywords are C++ only.
 	// However when parsing .h files we don't know if they belong to
@@ -280,7 +299,7 @@ typedef struct _CXXParserState
 	// This flag is meaningful only when parsing a .h file as C++ since in C
 	// public/protected/private are never keywords and we assume that .cpp files
 	// have C++ content (so public/protected/private are always keywords).
-	boolean bEnablePublicProtectedPrivateKeywords;
+	bool bEnablePublicProtectedPrivateKeywords;
 
 } CXXParserState;
 

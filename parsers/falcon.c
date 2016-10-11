@@ -32,20 +32,20 @@ typedef enum eFalconKinds {
 } falconKind;
 
 static kindOption FalconKinds [] = {
-    {TRUE, 'c', "class",     "classes" },
-    {TRUE, 'f', "function",  "functions"},
-    {TRUE, 'm', "member",    "class members"},
-    {TRUE, 'v', "variable",  "variables"},
-    {TRUE, 'i', "namespace", "imports"}
+    {true, 'c', "class",     "classes" },
+    {true, 'f', "function",  "functions"},
+    {true, 'm', "member",    "class members"},
+    {true, 'v', "variable",  "variables"},
+    {true, 'i', "namespace", "imports"}
 };
 
 /* 
  * Function Definitions
  */
 
-static boolean isIdentifierChar (int c)
+static bool isIdentifierChar (int c)
 {
-    return (boolean) (isalnum (c));
+    return (bool) (isalnum (c));
 }
 
 static const unsigned char *skipSpace (const unsigned char *cp)
@@ -84,7 +84,6 @@ static void findFalconTags (void)
                 vStringPut (name, (int) *cp);
                 ++cp;
             }
-            vStringTerminate (name);
             makeSimpleTag (name, FalconKinds, K_FUNCTION);
             vStringClear (name);
         }
@@ -98,7 +97,6 @@ static void findFalconTags (void)
                 vStringPut (name, (int) *cp);
                 ++cp;
             }
-            vStringTerminate (name);
             makeSimpleTag (name, FalconKinds, K_CLASS);
             vStringClear (name);
         }
@@ -112,7 +110,6 @@ static void findFalconTags (void)
                 vStringPut (name, (int) *cp);
                 ++cp;
             }
-            vStringTerminate (name);
             makeSimpleTag (name, FalconKinds, K_NAMESPACE);
             vStringClear (name);
         }
@@ -126,7 +123,6 @@ static void findFalconTags (void)
                 vStringPut (name, (int) *cp);
                 ++cp;
             }
-            vStringTerminate (name);
             makeSimpleTag (name, FalconKinds, K_NAMESPACE);
             vStringClear (name);
         }
@@ -147,5 +143,3 @@ extern parserDefinition* FalconParser (void)
     def->parser     = findFalconTags;
     return def;
 }
-
-/* vi:set tabstop=4 shiftwidth=4: */

@@ -29,46 +29,46 @@
 
 static iconv_t iconv_fd = (iconv_t) -1;
 
-extern boolean openConverter (char* inputEncoding, char* outputEncoding)
+extern bool openConverter (char* inputEncoding, char* outputEncoding)
 {
 	if (!inputEncoding || !outputEncoding)
 	{
-		static boolean warn = FALSE;
+		static bool warn = false;
 		/* --output-encoding is specified but not --input-encoding provided */
 		if (!warn && outputEncoding)
 		{
 			error (WARNING, "--input-encoding is not specified");
-			warn = TRUE;
+			warn = true;
 		}
-		return FALSE;
+		return false;
 	}
 	iconv_fd = iconv_open(outputEncoding, inputEncoding);
 	if (iconv_fd == (iconv_t) -1)
 	{
 		error (FATAL,
 					"failed opening encoding from '%s' to '%s'", inputEncoding, outputEncoding);
-		return FALSE;
+		return false;
 	}
-	return TRUE;
+	return true;
 }
 
-extern boolean isConverting ()
+extern bool isConverting ()
 {
 	return iconv_fd != (iconv_t) -1;
 }
 
-extern boolean convertString (vString *const string)
+extern bool convertString (vString *const string)
 {
 	size_t dest_len, src_len;
 	char *dest, *dest_ptr, *src;
 	if (iconv_fd == (iconv_t) -1)
-		return FALSE;
+		return false;
 	src_len = vStringLength (string);
 	/* Should be longest length of bytes. so maybe utf8. */
 	dest_len = src_len * 4;
 	dest_ptr = dest = xCalloc (dest_len, char);
 	if (!dest)
-		return FALSE;
+		return false;
 	src = vStringValue (string);
 retry:
 	if (iconv (iconv_fd, &src, &src_len, &dest_ptr, &dest_len) == (size_t) -1)
@@ -83,21 +83,21 @@ retry:
 			goto retry;
 		}
 		eFree (dest);
-		return FALSE;
+		return false;
 	}
 
 	dest_len = dest_ptr - dest;
 
 	vStringClear (string);
-	while (vStringSize (string) <= dest_len + 1)
-		vStringAutoResize (string);
+	if (vStringSize (string) < dest_len + 1)
+		vStringResize (string, dest_len + 1);
 	memcpy (vStringValue (string), dest, dest_len + 1);
 	vStringLength (string) = dest_len;
 	eFree (dest);
 
 	iconv (iconv_fd, NULL, NULL, NULL, NULL);
 
-	return TRUE;
+	return true;
 }
 
 extern void closeConverter ()

@@ -259,7 +259,7 @@ EOF
 
 sub emit_initializer {
     my $opts = shift;
-    my $may_unused = (@{$opts->{'xcmds'}} || @{$opts->{'disabledKinds'}}) ? "": " __unused__";
+    my $may_unused = (@{$opts->{'xcmds'}} || @{$opts->{'disabledKinds'}}) ? "": " CTAGS_ATTR_UNUSED";
 
     print <<EOF;
 static void initialize$opts->{'Clangdef'}Parser (const langType language$may_unused)
@@ -275,7 +275,7 @@ EOF
     }
     for (@{$opts->{'disabledKinds'}}) {
 	print <<EOF;
-	enableRegexKind (language, '$_', FALSE);
+	enableRegexKind (language, '$_', false);
 EOF
     }
     print <<EOF;
@@ -340,7 +340,7 @@ EOF
 
 sub emit_fields_initialization {
     my $opts = shift;
-    my $enabled = $opts->{"disabled"} ? "FALSE": "TRUE";
+    my $enabled = $opts->{"disabled"} ? "false": "true";
     my $method;
 
     $method  = "METHOD_NOT_CRAFTED";
@@ -369,23 +369,6 @@ EOF
     print <<EOF;
 	def->initialize    = initialize$opts->{'Clangdef'}Parser;
 
-EOF
-}
-
-sub emit_footer {
-    print <<EOF;
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 4
- * End:
- *
- * vi: set shiftwidth=4 tabstop=4:
- * :indentSize=4:tabSize=4:
- */
 EOF
 }
 
@@ -418,7 +401,6 @@ EOF
 	return def;
 }
 EOF
-    emit_footer;
 }
 
 ########################################################################

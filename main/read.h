@@ -55,18 +55,19 @@ enum eCharacters {
 
 /* InputFile: reading from fp in inputFile with updating fields in input fields */
 extern unsigned long getInputLineNumber (void);
+extern int getInputLineOffset (void);
 extern const char *getInputFileName (void);
 extern MIOPos getInputFilePosition (void);
 extern MIOPos getInputFilePositionForLine (int line);
 extern langType getInputLanguage (void);
 extern const char *getInputLanguageName (void);
 extern const char *getInputFileTagPath (void);
-extern boolean isInputLanguage (langType lang);
-extern boolean isInputHeaderFile (void);
-extern boolean isInputLanguageKindEnabled (char c);
-extern boolean doesInputLanguageAllowNullTag (void);
+extern bool isInputLanguage (langType lang);
+extern bool isInputHeaderFile (void);
+extern bool isInputLanguageKindEnabled (char c);
+extern bool doesInputLanguageAllowNullTag (void);
 extern kindOption *getInputLanguageFileKind (void);
-extern boolean doesInputLanguageRequestAutomaticFQTag (void);
+extern bool doesInputLanguageRequestAutomaticFQTag (void);
 
 extern void                 freeInputFileResources (void);
 extern const unsigned char *getInputFileData (size_t *size);
@@ -75,9 +76,9 @@ extern const unsigned char *getInputFileData (size_t *size);
    argument. If the 3rd argument is NULL, openInputFile calls getMio
    internally. The 3rd argument is introduced for reusing mio object
    created in parser guessing stage. */
-extern boolean              openInputFile (const char *const fileName, const langType language, MIO *mio);
+extern bool              openInputFile (const char *const fileName, const langType language, MIO *mio);
 extern MIO                 *getMio (const char *const fileName, const char *const openMode,
-				    boolean memStreamRequired);
+				    bool memStreamRequired);
 extern void                 resetInputFile (const langType language);
 
 extern void                 closeInputFile (void);
@@ -99,7 +100,7 @@ extern const char *getSourceLanguageName (void);
 extern unsigned long getSourceLineNumber (void);
 
 /* Raw: reading from given a parameter, fp */
-extern char *readLineRaw           (vString *const vLine, MIO *const fp);
+extern char *readLineRaw           (vString *const vLine, MIO *const mio);
 extern char* readLineRawWithNoSeek (vString *const vline, FILE *const pp);
 
 /* Bypass: reading from fp in inputFile WITHOUT updating fields in input fields */
@@ -113,6 +114,7 @@ extern void   pushNarrowedInputStream (const langType language,
 				       unsigned long sourceLineOffset);
 extern void   popNarrowedInputStream  (void);
 
-#endif  /* CTAGS_MAIN_READ_H */
+extern void     pushLanguage(const langType language);
+extern langType popLanguage (void);
 
-/* vi:set tabstop=4 shiftwidth=4: */
+#endif  /* CTAGS_MAIN_READ_H */

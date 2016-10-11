@@ -13,8 +13,20 @@
 #include "fmt.h"
 #include "mio.h"
 #include "options.h"
+#include "output.h"
 
-extern int writeXrefEntry (MIO * mio, const tagEntryInfo *const tag, void *data __unused__)
+
+static int writeXrefEntry  (MIO * mio, const tagEntryInfo *const tag, void *data CTAGS_ATTR_UNUSED);
+
+tagWriter xrefWriter = {
+	.writeEntry = writeXrefEntry,
+	.writePtagEntry = NULL,
+	.preWriteEntry = NULL,
+	.postWriteEntry = NULL,
+	.useStdoutByDefault = true,
+};
+
+static int writeXrefEntry (MIO * mio, const tagEntryInfo *const tag, void *data CTAGS_ATTR_UNUSED)
 {
 	int length;
 	static fmtElement *fmt1;

@@ -19,6 +19,7 @@
 
 typedef enum eDepType {
 	DEPTYPE_KIND_OWNER,
+	DEPTYPE_SUBPARSER,
 	COUNT_DEPTYPES,
 } depType;
 
@@ -28,11 +29,17 @@ typedef struct sParserDependency {
 	void *data;
 } parserDependency;
 
-
 extern void linkDependencyAtInitializeParsing (depType dtype,
 					       parserDefinition *const masterParser,
 					       parserDefinition *const slaveParser);
 
-#endif	/* CTAGS_MAIN_DEPENDENCY_H */
+typedef struct sSubparser subparser;
+struct sSubparser {
+	langType id;
+	subparser *next;
+};
 
-/* vi:set tabstop=4 shiftwidth=4: */
+extern void initializeSubparsers (const parserDefinition *parser);
+extern void finalizeSubparsers (parserDefinition *parser);
+
+#endif	/* CTAGS_MAIN_DEPENDENCY_H */

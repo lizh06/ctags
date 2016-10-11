@@ -35,7 +35,7 @@ static const char *TR_REXX     = "REXX";
 static const char *TR_DOSBATCH = "DosBatch";
 
 #define startsWith(line,prefix) \
-  (strncmp(line, prefix, strlen(prefix)) == 0? TRUE: FALSE)
+  (strncmp(line, prefix, strlen(prefix)) == 0? true: false)
 
 static const char *selectByLines (MIO *input,
 				  const char* (* lineTaster) (const char *, void *),
@@ -53,7 +53,7 @@ static const char *selectByLines (MIO *input,
 
 /* Returns "Perl" or "Perl6" or NULL if it does not taste like anything */
 static const char *
-tastePerlLine (const char *line, void *data __unused__)
+tastePerlLine (const char *line, void *data CTAGS_ATTR_UNUSED)
 {
     while (isspace(*line))
         ++line;
@@ -126,7 +126,7 @@ selectByPickingPerlVersion (MIO *input)
 }
 
 static const char *
-tasteObjectiveCOrMatLabLines (const char *line, void *data __unused__)
+tasteObjectiveCOrMatLabLines (const char *line, void *data CTAGS_ATTR_UNUSED)
 {
     if (startsWith (line, "% ")
 	|| startsWith (line, "%{"))
@@ -167,7 +167,7 @@ selectByObjectiveCAndMatLabKeywords (MIO * input)
 }
 
 static const char *
-tasteObjectiveC (const char *line, void *data __unused__)
+tasteObjectiveC (const char *line, void *data CTAGS_ATTR_UNUSED)
 {
     if (startsWith (line, "#import")
 	|| startsWith (line, "@interface ")
@@ -205,7 +205,7 @@ selectByObjectiveCKeywords (MIO * input)
 }
 
 static const char *
-tasteR (const char *line, void *data __unused__)
+tasteR (const char *line, void *data CTAGS_ATTR_UNUSED)
 {
 	/* As far as reading test cases in GNU assembler,
 	   assembly language for d10v and d30v processors
@@ -247,7 +247,7 @@ selectByArrowOfR (MIO *input)
 static const char *
 tasteREXXOrDosBatch (const char *line, void *data)
 {
-	boolean * in_rexx_comment = data;
+	bool * in_rexx_comment = data;
 
 	if (startsWith (line, ":"))
 		return TR_DOSBATCH;
@@ -256,7 +256,7 @@ tasteREXXOrDosBatch (const char *line, void *data)
 		return TR_REXX;
 	else if (strstr (line, "/*"))
 	{
-		*in_rexx_comment = TRUE;
+		*in_rexx_comment = true;
 		return NULL;
 	}
 	else
@@ -271,7 +271,7 @@ selectByRexxCommentAndDosbatchLabelPrefix (MIO *input)
 
     static langType rexx     = LANG_IGNORE;
     static langType dosbatch = LANG_IGNORE;
-    boolean in_rexx_comment = FALSE;
+    bool in_rexx_comment = false;
 
     if (rexx == LANG_IGNORE)
 	    rexx = getNamedLanguage (TR_R, 0);
@@ -296,7 +296,7 @@ selectByRexxCommentAndDosbatchLabelPrefix (MIO *input)
 #include <libxml/xpath.h>
 #include <libxml/tree.h>
 
-static void suppressWarning (void *ctx __unused__, const char *msg __unused__, ...)
+static void suppressWarning (void *ctx CTAGS_ATTR_UNUSED, const char *msg CTAGS_ATTR_UNUSED, ...)
 {
 }
 

@@ -54,8 +54,6 @@
 # include <stdbool.h>
 #endif
 
-#include "mybool.h"
-
 /*
 *   FUNCTION PROTOTYPES
 */
@@ -73,5 +71,3 @@ extern char *getenv (const char *);
 #endif
 
 #endif  /* CTAGS_MAIN_GENERAL_H */
-
-/* vi:set tabstop=4 shiftwidth=4: */

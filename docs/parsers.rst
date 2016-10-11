@@ -7,7 +7,7 @@ Parsers
 	:depth: 3
 	:local:
 
-This section deals parser individual topics.
+This section deals with individual parser topics.
 	   
 .. toctree::
 	:maxdepth: 2
@@ -15,3 +15,5 @@ This section deals parser individual topics.
 	parser-cxx.rst
 	parser-vim.rst
 	parser-xslt.rst
+	parser-python.rst
+	parser-html.rst
