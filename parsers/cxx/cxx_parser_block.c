@@ -25,7 +25,7 @@
 
 #include <string.h>
 
-static boolean cxxParserParseBlockHandleOpeningBracket(void)
+static bool cxxParserParseBlockHandleOpeningBracket(void)
 {
 	CXX_DEBUG_ENTER();
 
@@ -35,7 +35,8 @@ static boolean cxxParserParseBlockHandleOpeningBracket(void)
 		);
 
 	enum CXXScopeType eScopeType = cxxScopeGetType();
-	boolean bIsCPP = cxxParserCurrentLanguageIsCPP();
+	bool bIsCPP = cxxParserCurrentLanguageIsCPP();
+	CXXToken * pAux;
 
 	if(
 			(
@@ -47,22 +48,37 @@ static boolean cxxParserParseBlockHandleOpeningBracket(void)
 					(eScopeType == CXXScopeTypeNamespace)
 				)
 			) || (
-				// T { arg1, arg2, ... } (1)
-				// T object { arg1, arg2, ... } (2)
-				// new T { arg1, arg2, ... } (3)
-				// Class::Class() : member { arg1, arg2, ... } { (4)
 				bIsCPP &&
 				(g_cxx.pToken->pPrev) &&
-				cxxTokenTypeIs(g_cxx.pToken->pPrev,CXXTokenTypeIdentifier) &&
 				(
-					(!g_cxx.pToken->pPrev->pPrev) ||
-					(cxxTokenTypeIsOneOf(
-							g_cxx.pToken->pPrev->pPrev,
-							CXXTokenTypeIdentifier | CXXTokenTypeStar | CXXTokenTypeAnd |
-							CXXTokenTypeGreaterThanSign | CXXTokenTypeKeyword |
-							// FIXME: This check could be made stricter?
-							CXXTokenTypeSingleColon | CXXTokenTypeComma
-					))
+					(
+						// T { arg1, arg2, ... } (1)
+						// T object { arg1, arg2, ... } (2)
+						// new T { arg1, arg2, ... } (3)
+						// Class::Class() : member { arg1, arg2, ... } { (4)
+						cxxTokenTypeIs(g_cxx.pToken->pPrev,CXXTokenTypeIdentifier) &&
+						(
+							(!g_cxx.pToken->pPrev->pPrev) ||
+							(cxxTokenTypeIsOneOf(
+									g_cxx.pToken->pPrev->pPrev,
+									CXXTokenTypeIdentifier | CXXTokenTypeStar | CXXTokenTypeAnd |
+									CXXTokenTypeGreaterThanSign | CXXTokenTypeKeyword |
+									// FIXME: This check could be made stricter?
+									CXXTokenTypeSingleColon | CXXTokenTypeComma
+							))
+						)
+					) || (
+						// type var[][][]..[] { ... }
+						// (but not '[] { ... }' which is a parameterelss lambda)
+						cxxTokenTypeIs(g_cxx.pToken->pPrev,CXXTokenTypeSquareParenthesisChain) &&
+						(
+							pAux = cxxTokenChainPreviousTokenNotOfType(
+									g_cxx.pToken->pPrev,
+									CXXTokenTypeSquareParenthesisChain
+								)
+						) &&
+						cxxTokenTypeIs(pAux,CXXTokenTypeIdentifier)
+					)
 				)
 			) || (
 				// return { }
@@ -72,10 +88,10 @@ static boolean cxxParserParseBlockHandleOpeningBracket(void)
 		)
 	{
 		// array or list-like initialisation
-		boolean bRet = cxxParserParseAndCondenseCurrentSubchain(
+		bool bRet = cxxParserParseAndCondenseCurrentSubchain(
 				CXXTokenTypeOpeningBracket | CXXTokenTypeOpeningParenthesis |
 					CXXTokenTypeOpeningSquareParenthesis,
-				FALSE
+				false
 			);
 
 		CXX_DEBUG_LEAVE_TEXT("Handled array or list-like initialisation or return");
@@ -116,10 +132,10 @@ static boolean cxxParserParseBlockHandleOpeningBracket(void)
 
 	cxxParserNewStatement();
 
-	if(!cxxParserParseBlock(TRUE))
+	if(!cxxParserParseBlock(true))
 	{
 		CXX_DEBUG_LEAVE_TEXT("Failed to parse nested block");
-		return FALSE;
+		return false;
 	}
 
 	if(iCorkQueueIndex > CORK_NIL)
@@ -132,7 +148,7 @@ static boolean cxxParserParseBlockHandleOpeningBracket(void)
 	}
 
 	CXX_DEBUG_LEAVE();
-	return TRUE;
+	return true;
 }
 
 //
@@ -143,7 +159,7 @@ static boolean cxxParserParseBlockHandleOpeningBracket(void)
 // When the statement ends without finding any characteristic token the chain
 // is passed to an analysis routine which does a second scan pass.
 //
-boolean cxxParserParseBlock(boolean bExpectClosingBracket)
+bool cxxParserParseBlock(bool bExpectClosingBracket)
 {
 	CXX_DEBUG_ENTER();
 
@@ -171,11 +187,11 @@ found_eof:
 						"Syntax error: found EOF in block but a closing " \
 							"bracket was expected!"
 					);
-				return FALSE;
+				return false;
 			}
 
 			CXX_DEBUG_LEAVE_TEXT("EOF in main block");
-			return TRUE; // EOF
+			return true; // EOF
 		}
 
 process_token:
@@ -194,20 +210,21 @@ process_token:
 				{
 					case CXXKeywordNAMESPACE:
 					{
-						if(cxxScopeGetType() == CXXScopeTypeNamespace)
+						if(cxxScopeGetType() == CXXScopeTypeNamespace ||
+						   cxxScopeGetType() == CXXScopeTypeFunction)
 						{
 							// namespaces can be nested only within themselves
 							if(!cxxParserParseNamespace())
 							{
 								CXX_DEBUG_LEAVE_TEXT("Failed to parse namespace");
-								return FALSE;
+								return false;
 							}
 						} else {
 							// hm... syntax error?
 							CXX_DEBUG_LEAVE_TEXT(
 								"Found namespace in a wrong place: we're probably out of sync"
 							);
-							return FALSE;
+							return false;
 						}
 
 						cxxParserNewStatement();
@@ -217,7 +234,7 @@ process_token:
 						if(!cxxParserParseTemplatePrefix())
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse template");
-							return FALSE;
+							return false;
 						}
 						// Here we are just after the "template<parameters>" prefix.
 					break;
@@ -230,28 +247,28 @@ process_token:
 						if(!cxxParserParseEnum())
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse enum");
-							return FALSE;
+							return false;
 						}
 					break;
 					case CXXKeywordCLASS:
 						if(!cxxParserParseClassStructOrUnion(CXXKeywordCLASS,CXXTagCPPKindCLASS,CXXScopeTypeClass))
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse class/struct/union");
-							return FALSE;
+							return false;
 						}
 					break;
 					case CXXKeywordSTRUCT:
 						if(!cxxParserParseClassStructOrUnion(CXXKeywordSTRUCT,CXXTagKindSTRUCT,CXXScopeTypeStruct))
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse class/struct/union");
-							return FALSE;
+							return false;
 						}
 					break;
 					case CXXKeywordUNION:
 						if(!cxxParserParseClassStructOrUnion(CXXKeywordUNION,CXXTagKindUNION,CXXScopeTypeUnion))
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse class/struct/union");
-							return FALSE;
+							return false;
 						}
 					break;
 					case CXXKeywordPUBLIC:
@@ -262,14 +279,14 @@ process_token:
 						if(!cxxParserParseAccessSpecifier())
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse access specifier");
-							return FALSE;
+							return false;
 						}
 					break;
 					case CXXKeywordUSING:
 						if(!cxxParserParseUsingClause())
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse using clause");
-							return FALSE;
+							return false;
 						}
 						cxxParserNewStatement();
 					break;
@@ -280,7 +297,7 @@ process_token:
 						if(!cxxParserParseIfForWhileSwitch())
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse if/for/while/switch");
-							return FALSE;
+							return false;
 						}
 						cxxParserNewStatement();
 						// Force the cpp preprocessor to think that we're in the middle of a statement.
@@ -305,7 +322,7 @@ process_token:
 							if(!cxxParserParseUpToOneOf(CXXTokenTypeSemicolon | CXXTokenTypeEOF))
 							{
 								CXX_DEBUG_LEAVE_TEXT("Failed to parse return");
-								return FALSE;
+								return false;
 							}
 							cxxParserNewStatement();
 						}
@@ -317,7 +334,7 @@ process_token:
 						if(!cxxParserParseUpToOneOf(CXXTokenTypeSemicolon | CXXTokenTypeEOF))
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse continue/break/goto");
-							return FALSE;
+							return false;
 						}
 						cxxParserNewStatement();
 					break;
@@ -328,7 +345,7 @@ process_token:
 							if(!cxxParserParseUpToOneOf(CXXTokenTypeSemicolon | CXXTokenTypeEOF))
 							{
 								CXX_DEBUG_LEAVE_TEXT("Failed to parse return/continue/break");
-								return FALSE;
+								return false;
 							}
 							cxxParserNewStatement();
 						}
@@ -341,7 +358,7 @@ process_token:
 							))
 						{
 							CXX_DEBUG_LEAVE_TEXT("Failed to parse case keyword");
-							return FALSE;
+							return false;
 						}
 						cxxParserNewStatement();
 					break;
@@ -427,7 +444,7 @@ process_token:
 							if(!cxxParserParseGenericTypedef())
 							{
 								CXX_DEBUG_LEAVE_TEXT("Failed to parse generic typedef");
-								return FALSE;
+								return false;
 							}
 							cxxParserNewStatement();
 						}
@@ -456,10 +473,10 @@ process_token:
 						case 1:
 							// got K&R style function definition, one scope was pushed.
 							cxxParserNewStatement();
-							if(!cxxParserParseBlock(TRUE))
+							if(!cxxParserParseBlock(true))
 							{
 								CXX_DEBUG_LEAVE_TEXT("Failed to parse nested block");
-								return FALSE;
+								return false;
 							}
 							if(iCorkQueueIndex > CORK_NIL)
 								cxxParserMarkEndLineForTagInCorkQueue(iCorkQueueIndex);
@@ -471,7 +488,7 @@ process_token:
 						break;
 						default:
 							CXX_DEBUG_LEAVE_TEXT("Failed to check for K&R style function definition");
-							return FALSE;
+							return false;
 						break;
 					}
 				} else {
@@ -498,7 +515,7 @@ process_token:
 
 					if(tag)
 					{
-						tag->isFileScope = TRUE;
+						tag->isFileScope = true;
 						cxxTagCommit();
 					}
 				} else {
@@ -510,25 +527,25 @@ process_token:
 				if(!cxxParserParseBlockHandleOpeningBracket())
 				{
 					CXX_DEBUG_LEAVE_TEXT("Failed to handle opening bracket");
-					return FALSE;
+					return false;
 				}
 			break;
 			case CXXTokenTypeClosingBracket:
 				// scope finished
 				CXX_DEBUG_LEAVE_TEXT("Closing bracket!");
 				cxxParserNewStatement();
-				return TRUE;
+				return true;
 			break;
 			case CXXTokenTypeOpeningParenthesis:
 			case CXXTokenTypeOpeningSquareParenthesis:
 				if(!cxxParserParseAndCondenseCurrentSubchain(
 						CXXTokenTypeOpeningBracket | CXXTokenTypeOpeningParenthesis |
 							CXXTokenTypeOpeningSquareParenthesis,
-						TRUE
+						true
 					))
 				{
 					CXX_DEBUG_LEAVE_TEXT("Parsing the parenthesis failed");
-					return FALSE;
+					return false;
 				}
 
 				if(cxxTokenTypeIs(g_cxx.pToken,CXXTokenTypeEOF))
@@ -538,9 +555,9 @@ process_token:
 						CXX_DEBUG_LEAVE_TEXT(
 								"Syntax error: found EOF in block but a closing bracket was expected!"
 							);
-						return FALSE;
+						return false;
 					}
-					return TRUE; // EOF
+					return true; // EOF
 				}
 			break;
 			case CXXTokenTypeIdentifier:
@@ -550,7 +567,7 @@ process_token:
 					if(!cxxParserParseGenericTypedef())
 					{
 						CXX_DEBUG_LEAVE_TEXT("Failed to parse generic typedef");
-						return FALSE;
+						return false;
 					}
 					cxxParserNewStatement();
 				}
@@ -562,5 +579,5 @@ process_token:
 	}
 
 	CXX_DEBUG_LEAVE_TEXT("WARNING: Not reached");
-	return TRUE;
+	return true;
 }

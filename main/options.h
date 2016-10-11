@@ -27,6 +27,7 @@
 #include "fmt.h"
 #include "parse.h"
 #include "strlist.h"
+#include "htable.h"
 #include "vstring.h"
 
 /*
@@ -40,8 +41,8 @@ typedef struct sCookedArgs {
 	Arguments* args;
 	char *shortOptions;
 	char simple[2];
-	boolean isOption;
-	boolean longOption;
+	bool isOption;
+	bool longOption;
 	const char* parameter;
 	/* public */
 	char* item;
@@ -59,18 +60,23 @@ typedef enum sortType {
 	SO_FOLDSORTED
 } sortType;
 
+typedef struct sIgnoredTokenInfo {
+	bool ignoreFollowingParenthesis; /* -I SOMETHING+ */
+	char * replacement;              /* -I SOMETHING=REPLACEMENT */
+} ignoredTokenInfo;
+
 /*  This stores the command line options.
  */
 typedef struct sOptionValues {
-	stringList* ignore;     /* -I  name of file containing tokens to ignore */
-	boolean append;         /* -a  append to "tags" file */
-	boolean backward;       /* -B  regexp patterns search backwards */
-	boolean etags;          /* -e  output Emacs style tags file */
+	hashTable * ignore;  /* -I  name of file containing tokens to ignore */
+	bool append;         /* -a  append to "tags" file */
+	bool backward;       /* -B  regexp patterns search backwards */
+	bool etags;          /* -e  output Emacs style tags file */
 	exCmd locate;           /* --excmd  EX command used to locate tag */
-	boolean recurse;        /* -R  recurse into directories */
+	bool recurse;        /* -R  recurse into directories */
 	sortType sorted;        /* -u,--sort  sort tags */
-	boolean verbose;        /* -V  verbose */
-	boolean xref;           /* -x  generate xref output instead */
+	bool verbose;        /* -V  verbose */
+	bool xref;           /* -x  generate xref output instead */
 	fmtElement *customXfmt;	/* compiled code for --xformat=XFMT */
 	char *fileList;         /* -L  name of file containing names of files */
 	char *tagFileName;      /* -o  name of tags file */
@@ -82,24 +88,24 @@ typedef struct sOptionValues {
 	char *inputEncoding;	/* --input-encoding	convert text into --output-encoding */
 	char *outputEncoding;	/* --output-encoding	write tags file as this encoding */
 #endif
-	boolean if0;            /* --if0  examine code within "#if 0" branch */
+	bool if0;            /* --if0  examine code within "#if 0" branch */
 	langType language;      /* --lang specified language override */
-	boolean followLinks;    /* --link  follow symbolic links? */
-	boolean filter;         /* --filter  behave as filter: files in, tags out */
+	bool followLinks;    /* --link  follow symbolic links? */
+	bool filter;         /* --filter  behave as filter: files in, tags out */
 	char* filterTerminator; /* --filter-terminator  string to output */
-	boolean tagRelative;    /* --tag-relative file paths relative to tag file */
-	boolean printTotals;    /* --totals  print cumulative statistics */
-	boolean lineDirectives; /* --linedirectives  process #line directives */
-	boolean printLanguage;  /* --print-language */
-	boolean guessLanguageEagerly; /* --guess-language-eagerly|-G */
-	boolean quiet;		      /* --quiet */
-	boolean allowXcmdInHomeDir;     /* --_allow-xcmd-in-homedir */
-	boolean fatalWarnings;	/* --_fatal-warnings */
+	bool tagRelative;    /* --tag-relative file paths relative to tag file */
+	bool printTotals;    /* --totals  print cumulative statistics */
+	bool lineDirectives; /* --linedirectives  process #line directives */
+	bool printLanguage;  /* --print-language */
+	bool guessLanguageEagerly; /* --guess-language-eagerly|-G */
+	bool quiet;		      /* --quiet */
+	bool allowXcmdInHomeDir;     /* --_allow-xcmd-in-homedir */
+	bool fatalWarnings;	/* --_fatal-warnings */
 	unsigned int patternLengthLimit; /* --pattern-length-limit=N */
-	boolean putFieldPrefix;		 /* --put-field-prefix */
+	bool putFieldPrefix;		 /* --put-field-prefix */
 	unsigned int maxRecursionDepth; /* --maxdepth=<max-recursion-depth> */
-	boolean machinable;		/* --machinable */
-	boolean withListHeader;		/* --with-list-header */
+	bool machinable;		/* --machinable */
+	bool withListHeader;		/* --with-list-header */
 #ifdef DEBUG
 	long debugLevel;        /* -D  debugging output */
 	unsigned long breakLine;/* -b  input line at which to call lineBreak() */
@@ -127,8 +133,8 @@ extern CONST_OPTION optionValues		Option;
 /*
 *   FUNCTION PROTOTYPES
 */
-extern void notice (const char *const format, ...) __printf__ (1, 2);
-extern void verbose (const char *const format, ...) __printf__ (1, 2);
+extern void notice (const char *const format, ...) CTAGS_ATTR_PRINTF (1, 2);
+extern void verbose (const char *const format, ...) CTAGS_ATTR_PRINTF (1, 2);
 #define BEGIN_VERBOSE(VFP) do { if (Option.verbose) { \
                                 FILE* VFP = stderr
 #define END_VERBOSE()      } } while (0)
@@ -136,7 +142,7 @@ extern void verbose (const char *const format, ...) __printf__ (1, 2);
 extern void freeList (stringList** const pString);
 extern void setDefaultTagFileName (void);
 extern void checkOptions (void);
-extern boolean filesRequired (void);
+extern bool filesRequired (void);
 extern void testEtagsInvocation (void);
 
 extern cookedArgs* cArgNewFromString (const char* string);
@@ -144,14 +150,14 @@ extern cookedArgs* cArgNewFromArgv (char* const* const argv);
 extern cookedArgs* cArgNewFromFile (FILE* const fp);
 extern cookedArgs* cArgNewFromLineFile (FILE* const fp);
 extern void cArgDelete (cookedArgs* const current);
-extern boolean cArgOff (cookedArgs* const current);
-extern boolean cArgIsOption (cookedArgs* const current);
+extern bool cArgOff (cookedArgs* const current);
+extern bool cArgIsOption (cookedArgs* const current);
 extern const char* cArgItem (cookedArgs* const current);
 extern void cArgForth (cookedArgs* const current);
 
-extern boolean isExcludedFile (const char* const name);
-extern boolean isIncludeFile (const char *const fileName);
-extern boolean isIgnoreToken (const char *const name, boolean *const pIgnoreParens, const char **const replacement);
+extern bool isExcludedFile (const char* const name);
+extern bool isIncludeFile (const char *const fileName);
+extern const ignoredTokenInfo * isIgnoreToken (const char *const name);
 extern void parseCmdlineOptions (cookedArgs* const cargs);
 extern void previewFirstOption (cookedArgs* const cargs);
 extern void readOptionConfiguration (void);
@@ -170,19 +176,17 @@ extern langType getLanguageComponentInOption (const char *const option,
 					      const char *const prefix);
 
 extern void processLanguageDefineOption (const char *const option, const char *const parameter);
-extern boolean processMapOption (const char *const option, const char *const parameter);
-extern boolean processKindOption (const char *const option, const char *const parameter);
-extern boolean processCorpusOption (const char *const option, const char *const parameter);
-extern boolean processAliasOption (const char *const option, const char *const parameter);
+extern bool processMapOption (const char *const option, const char *const parameter);
+extern bool processKindOption (const char *const option, const char *const parameter);
+extern bool processCorpusOption (const char *const option, const char *const parameter);
+extern bool processAliasOption (const char *const option, const char *const parameter);
 #ifdef HAVE_ICONV
-extern boolean processLanguageEncodingOption (const char *const option, const char *const parameter);
+extern bool processLanguageEncodingOption (const char *const option, const char *const parameter);
 #endif
-extern boolean processRegexOption (const char *const option, const char *const parameter);
-extern boolean processXcmdOption (const char *const option, const char *const parameter, OptionLoadingStage stage);
+extern bool processRegexOption (const char *const option, const char *const parameter);
+extern bool processXcmdOption (const char *const option, const char *const parameter, OptionLoadingStage stage);
 
 typedef void (* mainLoopFunc) (cookedArgs *args, void *data);
 extern void setMainLoop (mainLoopFunc func, void *data);
 
 #endif  /* CTAGS_MAIN_OPTIONS_H */
-
-/* vi:set tabstop=4 shiftwidth=4: */

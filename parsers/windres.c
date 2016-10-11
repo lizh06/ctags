@@ -34,14 +34,14 @@ typedef enum _WindResKinds
 } ResKind;
 
 static kindOption ResKinds [] = {
-	{ TRUE, 'd', "dialog",			"dialogs"		},
-	{ TRUE, 'm', "menu",			"menus"			},
-	{ TRUE, 'i', "icon",			"icons"			},
-	{ TRUE, 'b', "bitmap",			"bitmaps"		},
-	{ TRUE, 'c', "cursor",			"cursors"		},
-	{ TRUE, 'f', "font",			"fonts"			},
-	{ TRUE, 'v', "version",			"versions"		},
-	{ TRUE, 'a', "accelerators",	"accelerators"	}
+	{ true, 'd', "dialog",			"dialogs"		},
+	{ true, 'm', "menu",			"menus"			},
+	{ true, 'i', "icon",			"icons"			},
+	{ true, 'b', "bitmap",			"bitmaps"		},
+	{ true, 'c', "cursor",			"cursors"		},
+	{ true, 'f', "font",			"fonts"			},
+	{ true, 'v', "version",			"versions"		},
+	{ true, 'a', "accelerators",	"accelerators"	}
 };
 
 typedef enum _WindResParserState
@@ -55,7 +55,6 @@ typedef enum _WindResParserState
 
 static void makeResTag(vString *name, ResKind kind)
 {
-	vStringTerminate(name);
 	vStringStripTrailing(name);
 	makeSimpleTag(name, ResKinds, kind);
 	vStringClear(name);
@@ -72,7 +71,6 @@ static ResParserState parseResDefinition(const unsigned char *line)
 		vStringPut(name, (int) *line);
 		line++;
 	}
-	vStringTerminate(name);
 
 	while (*line && isspace((int) *line))
 		line++;
@@ -83,7 +81,6 @@ static ResParserState parseResDefinition(const unsigned char *line)
 		vStringPut(type, (int) *line);
 		line++;
 	}
-	vStringTerminate(type);
 
 	if (strcmp(vStringValue(type), "DIALOG") == 0 || strcmp(vStringValue(type), "DIALOGEX") == 0)
 	{
@@ -234,4 +231,3 @@ extern parserDefinition* WindResParser(void)
 	def->parser		= findResTags;
 	return def;
 }
-/* vi:set tabstop=4 shiftwidth=4 noexpandtab: */

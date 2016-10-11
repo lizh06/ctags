@@ -64,7 +64,7 @@ out:
 	xmlFree (str);
 }
 
-extern void addTagXpath (const langType language __unused__, tagXpathTable *xpathTable)
+extern void addTagXpath (const langType language CTAGS_ATTR_UNUSED, tagXpathTable *xpathTable)
 {
 	Assert (xpathTable->xpath);
 	Assert (!xpathTable->xpathCompiled);
@@ -118,16 +118,16 @@ static void findXMLTagsCore (xmlXPathContext *ctx, xmlNode *root,
 			{
 				node = set->nodeTab[j];
 				if (elt->specType == LXPATH_TABLE_DO_MAKE)
-					simpleXpathMakeTag (node, &(elt->makeTagSpec), kinds, userData);
+					simpleXpathMakeTag (node, &(elt->spec.makeTagSpec), kinds, userData);
 				else
-					elt->recurSpec.enter (node, &(elt->recurSpec), ctx, userData);
+					elt->spec.recurSpec.enter (node, &(elt->spec.recurSpec), ctx, userData);
 			}
 		}
 		xmlXPathFreeObject (object);
 	}
 }
 
-static void suppressWarning (void *ctx __unused__, const char *msg __unused__, ...)
+static void suppressWarning (void *ctx CTAGS_ATTR_UNUSED, const char *msg CTAGS_ATTR_UNUSED, ...)
 {
 }
 
@@ -158,12 +158,12 @@ extern void findXMLTags (xmlXPathContext *ctx, xmlNode *root,
 			 const tagXpathTableTable *xpathTableTable,
 			 const kindOption* const kinds,void *userData)
 {
-	boolean usedAsEntryPoint = FALSE;
+	bool usedAsEntryPoint = false;
 	xmlDocPtr doc = NULL;
 
 	if (ctx == NULL)
 	{
-		usedAsEntryPoint = TRUE;
+		usedAsEntryPoint = true;
 
 		findRegexTags ();
 
@@ -215,5 +215,3 @@ extern void findXMLTags (xmlXPathContext *ctx, xmlNode *root,
 }
 
 #endif
-
-/* vi:set tabstop=4 shiftwidth=4: */

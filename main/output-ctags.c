@@ -17,6 +17,20 @@
 #include "ptag.h"
 
 
+static int writeCtagsEntry (MIO * mio, const tagEntryInfo *const tag, void *data CTAGS_ATTR_UNUSED);
+static int writeCtagsPtagEntry (MIO * mio, const ptagDesc *desc,
+								const char *const fileName,
+								const char *const pattern,
+								const char *const parserName, void *data CTAGS_ATTR_UNUSED);
+
+tagWriter ctagsWriter = {
+	.writeEntry = writeCtagsEntry,
+	.writePtagEntry = writeCtagsPtagEntry,
+	.preWriteEntry = NULL,
+	.postWriteEntry = NULL,
+	.useStdoutByDefault = false,
+};
+
 static const char* escapeFieldValue (const tagEntryInfo * tag, fieldType ftype)
 {
 	return renderFieldEscaped (ftype, tag, NO_PARSER_FIELD);
@@ -79,8 +93,8 @@ static int file_puts (const char* s, void *data)
 
 static int addExtensionFields (MIO *mio, const tagEntryInfo *const tag)
 {
-	boolean isKindKeyEnabled = isFieldEnabled (FIELD_KIND_KEY);
-	boolean isScopeEnabled = isFieldEnabled   (FIELD_SCOPE_KEY);
+	bool isKindKeyEnabled = isFieldEnabled (FIELD_KIND_KEY);
+	bool isScopeEnabled = isFieldEnabled   (FIELD_SCOPE_KEY);
 
 	const char* const kindKey = isKindKeyEnabled
 		?getFieldName (FIELD_KIND_KEY)
@@ -168,7 +182,7 @@ static int writePatternEntry (MIO *mio, const tagEntryInfo *const tag)
 	return makePatternStringCommon (tag, file_putc, file_puts, mio);
 }
 
-extern int writeCtagsEntry (MIO * mio, const tagEntryInfo *const tag, void *data __unused__)
+static int writeCtagsEntry (MIO * mio, const tagEntryInfo *const tag, void *data CTAGS_ATTR_UNUSED)
 {
 	int length = mio_printf (mio, "%s\t%s\t",
 			      escapeFieldValue (tag, FIELD_NAME),
@@ -192,10 +206,10 @@ extern int writeCtagsEntry (MIO * mio, const tagEntryInfo *const tag, void *data
 	return length;
 }
 
-extern int writeCtagsPtagEntry (MIO * mio, const ptagDesc *desc,
+static int writeCtagsPtagEntry (MIO * mio, const ptagDesc *desc,
 				const char *const fileName,
 				const char *const pattern,
-				const char *const parserName, void *data __unused__)
+				const char *const parserName, void *data CTAGS_ATTR_UNUSED)
 {
 	return parserName
 

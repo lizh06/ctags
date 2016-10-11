@@ -33,6 +33,11 @@ MAIN_SRCS += $(JANSSON_SRCS)
 MAIN_HEADS += $(JANSSON_HEADS)
 endif
 
+if HAVE_LIBYAML
+PARSER_SRCS += $(YAML_SRCS)
+PARSER_HEADS += $(YAML_HEADS)
+endif
+
 ctags_CPPFLAGS = -I. -I$(srcdir) -I$(srcdir)/main
 if ENABLE_DEBUGGING
 ctags_CPPFLAGS+= $(DEBUG_CPPFLAGS)
@@ -48,9 +53,12 @@ ctags_CFLAGS  += $(COVERAGE_CFLAGS)
 ctags_CFLAGS  += $(CGCC_CFLAGS)
 ctags_CFLAGS  += $(LIBXML_CFLAGS)
 ctags_CFLAGS  += $(JANSSON_CFLAGS)
+ctags_CFLAGS  += $(LIBYAML_CFLAGS)
 
 ctags_LDADD  =
-ctags_LDADD += $(LIBXML_LIBS) $(JANSSON_LIBS)
+ctags_LDADD += $(LIBXML_LIBS)
+ctags_LDADD += $(JANSSON_LIBS)
+ctags_LDADD += $(LIBYAML_LIBS)
 
 nodist_ctags_SOURCES = $(REPOINFO_HEADS)
 BUILT_SOURCES = $(REPOINFO_HEADS)
@@ -75,8 +83,6 @@ OPTLIB2C = $(srcdir)/misc/optlib2c
 endif
 dist_ctags_SOURCES = $(ALL_HEADS) $(ALL_SRCS)
 
-man_MANS = ctags.1
-
 if ENABLE_XCMD
 driversdir = $(pkglibexecdir)/drivers
 dist_drivers_SCRIPTS = libexec/drivers/coffeetags
@@ -95,4 +101,14 @@ include $(top_srcdir)/makefiles/testing.mak
 include $(top_srcdir)/makefiles/test-cases.mak
 
 include $(top_srcdir)/makefiles/help.mak
+
+if HAVE_RST2MAN
+man_MANS = man/ctags.1
+rst2man_verbose = $(rst2man_verbose_@AM_V@)
+rst2man_verbose_ = $(rst2man_verbose_@AM_DEFAULT_V@)
+rst2man_verbose_0 = @echo RST2MAN "  $@";
+SUFFIXES = .1.rst .1
+.1.rst.1:
+	$(rst2man_verbose)$(RST2MAN) $< $@
+endif
 

@@ -24,9 +24,9 @@ typedef enum {
 } relaxngKind;
 
 static kindOption RelaxNGKinds [] = {
-	{ TRUE,  'e', "element",     "elements"       },
-	{ TRUE,  'a', "attribute",   "attributes"     },
-	{ TRUE,  'n', "namedPattern", "named patterns" },
+	{ true,  'e', "element",     "elements"       },
+	{ true,  'a', "attribute",   "attributes"     },
+	{ true,  'n', "namedPattern", "named patterns" },
 };
 
 enum relaxngXpathTable {
@@ -210,8 +210,8 @@ findRelaxNGTags (void)
 }
 
 static void
-makeTagWithScope (xmlNode *node __unused__,
-		  const struct sTagXpathMakeTagSpec *spec __unused__,
+makeTagWithScope (xmlNode *node CTAGS_ATTR_UNUSED,
+		  const struct sTagXpathMakeTagSpec *spec CTAGS_ATTR_UNUSED,
 		  struct sTagEntryInfo *tag,
 		  void *userData)
 {
@@ -233,9 +233,7 @@ RelaxNGParser (void)
 	def->parser        = findRelaxNGTags;
 	def->tagXpathTableTable = relaxngXpathTableTable;
 	def->tagXpathTableCount = ARRAY_SIZE (relaxngXpathTableTable);
-	def->useCork = TRUE;
+	def->useCork = true;
 	/* def->selectLanguage = selectors; */
 	return def;
 }
-
-/* vi:set tabstop=4 shiftwidth=4: */

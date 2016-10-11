@@ -1,6 +1,4 @@
 /*
- *	 $Id: tex.c 666 2008-05-15 17:47:31Z dfishburn $
- *
  *	 Copyright (c) 2008, David Fishburn
  *	 Copyright (c) 2012, Jan Larres
  *
@@ -35,8 +33,11 @@
 /*
  *	 MACROS
  */
-#define isType(token,t)		(boolean) ((token)->type == (t))
-#define isKeyword(token,k)	(boolean) ((token)->keyword == (k))
+#define isType(token,t)		(bool) ((token)->type == (t))
+#define isKeyword(token,k)	(bool) ((token)->keyword == (k))
+#define isIdentChar(c) \
+	(isalpha (c) || isdigit (c) || (c) == '$' || \
+		(c) == '_' || (c) == '#' || (c) == '-' || (c) == '.' || (c) == ':')
 
 /*
  *	 DATA DECLARATIONS
@@ -47,8 +48,7 @@ typedef enum eException { ExceptionNone, ExceptionEOF } exception_t;
 /*
  * Used to specify type of keyword.
  */
-typedef enum eKeywordId {
-	KEYWORD_NONE = -1,
+enum eKeywordId {
 	KEYWORD_part,
 	KEYWORD_chapter,
 	KEYWORD_section,
@@ -58,7 +58,8 @@ typedef enum eKeywordId {
 	KEYWORD_subparagraph,
 	KEYWORD_label,
 	KEYWORD_include
-} keywordId;
+};
+typedef int keywordId; /* to allow KEYWORD_NONE */
 
 typedef enum eTokenType {
 	TOKEN_UNDEFINED,
@@ -90,7 +91,7 @@ typedef struct sTokenInfo {
  *	DATA DEFINITIONS
  */
 
-static langType Lang_js;
+static langType Lang_tex;
 
 static jmp_buf Exception;
 
@@ -114,15 +115,15 @@ typedef enum {
 } texKind;
 
 static kindOption TexKinds [] = {
-	{ TRUE,  'p', "part",			  "parts"			   },
-	{ TRUE,  'c', "chapter",		  "chapters"		   },
-	{ TRUE,  's', "section",		  "sections"		   },
-	{ TRUE,  'u', "subsection",		  "subsections"		   },
-	{ TRUE,  'b', "subsubsection",	  "subsubsections"	   },
-	{ TRUE,  'P', "paragraph",		  "paragraphs"		   },
-	{ TRUE,  'G', "subparagraph",	  "subparagraphs"	   },
-	{ TRUE,  'l', "label",			  "labels"			   },
-	{ TRUE,  'i', "include",	  	  "includes"		   }
+	{ true,  'p', "part",			  "parts"			   },
+	{ true,  'c', "chapter",		  "chapters"		   },
+	{ true,  's', "section",		  "sections"		   },
+	{ true,  'u', "subsection",		  "subsections"		   },
+	{ true,  'b', "subsubsection",	  "subsubsections"	   },
+	{ true,  'P', "paragraph",		  "paragraphs"		   },
+	{ true,  'G', "subparagraph",	  "subparagraphs"	   },
+	{ true,  'l', "label",			  "labels"			   },
+	{ true,  'i', "include",	  	  "includes"		   }
 };
 
 static const keywordTable TexKeywordTable [] = {
@@ -141,13 +142,6 @@ static const keywordTable TexKeywordTable [] = {
 /*
  *	 FUNCTION DEFINITIONS
  */
-
-static boolean isIdentChar (const int c)
-{
-	return (boolean)
-		(isalpha (c) || isdigit (c) || c == '$' ||
-		  c == '_' || c == '#' || c == '-' || c == '.' || c == ':');
-}
 
 static tokenInfo *newToken (void)
 {
@@ -287,7 +281,6 @@ static void parseIdentifier (vString *const string, const int firstChar)
 		c = getcFromInputFile ();
 	} while (isIdentChar (c));
 
-	vStringTerminate (string);
 	if (!isspace (c))
 		ungetcToInputFile (c);		/* unget non-identifier character */
 }
@@ -335,7 +328,7 @@ getNextChar:
 					  parseIdentifier (token->string, c);
 					  token->lineNumber = getInputLineNumber ();
 					  token->filePosition = getInputFilePosition ();
-					  token->keyword = analyzeToken (token->string, Lang_js);
+					  token->keyword = lookupKeyword (vStringValue (token->string), Lang_tex);
 					  if (isKeyword (token, KEYWORD_NONE))
 						  token->type = TOKEN_IDENTIFIER;
 					  else
@@ -376,11 +369,11 @@ static void copyToken (tokenInfo *const dest, tokenInfo *const src)
  *	 Scanning functions
  */
 
-static boolean parseTag (tokenInfo *const token, texKind kind)
+static bool parseTag (tokenInfo *const token, texKind kind)
 {
 	tokenInfo *const name = newToken ();
 	vString *	fullname;
-	boolean		useLongName = TRUE;
+	bool		useLongName = true;
 
 	fullname = vStringNew ();
 	vStringClear (fullname);
@@ -403,7 +396,7 @@ static boolean parseTag (tokenInfo *const token, texKind kind)
 
 	if (isType (token, TOKEN_OPEN_SQUARE))
 	{
-		useLongName = FALSE;
+		useLongName = false;
 
 		readToken (token);
 		while (! isType (token, TOKEN_CLOSE_SQUARE) )
@@ -416,7 +409,6 @@ static boolean parseTag (tokenInfo *const token, texKind kind)
 			}
 			readToken (token);
 		}
-		vStringTerminate (fullname);
 		vStringCopy (name->string, fullname);
 		makeTexTag (name, kind);
 	}
@@ -442,7 +434,6 @@ static boolean parseTag (tokenInfo *const token, texKind kind)
 		}
 		if (useLongName)
 		{
-			vStringTerminate (fullname);
 			if (vStringLength (fullname) > 0)
 			{
 				vStringCopy (name->string, fullname);
@@ -488,7 +479,7 @@ static boolean parseTag (tokenInfo *const token, texKind kind)
 
 	deleteToken (name);
 	vStringDelete (fullname);
-	return TRUE;
+	return true;
 }
 
 static void parseTexFile (tokenInfo *const token)
@@ -532,13 +523,13 @@ static void parseTexFile (tokenInfo *const token)
 					break;
 			}
 		}
-	} while (TRUE);
+	} while (true);
 }
 
 static void initialize (const langType language)
 {
 	Assert (ARRAY_SIZE (TexKinds) == TEXTAG_COUNT);
-	Lang_js = language;
+	Lang_tex = language;
 
 	lastPart    = vStringNew();
 	lastChapter = vStringNew();
@@ -547,8 +538,8 @@ static void initialize (const langType language)
 	lastSubSubS = vStringNew();
 }
 
-static void finalize (const langType language __unused__,
-		      boolean initialized)
+static void finalize (const langType language CTAGS_ATTR_UNUSED,
+		      bool initialized)
 {
 	if (initialized)
 	{
@@ -595,4 +586,3 @@ extern parserDefinition* TexParser (void)
 	def->keywordCount = ARRAY_SIZE (TexKeywordTable);
 	return def;
 }
-/* vi:set tabstop=4 shiftwidth=4 noexpandtab: */

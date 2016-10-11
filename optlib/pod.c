@@ -6,7 +6,7 @@
 #include "routines.h"
 
 
-static void initializePodParser (const langType language __unused__)
+static void initializePodParser (const langType language CTAGS_ATTR_UNUSED)
 {
 }
 
@@ -39,7 +39,7 @@ extern parserDefinition* PodParser (void)
 
 	parserDefinition* const def = parserNew ("pod");
 
-	def->enabled       = TRUE;
+	def->enabled       = true;
 	def->extensions    = extensions;
 	def->patterns      = patterns;
 	def->aliases       = aliases;
@@ -50,15 +50,3 @@ extern parserDefinition* PodParser (void)
 
 	return def;
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 4
- * End:
- *
- * vi: set shiftwidth=4 tabstop=4:
- * :indentSize=4:tabSize=4:
- */

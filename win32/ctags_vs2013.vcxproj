@@ -134,12 +134,15 @@
     <ClCompile Include="..\main\kind.c" />
     <ClCompile Include="..\main\lcpp.c" />
     <ClCompile Include="..\parsers\lisp.c" />
+    <ClCompile Include="..\parsers\iniconf.c" />
     <ClCompile Include="..\main\lregex.c" />
     <ClCompile Include="..\main\lxcmd.c" />
     <ClCompile Include="..\main\lxpath.c" />
     <ClCompile Include="..\parsers\lua.c" />
-    <ClCompile Include="..\optlib\m4.c" />
+    <ClCompile Include="..\parsers\autoconf.c" />
+    <ClCompile Include="..\parsers\m4.c" />
     <ClCompile Include="..\main\main.c" />
+    <ClCompile Include="..\parsers\automake.c" />
     <ClCompile Include="..\parsers\make.c" />
     <ClCompile Include="..\optlib\man.c" />
     <ClCompile Include="..\parsers\matlab.c" />
@@ -209,6 +212,12 @@
     <ClCompile Include="..\main\promise.c" />
     <ClCompile Include="..\main\dependency.c" />
     <ClCompile Include="..\optlib\pod.c" />
+    <ClCompile Include="..\parsers\protobuf.c" />
+    <ClCompile Include="..\parsers\systemdunit.c" />
+    <ClCompile Include="..\parsers\yumrepo.c" />
+    <ClCompile Include="..\parsers\pythonloggingconfig.c" />
+    <ClCompile Include="..\main\ptrarray.c" />
+    <ClCompile Include="..\main\objpool.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\fnmatch\fnmatch.h" />
@@ -223,7 +232,6 @@
     <ClInclude Include="..\main\fmt.h" />
     <ClInclude Include="..\main\general.h" />
     <ClInclude Include="..\main\gcc-attr.h" />
-    <ClInclude Include="..\main\mybool.h" />
     <ClInclude Include="..\gnu_regex\regex.h" />
     <ClInclude Include="..\main\htable.h" />
     <ClInclude Include="..\main\keyword.h" />
@@ -255,6 +263,12 @@
     <ClInclude Include="..\parsers\cxx\cxx_token_chain.h" />
     <ClInclude Include="..\main\promise.h" />
     <ClInclude Include="..\main\dependency.h" />
+    <ClInclude Include="..\main\gcc-attr.h" />
+    <ClInclude Include="..\parsers\meta-make.h" />
+    <ClInclude Include="..\parsers\meta-iniconf.h" />
+    <ClInclude Include="..\parsers\meta-m4.h" />
+    <ClInclude Include="..\main\ptrarray.h" />
+    <ClInclude Include="..\main\objpool.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

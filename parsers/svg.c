@@ -23,7 +23,7 @@ typedef enum {
 } svgKind;
 
 static kindOption SvgKinds [] = {
-	{ TRUE,  'i', "id", "id attributes" },
+	{ true,  'i', "id", "id attributes" },
 };
 
 static tagXpathTable svgXpathMainTable [] = {
@@ -64,5 +64,3 @@ SvgParser (void)
 	def->tagXpathTableCount = ARRAY_SIZE (svgXpathTableTable);
 	return def;
 }
-
-/* vi:set tabstop=4 shiftwidth=4: */

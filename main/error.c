@@ -25,9 +25,9 @@ extern void setErrorPrinter (errorPrintFunc printer, void *data)
 	errorPrinterData = data;
 }
 
-extern boolean stderrDefaultErrorPrinter (const errorSelection selection,
+extern bool stderrDefaultErrorPrinter (const errorSelection selection,
 					  const char *const format,
-					  va_list ap, void *data __unused__)
+					  va_list ap, void *data CTAGS_ATTR_UNUSED)
 {
 	fprintf (stderr, "%s: %s", getExecutableName (),
 		 selected (selection, WARNING) ? "Warning: " : "");
@@ -40,14 +40,14 @@ extern boolean stderrDefaultErrorPrinter (const errorSelection selection,
 #endif
 	fputs ("\n", stderr);
 
-	return (selected (selection, FATAL) || Option.fatalWarnings)? TRUE: FALSE;
+	return (selected (selection, FATAL) || Option.fatalWarnings)? true: false;
 }
 
 extern void error (const errorSelection selection,
 		   const char *const format, ...)
 {
 	va_list ap;
-	boolean shouldExit;
+	bool shouldExit;
 
 	va_start (ap, format);
 	shouldExit = (* errorPrinter) (selection, format, ap, errorPrinterData);

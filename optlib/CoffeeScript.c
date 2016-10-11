@@ -29,7 +29,7 @@ extern parserDefinition* CoffeeScriptParser (void)
 
 	parserDefinition* const def = parserNew ("CoffeeScript");
 
-	def->enabled       = TRUE;
+	def->enabled       = true;
 	def->extensions    = extensions;
 	def->patterns      = patterns;
 	def->aliases       = aliases;
@@ -38,15 +38,3 @@ extern parserDefinition* CoffeeScriptParser (void)
 
 	return def;
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 4
- * End:
- *
- * vi: set shiftwidth=4 tabstop=4:
- * :indentSize=4:tabSize=4:
- */

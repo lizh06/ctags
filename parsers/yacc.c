@@ -20,7 +20,7 @@
 #include "promise.h"
 
 
-static boolean not_in_grammar_rules = TRUE;
+static bool not_in_grammar_rules = true;
 static tagRegexTable yaccTagRegexTable [] = {
 	{"^([A-Za-z][A-Za-z_0-9]+)[ \t]*:", "\\1",
 	 "l,label,labels", NULL, &not_in_grammar_rules },
@@ -33,10 +33,10 @@ struct cStart {
 	unsigned long source;
 };
 
-static  void change_section (const char *line __unused__,
-			     const regexMatch *matches __unused__,
-			     unsigned int count __unused__,
-			     void *data __unused__)
+static  void change_section (const char *line CTAGS_ATTR_UNUSED,
+			     const regexMatch *matches CTAGS_ATTR_UNUSED,
+			     unsigned int count CTAGS_ATTR_UNUSED,
+			     void *data CTAGS_ATTR_UNUSED)
 {
 	not_in_grammar_rules = !not_in_grammar_rules;
 
@@ -60,9 +60,9 @@ static  void change_section (const char *line __unused__,
 	}
 }
 
-static void enter_c_prologue (const char *line __unused__,
-			      const regexMatch *matches __unused__,
-			      unsigned int count __unused__,
+static void enter_c_prologue (const char *line CTAGS_ATTR_UNUSED,
+			      const regexMatch *matches CTAGS_ATTR_UNUSED,
+			      unsigned int count CTAGS_ATTR_UNUSED,
 			      void *data)
 {
 	struct cStart *cstart = data;
@@ -73,9 +73,9 @@ static void enter_c_prologue (const char *line __unused__,
 	cstart->source = getSourceLineNumber ();
 }
 
-static void leave_c_prologue (const char *line __unused__,
-			      const regexMatch *matches __unused__,
-			      unsigned int count __unused__,
+static void leave_c_prologue (const char *line CTAGS_ATTR_UNUSED,
+			      const regexMatch *matches CTAGS_ATTR_UNUSED,
+			      unsigned int count CTAGS_ATTR_UNUSED,
 			      void *data)
 {
 	struct cStart *cstart = data;
@@ -86,9 +86,9 @@ static void leave_c_prologue (const char *line __unused__,
 	memset (cstart, 0, sizeof (*cstart));
 }
 
-static void enter_union (const char *line __unused__,
+static void enter_union (const char *line CTAGS_ATTR_UNUSED,
 			 const regexMatch *matches,
-			 unsigned int count __unused__,
+			 unsigned int count CTAGS_ATTR_UNUSED,
 			 void *data)
 {
 	struct cStart *cstart = data;
@@ -100,9 +100,9 @@ static void enter_union (const char *line __unused__,
 	}
 }
 
-static void leave_union (const char *line __unused__,
+static void leave_union (const char *line CTAGS_ATTR_UNUSED,
 			 const regexMatch *matches,
-			 unsigned int count __unused__,
+			 unsigned int count CTAGS_ATTR_UNUSED,
 			 void *data)
 {
 	struct cStart *cstart = data;
@@ -141,7 +141,7 @@ static void initializeYaccParser (langType language)
 	addCallbackRegex (language, "^%\\{", "{exclusive}", enter_c_prologue, NULL, &cStart);
 	addCallbackRegex (language, "^%\\}", "{exclusive}", leave_c_prologue, NULL, &cStart);
 
-	not_in_grammar_rules = TRUE;
+	not_in_grammar_rules = true;
 	addCallbackRegex (language, "^%%", "{exclusive}", change_section, NULL, NULL);
 
 	addCallbackRegex (language, "^%union", "{exclusive}", enter_union, NULL, &cStart);
@@ -159,5 +159,3 @@ extern parserDefinition* YaccParser (void)
 	def->tagRegexCount = ARRAY_SIZE (yaccTagRegexTable);
 	return def;
 }
-
-/* vi:set tabstop=4 shiftwidth=4: */

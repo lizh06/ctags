@@ -14,18 +14,41 @@ feature
 	four: DOUBLE
 			-- Header comment
 
-	five, six: INTEGER is unique
+	five, six: INTEGER = unique
 			-- Header comment
 
-	seven: INTEGER is 1
+	seven: INTEGER = 1
 			-- Header comment
 
-	eight: DOUBLE is 2.0
+	eight: DOUBLE = 2.0
 			-- Header comment
 
-	nine: STRING is "abc"
+	nine: STRING = "abc"
 			-- Header comment
 
 	anchored: like one
+			-- Header comment
+
+	attribute_short: STRING
+			-- Header comment
+		attribute
+		end
+
+	attribute_full: STRING
+			-- Header comment
+		note
+		obsolete
+			"Obsolete message"
+		require
+		local
+		attribute
+			-- Implementation
+		ensure
+		rescue
+		end
+
+	final_feature
+		do
+		end
 
 end

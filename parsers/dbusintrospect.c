@@ -27,10 +27,10 @@ typedef enum {
 } dbusIntrospectKind;
 
 static kindOption DbusIntrospectKinds [] = {
-	{ TRUE,  'i', "interface", "interfaces" },
-	{ TRUE,  'm', "method",    "methods"    },
-	{ TRUE,  's', "signal",    "signals"    },
-	{ TRUE,  'p', "property",  "properties" },
+	{ true,  'i', "interface", "interfaces" },
+	{ true,  'm', "method",    "methods"    },
+	{ true,  's', "signal",    "signals"    },
+	{ true,  'p', "property",  "properties" },
 };
 
 static void dbusIntrospectFindTagsUnderInterface (xmlNode *node,
@@ -91,9 +91,9 @@ static tagXpathTableTable dbusIntrospectXpathTableTable[] = {
 };
 
 static void dbusIntrospectFindTagsUnderInterface (xmlNode *node,
-						  const struct sTagXpathRecurSpec *spec __unused__,
+						  const struct sTagXpathRecurSpec *spec CTAGS_ATTR_UNUSED,
 						  xmlXPathContext *ctx,
-						  void *userData __unused__)
+						  void *userData CTAGS_ATTR_UNUSED)
 {
 	int corkIndex = CORK_NIL;
 
@@ -107,8 +107,8 @@ static void dbusIntrospectFindTagsUnderInterface (xmlNode *node,
 		     &corkIndex);
 }
 
-static void makeTagWithScope (xmlNode *node __unused__,
-			      const struct sTagXpathMakeTagSpec *spec __unused__,
+static void makeTagWithScope (xmlNode *node CTAGS_ATTR_UNUSED,
+			      const struct sTagXpathMakeTagSpec *spec CTAGS_ATTR_UNUSED,
 			      struct sTagEntryInfo *tag,
 			      void *userData)
 {
@@ -119,8 +119,8 @@ static void makeTagWithScope (xmlNode *node __unused__,
 	makeTagEntry (tag);
 }
 
-static void makeTagForInterfaceName (xmlNode *node __unused__,
-				     const struct sTagXpathMakeTagSpec *spec __unused__,
+static void makeTagForInterfaceName (xmlNode *node CTAGS_ATTR_UNUSED,
+				     const struct sTagXpathMakeTagSpec *spec CTAGS_ATTR_UNUSED,
 				     struct sTagEntryInfo *tag,
 				     void *userData)
 {
@@ -151,9 +151,7 @@ DbusIntrospectParser (void)
 	def->parser        = findDbusIntrospectTags;
 	def->tagXpathTableTable = dbusIntrospectXpathTableTable;
 	def->tagXpathTableCount = ARRAY_SIZE (dbusIntrospectXpathTableTable);
-	def->useCork = TRUE;
+	def->useCork = true;
 	def->selectLanguage = selectors;
 	return def;
 }
-
-/* vi:set tabstop=4 shiftwidth=4: */

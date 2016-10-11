@@ -27,9 +27,9 @@ typedef enum {
 } tclKind;
 
 static kindOption TclKinds [] = {
-	{ TRUE, 'c', "class",     "classes" },
-	{ TRUE, 'm', "method",    "methods" },
-	{ TRUE, 'p', "procedure", "procedures" }
+	{ true, 'c', "class",     "classes" },
+	{ true, 'm', "method",    "methods" },
+	{ true, 'p', "procedure", "procedures" }
 };
 
 /*
@@ -47,14 +47,13 @@ static const unsigned char *makeTclTag (
 		vStringPut (name, (int) *cp);
 		++cp;
 	}
-	vStringTerminate (name);
 	makeSimpleTag (name, TclKinds, kind);
 	return cp;
 }
 
-static boolean match (const unsigned char *line, const char *word)
+static bool match (const unsigned char *line, const char *word)
 {
-	return (boolean) (strncmp ((const char*) line, word, strlen (word)) == 0);
+	return (bool) (strncmp ((const char*) line, word, strlen (word)) == 0);
 }
 
 static void findTclTags (void)
@@ -111,5 +110,3 @@ extern parserDefinition* TclParser (void)
 	def->parser     = findTclTags;
 	return def;
 }
-
-/* vi:set tabstop=4 shiftwidth=4: */

@@ -57,15 +57,15 @@ typedef enum {
 } antAntfileRole;
 
 static roleDesc AntAntfileRoles [] = {
-        { TRUE, "imported", "imported" },
+        { true, "imported", "imported" },
 };
 
 static kindOption AntKinds [] = {
-	{ TRUE,  'p', "project",  "projects"   },
-	{ TRUE,  't', "target",   "targets"    },
-	{ TRUE,  'P', "property", "properties(global)" },
-	{ TRUE,  'i', "antfile",  "antfiles",
-	  .referenceOnly = TRUE, ATTACH_ROLES(AntAntfileRoles)},
+	{ true,  'p', "project",  "projects"   },
+	{ true,  't', "target",   "targets"    },
+	{ true,  'P', "property", "properties(global)" },
+	{ true,  'i', "antfile",  "antfiles",
+	  .referenceOnly = true, ATTACH_ROLES(AntAntfileRoles)},
 };
 
 enum antXpathTable {
@@ -137,9 +137,9 @@ static const tagRegexTable antTagRegexTable [] = {
 
 static void
 antFindTagsUnderProject (xmlNode *node,
-			 const struct sTagXpathRecurSpec *spec __unused__,
+			 const struct sTagXpathRecurSpec *spec CTAGS_ATTR_UNUSED,
 			 xmlXPathContext *ctx,
-			 void *userData __unused__)
+			 void *userData CTAGS_ATTR_UNUSED)
 {
 	int corkIndex = CORK_NIL;
 
@@ -166,8 +166,8 @@ static void antFindTagsUnderTask (xmlNode *node,
 		     &corkIndex);
 }
 
-static void makeTagForProjectName (xmlNode *node __unused__,
-				   const struct sTagXpathMakeTagSpec *spec __unused__,
+static void makeTagForProjectName (xmlNode *node CTAGS_ATTR_UNUSED,
+				   const struct sTagXpathMakeTagSpec *spec CTAGS_ATTR_UNUSED,
 				   struct sTagEntryInfo *tag,
 				   void *userData)
 {
@@ -176,8 +176,8 @@ static void makeTagForProjectName (xmlNode *node __unused__,
 	*corkIndex = makeTagEntry (tag);
 }
 
-static void makeTagForTargetName (xmlNode *node __unused__,
-				  const struct sTagXpathMakeTagSpec *spec __unused__,
+static void makeTagForTargetName (xmlNode *node CTAGS_ATTR_UNUSED,
+				  const struct sTagXpathMakeTagSpec *spec CTAGS_ATTR_UNUSED,
 				  struct sTagEntryInfo *tag,
 				  void *userData)
 {
@@ -191,8 +191,8 @@ static void makeTagForTargetName (xmlNode *node __unused__,
 	*corkIndex = makeTagEntry (tag);
 }
 
-static void makeTagWithScope (xmlNode *node __unused__,
-			      const struct sTagXpathMakeTagSpec *spec __unused__,
+static void makeTagWithScope (xmlNode *node CTAGS_ATTR_UNUSED,
+			      const struct sTagXpathMakeTagSpec *spec CTAGS_ATTR_UNUSED,
 			      struct sTagEntryInfo *tag,
 			      void *userData)
 {
@@ -234,7 +234,7 @@ extern parserDefinition* AntParser (void)
 	def->parser = findAntTags;
 	def->tagXpathTableTable = antXpathTableTable;
 	def->tagXpathTableCount = ARRAY_SIZE (antXpathTableTable);
-	def->useCork = TRUE;
+	def->useCork = true;
 	def->selectLanguage = selectors;
 #else
 	def->tagRegexTable = antTagRegexTable;
@@ -243,5 +243,3 @@ extern parserDefinition* AntParser (void)
 #endif
 	return def;
 }
-
-/* vi:set tabstop=4 shiftwidth=4: */

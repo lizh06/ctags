@@ -25,11 +25,21 @@
 #define XML_PARSER_LIST
 #endif
 
+#ifdef HAVE_LIBYAML
+#define YAML_PARSER_LIST						\
+	YamlParser,									\
+	AnsiblePlaybookParser
+#else
+#define YAML_PARSER_LIST
+#endif
+
+
 /* Add the name of any new parser definition function here */
 #define PARSER_LIST \
 	AntParser, \
 	AsmParser, \
 	AspParser, \
+	AutoconfParser, \
 	AutomakeParser, \
 	AwkParser, \
 	BasicParser, \
@@ -48,6 +58,7 @@
 	GdbinitParser, \
 	GoParser, \
 	HtmlParser, \
+        IniconfParser, \
 	JavaParser, \
 	JavaPropertiesParser, \
 	JavaScriptParser, \
@@ -67,7 +78,9 @@
 	Perl6Parser, \
 	PhpParser, \
 	PodParser, \
+	ProtobufParser, \
 	PythonParser, \
+	PythonLoggingConfigParser, \
 	RParser, \
 	RexxParser, \
 	RpmSpecParser, \
@@ -78,6 +91,7 @@
 	ShParser, \
 	SmlParser, \
 	SqlParser, \
+	SystemdUnitParser, \
 	TclParser, \
 	TexParser, \
 	TTCNParser, \
@@ -88,8 +102,7 @@
 	VimParser, \
 	WindResParser, \
 	YaccParser, \
+	YumRepoParser, \
 	ZephirParser
 
 #endif  /* CTAGS_MAIN_PARSERS_H */
-
-/* vi:set tabstop=4 shiftwidth=4: */

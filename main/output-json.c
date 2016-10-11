@@ -24,6 +24,22 @@
 #endif
 
 
+static int writeJsonEntry  (MIO * mio, const tagEntryInfo *const tag, void *data CTAGS_ATTR_UNUSED);
+
+static int writeJsonPtagEntry (MIO * mio, const ptagDesc *desc,
+				const char *const fileName,
+				const char *const pattern,
+				const char *const parserName, void *data CTAGS_ATTR_UNUSED);
+
+tagWriter jsonWriter = {
+	.writeEntry = writeJsonEntry,
+	.writePtagEntry = writeJsonPtagEntry,
+	.preWriteEntry = NULL,
+	.postWriteEntry = NULL,
+	.useStdoutByDefault = true,
+};
+
+
 static json_t* escapeFieldValue (const tagEntryInfo * tag, fieldType ftype)
 {
 	const char *str = renderFieldEscaped (ftype, tag, NO_PARSER_FIELD);
@@ -80,22 +96,22 @@ static void addExtensionFields (json_t *response, const tagEntryInfo *const tag)
 	   That cannot be changed to keep the compatibility of tags file format.
 	   Use FIELD_KIND_KEY instead */
 	if (isFieldEnabled (FIELD_KIND) || isFieldEnabled (FIELD_KIND_LONG))
-		enableField (FIELD_KIND_KEY, TRUE, FALSE);
+		enableField (FIELD_KIND_KEY, true, false);
 
 	/* FIELD_SCOPE has no name; getFieldName (FIELD_KIND_KEY) returns NULL.
 	   That cannot be changed to keep the compatibility of tags file format.
 	   Use FIELD_SCOPE_KEY and FIELD_SCOPE_KIND_LONG instead. */
 	if (isFieldEnabled (FIELD_SCOPE))
 	{
-		enableField (FIELD_SCOPE_KEY, TRUE, FALSE);
-		enableField (FIELD_SCOPE_KIND_LONG, TRUE, FALSE);
+		enableField (FIELD_SCOPE_KEY, true, false);
+		enableField (FIELD_SCOPE_KIND_LONG, true, false);
 	}
 
 	for (k = FIELD_EXTENSION_START; k <= FIELD_BUILTIN_LAST; k++)
 		renderExtensionFieldMaybe (k, tag, response);
 }
 
-extern int writeJsonEntry (MIO * mio, const tagEntryInfo *const tag, void *data __unused__)
+static int writeJsonEntry (MIO * mio, const tagEntryInfo *const tag, void *data CTAGS_ATTR_UNUSED)
 {
 	json_t *response = json_pack ("{ss ss ss ss}",
 		"_type", "tag",
@@ -120,10 +136,10 @@ extern int writeJsonEntry (MIO * mio, const tagEntryInfo *const tag, void *data 
 	return length;
 }
 
-extern int writeJsonPtagEntry (MIO * mio, const ptagDesc *desc,
+static int writeJsonPtagEntry (MIO * mio, const ptagDesc *desc,
 			       const char *const fileName,
 			       const char *const pattern,
-			       const char *const parserName, void *data __unused__)
+			       const char *const parserName, void *data CTAGS_ATTR_UNUSED)
 {
 #define OPT(X) ((X)?(X):"")
 	json_t *response;
@@ -155,7 +171,7 @@ extern int writeJsonPtagEntry (MIO * mio, const ptagDesc *desc,
 #undef OPT
 }
 
-extern boolean ptagMakeJsonOutputVersion (ptagDesc *desc, void *data __unused__)
+extern bool ptagMakeJsonOutputVersion (ptagDesc *desc, void *data CTAGS_ATTR_UNUSED)
 {
 	return writePseudoTag (desc,
 			       "0.0",
@@ -164,21 +180,10 @@ extern boolean ptagMakeJsonOutputVersion (ptagDesc *desc, void *data __unused__)
 }
 
 #else /* HAVE_JANSSON */
-extern int writeJsonEntry (MIO * mio, const tagEntryInfo *const tag, void *data __unused__)
-{
-	return 0;
-}
-extern int writeJsonPtagEntry (MIO * mio, const ptagDesc *desc,
-			       const char *const fileName,
-			       const char *const pattern,
-			       const char *const parserName, void *data __unused__)
-{
-	return 0;
-}
 
-extern boolean ptagMakeJsonOutputVersion (ptagDesc *desc, void *data __unused__)
+extern bool ptagMakeJsonOutputVersion (ptagDesc *desc, void *data CTAGS_ATTR_UNUSED)
 {
-	return FALSE;
+	return false;
 }
 
 #endif

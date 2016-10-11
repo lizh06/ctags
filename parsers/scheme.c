@@ -28,8 +28,8 @@ typedef enum {
 } schemeKind;
 
 static kindOption SchemeKinds [] = {
-	{ TRUE, 'f', "function", "functions" },
-	{ TRUE, 's', "set",      "sets" }
+	{ true, 'f', "function", "functions" },
+	{ true, 's', "set",      "sets" }
 };
 
 /*
@@ -50,7 +50,6 @@ static void readIdentifier (vString *const name, const unsigned char *cp)
 	/* Go till you get to white space or a syntactic break */
 	for (p = cp; *p != '\0' && *p != '(' && *p != ')' && !isspace (*p); p++)
 		vStringPut (name, (int) *p);
-	vStringTerminate (name);
 }
 
 static void findSchemeTags (void)
@@ -125,5 +124,3 @@ extern parserDefinition* SchemeParser (void)
 	def->parser     = findSchemeTags;
 	return def;
 }
-
-/* vi:set tabstop=4 shiftwidth=4: */
