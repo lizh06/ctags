@@ -18,7 +18,7 @@
 
 #include "parse.h"
 #include "vstring.h"
-#include "lcpp.h"
+#include "../meta-cpreprocessor.h"
 #include "debug.h"
 #include "keyword.h"
 #include "read.h"
@@ -248,12 +248,12 @@ bool cxxParserHandleLambda(CXXToken * pParenthesis)
 
 	CXXToken * t = cxxTokenCreate();
 	t->eType = CXXTokenTypeOpeningBracket;
-	vStringCatS(t->pszWord,"{");
+	vStringPut (t->pszWord, '{');
 	cxxTokenChainAppend(pNew,t);
 
 	t = cxxTokenCreate();
 	t->eType = CXXTokenTypeClosingBracket;
-	vStringCatS(t->pszWord,"}");
+	vStringPut (t->pszWord, '}');
 	cxxTokenChainAppend(pNew,t);
 
 	CXX_DEBUG_LEAVE();

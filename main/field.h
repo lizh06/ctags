@@ -13,6 +13,7 @@
 #define CTAGS_MAIN_FIELD_H
 
 #include "general.h"
+#include "writer.h"
 #include "types.h"
 
 #include "vstring.h"
@@ -54,7 +55,8 @@ typedef enum eFieldType { /* extension field content control */
 
 typedef const char* (* renderEscaped) (const tagEntryInfo *const tag,
 				       const char *value,
-				       vString * buffer);
+				       vString * buffer,
+					   bool *rejected);
 typedef bool (* isValueAvailable) (const struct sTagEntryInfo *const tag);
 
 #define FIELD_LETTER_NO_USE '\0'
@@ -66,7 +68,7 @@ typedef struct sFieldSpec {
 	const char* name;
 	const char* description;
 	bool enabled;
-	renderEscaped renderEscaped;
+	renderEscaped renderEscaped [WRITER_COUNT];
 	isValueAvailable isValueAvailable;
 
 	unsigned int ftype;	/* Given from the main part */
@@ -98,7 +100,8 @@ extern void printFields (int language);
 extern bool isFieldRenderable (fieldType type);
 
 extern bool doesFieldHaveValue (fieldType type, const tagEntryInfo *tag);
-extern const char* renderFieldEscaped (fieldType type, const tagEntryInfo *tag, int index);
+extern const char* renderFieldEscaped (writerType writer, fieldType type, const tagEntryInfo *tag, int index,
+									   bool *rejected);
 
 extern void initFieldDescs (void);
 extern int countFields (void);

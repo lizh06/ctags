@@ -488,6 +488,108 @@ used to enable it.
 See :ref:`JSON output <output-json>` for more details.
 
 
+Defining a macro in CPreProcessor input
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Newly introduced ``-D`` option extends the function provided by
+``-I`` option.
+
+``-D`` emulates the behaviour of the corresponding gcc option:
+it defines a C preprocessor macro. All types of macros are supported,
+including the ones with parameters and variable arguments.
+Stringification, token pasting and recursive macro expansion are also supported.
+
+``-I`` is now simply a backward-compatible syntax to define a
+macro with no replacement.
+
+Some examples follow.
+
+.. code-block:: console
+
+	$ ctags ... -D IGNORE_THIS ...
+
+With this commandline the following C/C++ input
+
+.. code-block:: C
+
+	int IGNORE_THIS a;
+
+will be processed as if it was
+
+.. code-block:: C
+
+	int a;
+
+Defining a macro with parameters uses the following syntax:
+
+.. code-block:: console
+
+	$ ctags ... -D "foreach(arg)=for(arg;;)" ...
+
+This example defines `for(arg;;)` as the replacement `foreach(arg)`.
+So the following C/C++ input
+
+.. code-block:: C
+
+	foreach(char * p,pointers)
+	{
+
+	}
+
+is processed in new C/C++ parser as:
+
+.. code-block:: C
+
+	for(char * p;;)
+	{
+
+	}
+
+and the p local variable can be extracted.
+
+The previous commandline includes quotes since the macros generally contain
+characters that are treated specially by the shells. You may need some escaping.
+
+Token pasting is performed by the ## operator, just like in the normal
+C preprocessor.
+
+.. code-block:: console
+
+	$ ctags ... -D "DECLARE_FUNCTION(prefix)=int prefix ## Call();"
+
+So the following code
+
+.. code-block:: C
+
+	DECLARE_FUNCTION(a)
+	DECLARE_FUNCTION(b)
+
+will be processed as
+
+.. code-block:: C
+
+	int aCall();
+	int bCall();
+
+Macros with variable arguments use the gcc __VA_ARGS__ syntax.
+
+.. code-block:: console
+
+	$ ctags ... -D "DECLARE_FUNCTION(name,...)=int name(__VA_ARGS__);"
+
+So the following code
+
+.. code-block:: C
+
+	DECLARE_FUNCTION(x,int a,int b)
+
+will be processed as
+
+.. code-block:: C
+
+	int x(int a,int b);
+
+
 Changes to the tags file format
 ---------------------------------------------------------------------
 
@@ -771,6 +873,14 @@ The third line means `\\` is used when for combining a namespace item
 Of course, ctags uses the more specific line when choosing a
 separator; the third line has higher priority than the first.
 
+``TAG_OUTPUT_MODE``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. NOT REVIEWED YET
+
+This pseudo tag represents output mode: u-ctags or e-ctags.
+
+See also :ref:`Compatible output and weakness <compat-output>`.
 
 Parser own fields
 ---------------------------------------------------------------------
@@ -864,6 +974,43 @@ With respect to the tags file format, nothing is changed when
 introducing parser own fields; `<fieldname>`:`<value>` is used as
 before and the name of field owner is never prefixed. The `language:`
 field of the tag identifies the owner.
+
+Parser own parameter
+---------------------------------------------------------------------
+
+.. NOT REVIEWED YET
+
+To control the detail of a parser, ``--param-<LANG>`` option.
+``--kinds-<LANG>``, ``--fields-<LANG>``, ``--extra-<LANG>`` (not implemented yet)
+can be used for customizing the behavior of a parser specified with ``<LANG>``.
+
+``--param-<LANG>`` should be used other aspects of the parser other
+than the options(kinds, fields, etras).
+
+A parser defines a set of parameters. Each parameter has name and
+takes an argument. A user can set a parameter with following notation
+::
+
+   --param-<LANG>:name=arg
+
+An example of specifying a parameter
+::
+
+   --param-CPreProcessor:if0=true
+
+Here `if0` is a name of parameter of CPreProcessor parser and
+`true` is the value of it.
+
+All available parameters can be listed with ``--list-params`` option.
+
+.. code-block:: console
+
+    $ ./ctags --list-params
+    #PARSER         NAME     DESCRIPTION
+    CPreProcessor   if0      examine code within "#if 0" branch (true or [false])
+    CPreProcessor   ignore   a token to be specially handled
+
+(At this time only CPreProcessor parser has parameters.)
 
 
 .. _xformat:
@@ -990,6 +1137,22 @@ the elements of the format.
 
 
 .. TODO: An example of using WILDCARD
+
+
+Incompatible changes in command line
+---------------------------------------------------------------------
+
+.. NOT REVIEWED YET
+
+``-D`` option
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For ctags buinary that debugging output is enabled in build config
+stage, ``-D`` was used for specifying the level of debugging
+output. It is changed to ``-d``. This change is not critical because
+``-D`` option was not described in ctags.1 man page.
+
+Instead ``-D`` is used for defining a macro in CPreProcessor parser.
 
 
 Readtags
