@@ -59,7 +59,8 @@ static int printTagField (fmtSpec* fspec, MIO* fp, const tagEntryInfo * tag)
 	ftype = fspec->field.ftype;
 
 	if (isCommonField (ftype))
-		str = renderFieldEscaped (ftype, tag, NO_PARSER_FIELD);
+		/* TODO: Don't use WRITER_XREF directly */
+		str = renderFieldEscaped (WRITER_XREF, ftype, tag, NO_PARSER_FIELD, NULL);
 	else
 	{
 		unsigned int findex;
@@ -73,8 +74,9 @@ static int printTagField (fmtSpec* fspec, MIO* fp, const tagEntryInfo * tag)
 		if (findex == tag->usedParserFields)
 			str = "";
 		else if (isFieldEnabled (tag->parserFields [findex].ftype))
-			str = renderFieldEscaped (tag->parserFields [findex].ftype,
-						  tag, findex);
+			/* TODO: Don't use WRITER_XREF directly */
+			str = renderFieldEscaped (WRITER_XREF, tag->parserFields [findex].ftype,
+						  tag, findex, NULL);
 	}
 
 	if (str == NULL)
