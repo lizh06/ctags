@@ -30,12 +30,12 @@
 #include "main.h"
 #define OPTION_WRITE
 #include "options.h"
-#include "output.h"
 #include "parse.h"
 #include "ptag.h"
 #include "routines.h"
 #include "xtag.h"
 #include "routines.h"
+#include "writer.h"
 
 /*
 *   MACROS
@@ -69,7 +69,7 @@
 # define RECURSE_SUPPORTED
 #endif
 
-#define isCompoundOption(c)  (bool) (strchr ("fohiILpDb", (c)) != NULL)
+#define isCompoundOption(c)  (bool) (strchr ("fohiILpdDb", (c)) != NULL)
 
 #define SUBDIR_OPTLIB "optlib"
 #define SUBDIR_PRELOAD "preload"
@@ -133,7 +133,6 @@ static const char *const HeaderExtensions [] = {
 };
 
 optionValues Option = {
-	NULL,       /* -I */
 	false,      /* -a */
 	false,      /* -B */
 	false,      /* -e */
@@ -157,7 +156,6 @@ optionValues Option = {
 	NULL,		/* --input-encoding */
 	NULL,		/* --output-encoding */
 #endif
-	false,      /* --if0 */
 	LANG_AUTO,  /* --lang */
 	true,       /* --links */
 	false,      /* --filter */
@@ -176,7 +174,7 @@ optionValues Option = {
 	.machinable = false,
 	.withListHeader = true,
 #ifdef DEBUG
-	0, 0        /* -D, -b */
+	0, 0        /* -d, -b */
 #endif
 };
 
@@ -195,9 +193,11 @@ static optionDescription LongOptionDescription [] = {
 #endif
  {0,"  -B   Use backward searching patterns (?...?)."},
 #ifdef DEBUG
- {1,"  -D <level>"},
+ {1,"  -d <level>"},
  {1,"       Set debug level."},
 #endif
+ {1,"  -D <macro>=<definition>"},
+ {1,"       (CPreProcessor) Give definition for macro."},
  {0,"  -e   Output tag file for use with Emacs."},
  {1,"  -f <name>"},
  {1,"       Write tags to specified file. Value of \"-\" writes tags to stdout"},
@@ -324,6 +324,8 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Output list of supported languages."},
  {1,"  --list-maps=[language|all]"},
  {1,"       Output list of language mappings(both extensions and patterns)."},
+ {1,"  --list-params=[language|all]"},
+ {1,"       Output list of language parameters. This works with --machinable."},
  {1,"  --list-patterns=[language|all]"},
  {1,"       Output list of language patterns in mapping."},
  {0,"  --list-pseudo-tags"},
@@ -332,7 +334,7 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Output list of flags which can be used in a regex parser definition."},
  {1,"  --machinable=[yes|no]"},
  {1,"       Use tab separated representation in --list- option output. [no]"},
- {1,"       --list-extra, --list-fields, and --list-kinds-full support this option."},
+ {1,"       --list-extra, --list-fields, --list-kinds-full, and --list-params support this option."},
  {1,"       Suitable for scripting. Specify before --list-* option."},
  {1,"  --map-<LANG>=[+|-]pattern|extension"},
  {1,"       Set or add(+) a map for <LANG>."},
@@ -352,12 +354,14 @@ static optionDescription LongOptionDescription [] = {
  {1,"      The encoding to write the tag file in. Defaults to UTF-8 if --input-encoding"},
  {1,"      is specified, otherwise no conversion is performed."},
 #endif
- {0,"  --output-format=ctags|etags|xref"
+ {0,"  --output-format=u-ctags|e-ctags|etags|xref"
 #ifdef HAVE_JANSSON
   "|json"
 #endif
  },
- {0,"      Specify the output format. [ctags]"},
+ {0,"      Specify the output format. [u-ctags]"},
+ {1,"  --param-<LANG>=name:argument"},
+ {1,"       Set <LANG> specific parameter. Available parameters can be listed with --list-params."},
  {0,"  --pattern-length-limit=N"},
  {0,"      Cutoff patterns of tag entries after N characters. Disable by setting to 0. [96]"},
  {0,"  --print-language"},
@@ -392,9 +396,8 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Print version identifier to standard output."},
  {1,"  --with-list-header=[yes|no]"},
  {1,"       Preprend the column descriptions in --list- output. [yes]"},
- {1,"       --list-extra, --list-fields, and --list-kinds-full support this option."},
+ {1,"       --list-extra, --list-fields, --list-kinds-full, and --list-params support this option."},
  {1,"       Specify before --list-* option."},
- {1,"       --list-fields, and --list-kinds-full support this option."},
 #ifdef HAVE_COPROC
  {1,"  --xcmd-<LANG>=parser_command_path|parser_command_name"},
  {1,"       Define external parser command path or name for specific language."},
@@ -498,6 +501,7 @@ static const char *const StageDescription [] = {
 static bool parseFileOptions (const char *const fileName);
 static bool parseAllConfigurationFilesOptionsInDirectory (const char *const fileName,
 							     stringList* const already_loaded_files);
+static bool getBooleanOption (const char *const option, const char *const parameter);
 
 /*
 *   FUNCTION DEFINITIONS
@@ -684,26 +688,32 @@ extern void checkOptions (void)
 }
 
 extern langType getLanguageComponentInOption (const char *const option,
-					      const char *const prefix)
+											  const char *const prefix)
 {
-	size_t len;
+	size_t prefix_len;
 	langType language;
 	const char *lang;
+	char *colon = NULL;
+	size_t lang_len = 0;
 
 	Assert (prefix && prefix[0]);
 	Assert (option);
 
-	len = strlen (prefix);
-	if (strncmp (option, prefix, len) != 0)
+	prefix_len = strlen (prefix);
+	if (strncmp (option, prefix, prefix_len) != 0)
 		return LANG_IGNORE;
 	else
 	{
-		lang = option + len;
+		lang = option + prefix_len;
 		if (lang [0] == '\0')
 			return LANG_IGNORE;
 	}
 
-	language = getNamedLanguage (lang, 0);
+	/* --para-<LANG>:<PARAM>=... */
+	colon = strchr (lang, ':');
+	if (colon)
+		lang_len = colon - lang;
+	language = getNamedLanguage (lang, lang_len);
 	if (language == LANG_IGNORE)
 		error (FATAL, "Unknown language \"%s\" in \"%s\" option", lang, option);
 
@@ -716,7 +726,7 @@ static void setEtagsMode (void)
 	Option.sorted = SO_UNSORTED;
 	Option.lineDirectives = false;
 	Option.tagRelative = true;
-	setTagWriter (&etagsWriter);
+	setTagWriter (WRITER_ETAGS);
 }
 
 extern void testEtagsInvocation (void)
@@ -739,14 +749,15 @@ extern void testEtagsInvocation (void)
 static void setXrefMode (void)
 {
 	Option.xref = true;
-	setTagWriter (&xrefWriter);
+	setTagWriter (WRITER_XREF);
 }
 
 #ifdef HAVE_JANSSON
 static void setJsonMode (void)
 {
 	enablePtag (PTAG_JSON_OUTPUT_VERSION, true);
-	setTagWriter (&jsonWriter);
+	enablePtag (PTAG_OUTPUT_MODE, false);
+	setTagWriter (WRITER_JSON);
 }
 #endif
 
@@ -1401,6 +1412,16 @@ static void processHelpOption (
 	exit (0);
 }
 
+static void processIf0Option (const char *const option,
+							  const char *const parameter)
+{
+	bool if0 = getBooleanOption (option, parameter);
+	langType lang = getNamedLanguage ("CPreProcessor", 0);
+	const char *arg = if0? "true": "false";
+
+	applyParameter (lang, "if0", arg);
+}
+
 static void processLanguageForceOption (
 		const char *const option, const char *const parameter)
 {
@@ -1707,6 +1728,30 @@ extern bool processMapOption (
 	return true;
 }
 
+extern bool processParamOption (
+			const char *const option, const char *const value)
+{
+	langType language;
+	const char* name;
+	const char* sep;
+
+	language = getLanguageComponentInOption (option, "param-");
+	if (language == LANG_IGNORE)
+		return false;
+
+	sep = option + strlen ("param-") + strlen (getLanguageName (language));
+	if (*sep != ':')
+		error (FATAL, "no separator(:) is given for %s=%s", option, value);
+	name = sep + 1;
+
+	if (value == NULL || value [0] == '\0')
+		error (FATAL, "no parameter is given for %s", option);
+
+	applyParameter (language, name, value);
+
+	return true;
+}
+
 static void processLicenseOption (
 		const char *const option CTAGS_ATTR_UNUSED,
 		const char *const parameter CTAGS_ATTR_UNUSED)
@@ -1774,6 +1819,23 @@ static void processListKindsOption (
 	}
 	exit (0);
 }
+
+static void processListParametersOption (const char *const option,
+										 const char *const parameter)
+{
+	if (parameter [0] == '\0' || strcasecmp (parameter, "all") == 0)
+		printLanguageParameters (LANG_AUTO);
+	else
+	{
+		langType language = getNamedLanguage (parameter, 0);
+		if (language == LANG_IGNORE)
+			error (FATAL, "Unknown language \"%s\" in \"%s\" option", parameter, option);
+		else
+			printLanguageParameters (language);
+	}
+	exit (0);
+}
+
 
 static void processListMapsOptionForType (const char *const option CTAGS_ATTR_UNUSED,
 					  const char *const  parameter,
@@ -2010,8 +2072,10 @@ static void processOutputFormat (const char *const option CTAGS_ATTR_UNUSED,
 	if (parameter [0] == '\0')
 		error (FATAL, "no output format name supplied for \"%s\"", option);
 
-	if (strcmp (parameter, "ctags") == 0)
+	if (strcmp (parameter, "u-ctags") == 0)
 		;
+	else if (strcmp (parameter, "e-ctags") == 0)
+		setTagWriter (WRITER_E_CTAGS);
 	else if (strcmp (parameter, "etags") == 0)
 		setEtagsMode ();
 	else if (strcmp (parameter, "xref") == 0)
@@ -2123,98 +2187,15 @@ static void processHeaderListOption (const int option, const char *parameter)
 /*
  *  Token ignore processing
  */
-
-/*  Determines whether or not "name" should be ignored, per the ignore list.
- */
-extern const ignoredTokenInfo * isIgnoreToken(const char * name)
-{
-	if(!Option.ignore)
-		return NULL;
-
-	return (const ignoredTokenInfo *)hashTableGetItem(Option.ignore,(char *)name);
-}
-
-static void freeIgnoredTokenInfo(ignoredTokenInfo * info)
-{
-	if(!info)
-		return;
-	if(info->replacement)
-		eFree(info->replacement);
-	eFree(info);
-}
-
-static void saveIgnoreToken(const char * ignoreToken)
-{
-	if(!ignoreToken)
-		return;
-
-	if(!Option.ignore)
-	{
-		Option.ignore = hashTableNew(
-				1024,
-				hashCstrhash,
-				hashCstreq,
-				free,
-				(void (*)(void *))freeIgnoredTokenInfo
-			);
-	}
-
-	const char * c = ignoreToken;
-	char cc = *c;
-	
-	const char * tokenBegin = c;
-	const char * tokenEnd = NULL;
-	const char * replacement = NULL;
-	bool ignoreFollowingParenthesis = false;
-
-	while(cc)
-	{
-		if(cc == '=')
-		{
-			if(!tokenEnd)
-				tokenEnd = c;
-			c++;
-			if(*c)
-				replacement = c;
-			break;
-		}
-		
-		if(cc == '+')
-		{
-			if(!tokenEnd)
-				tokenEnd = c;
-			ignoreFollowingParenthesis = true;
-		}
-		
-		c++;
-		cc = *c;
-	}
-
-	if(!tokenEnd)
-		tokenEnd = c;
-	
-	if(tokenEnd <= tokenBegin)
-		return;
-
-	
-	ignoredTokenInfo * info = (ignoredTokenInfo *)eMalloc(sizeof(ignoredTokenInfo));
-	
-	info->ignoreFollowingParenthesis = ignoreFollowingParenthesis;
-	info->replacement = replacement ? eStrdup(replacement) : NULL;
-
-	hashTablePutItem(Option.ignore,eStrndup(tokenBegin,tokenEnd - tokenBegin),info);
-
-	verbose ("    ignore token: %s\n", ignoreToken);
-}
-
 static void readIgnoreList (const char *const list)
 {
+	langType lang = getNamedLanguage ("CPreProcessor", 0);
 	char* newList = stringCopy (list);
 	const char *token = strtok (newList, IGNORE_SEPARATORS);
 
 	while (token != NULL)
 	{
-		saveIgnoreToken (token);
+		applyParameter (lang, "ignore", token);
 		token = strtok (NULL, IGNORE_SEPARATORS);
 	}
 	eFree (newList);
@@ -2222,6 +2203,8 @@ static void readIgnoreList (const char *const list)
 
 static void addIgnoreListFromFile (const char *const fileName)
 {
+	langType lang = getNamedLanguage ("CPreProcessor", 0);
+
 	stringList* tokens = stringListNewFromFile (fileName);
 	if (tokens == NULL)
 		error (FATAL | PERROR, "cannot open \"%s\"", fileName);
@@ -2232,15 +2215,19 @@ static void addIgnoreListFromFile (const char *const fileName)
 	for(i=0;i<c;i++)
 	{
 		vString * s = stringListItem(tokens,i);
-		saveIgnoreToken(vStringValue(s));
+		applyParameter (lang, "ignore", vStringValue(s));
 	}
 
 	stringListDelete(tokens);
 }
 
-static void processIgnoreOption (const char *const list)
+static void processIgnoreOption (const char *const list, int IgnoreOrDefine)
 {
-	if (strchr ("@./\\", list [0]) != NULL)
+	langType lang = getNamedLanguage ("CPreProcessor", 0);
+
+	if (IgnoreOrDefine == 'D')
+		applyParameter (lang, "define", list);
+	else if (strchr ("@./\\", list [0]) != NULL)
 	{
 		const char* fileName = (*list == '@') ? list + 1 : list;
 		addIgnoreListFromFile (fileName);
@@ -2250,14 +2237,7 @@ static void processIgnoreOption (const char *const list)
 		addIgnoreListFromFile (list);
 #endif
 	else if (strcmp (list, "-") == 0)
-	{
-		if(Option.ignore)
-		{
-			hashTableDelete(Option.ignore);
-			Option.ignore = NULL;
-		}
-		verbose ("    clearing list\n");
-	}
+		applyParameter (lang, "ignore", NULL);
 	else
 		readIgnoreList (list);
 }
@@ -2455,6 +2435,7 @@ static parametricOption ParametricOptions [] = {
 	{ "filter-terminator",      processFilterTerminatorOption,  true,   STAGE_ANY },
 	{ "format",                 processFormatOption,            true,   STAGE_ANY },
 	{ "help",                   processHelpOption,              true,   STAGE_ANY },
+	{ "if0",                    processIf0Option,               false,  STAGE_ANY },
 #ifdef HAVE_ICONV
 	{ "input-encoding",         processInputEncodingOption,     false,  STAGE_ANY },
 	{ "output-encoding",        processOutputEncodingOption,    false,  STAGE_ANY },
@@ -2477,6 +2458,7 @@ static parametricOption ParametricOptions [] = {
 	{ "list-kinds-full",        processListKindsOption,         true,   STAGE_ANY },
 	{ "list-languages",         processListLanguagesOption,     true,   STAGE_ANY },
 	{ "list-maps",              processListMapsOption,          true,   STAGE_ANY },
+	{ "list-params",            processListParametersOption,    true,   STAGE_ANY },
 	{ "list-patterns",          processListPatternsOption,      true,   STAGE_ANY },
 	{ "list-pseudo-tags",       processListPseudoTagsOptions,   true,   STAGE_ANY },
 	{ "list-regex-flags",       processListRegexFlagsOptions,   true,   STAGE_ANY },
@@ -2499,7 +2481,6 @@ static booleanOption BooleanOptions [] = {
 	{ "file-tags",      ((bool *)XTAG_FILE_NAMES),   false, STAGE_ANY, redirectToXtag },
 	{ "filter",         &Option.filter,                 true,  STAGE_ANY },
 	{ "guess-language-eagerly", &Option.guessLanguageEagerly, false, STAGE_ANY },
-	{ "if0",            &Option.if0,                    false, STAGE_ANY },
 	{ "line-directives",&Option.lineDirectives,         false, STAGE_ANY },
 	{ "links",          &Option.followLinks,            false, STAGE_ANY },
 	{ "machinable",     &Option.machinable,             true,  STAGE_ANY },
@@ -2742,6 +2723,8 @@ static void processLongOption (
 		;
 	else if (processMapOption (option, parameter))
 		;
+	else if (processParamOption (option, parameter))
+		;
 #ifdef HAVE_ICONV
 	else if (processLanguageEncodingOption (option, parameter))
 		;
@@ -2780,7 +2763,7 @@ static void processShortOption (
 				error (FATAL, "-%s: Invalid line number", option);
 			Option.breakLine = atol (parameter);
 			break;
-		case 'D':
+		case 'd':
 			if (!strToLong(parameter, 0, &Option.debugLevel))
 				error (FATAL, "-%s: Invalid debug level", option);
 
@@ -2790,6 +2773,9 @@ static void processShortOption (
 #endif
 		case 'B':
 			Option.backward = true;
+			break;
+		case 'D':
+			processIgnoreOption (parameter, *option);
 			break;
 		case 'e':
 			checkOptionOrder (option, false);
@@ -2819,7 +2805,7 @@ static void processShortOption (
 			processHeaderListOption (*option, parameter);
 			break;
 		case 'I':
-			processIgnoreOption (parameter);
+			processIgnoreOption (parameter, *option);
 			break;
 		case 'L':
 			if (Option.fileList != NULL)
@@ -3355,11 +3341,6 @@ extern void freeOptionResources (void)
 	freeString (&Option.filterTerminator);
 
 	freeList (&Excluded);
-	if(Option.ignore)
-	{
-		hashTableDelete(Option.ignore);
-		Option.ignore = NULL;
-	}
 	freeList (&Option.headerExt);
 	freeList (&Option.etagsInclude);
 
