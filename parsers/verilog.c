@@ -23,7 +23,7 @@
 #include <setjmp.h>
 
 #include "debug.h"
-#include "lcpp.h"
+#include "meta-cpreprocessor.h"
 #include "keyword.h"
 #include "options.h"
 #include "parse.h"
@@ -511,7 +511,7 @@ static void createContext (tokenInfo *const scope)
 		if (currentContext->kind != K_UNDEFINED)
 		{
 			vStringCopy (contextName, currentContext->name);
-			vStringCatS (contextName, ".");
+			vStringPut (contextName, '.');
 		}
 		vStringCat (contextName, scope->name);
 		/* Create context */
@@ -599,7 +599,7 @@ static void createTag (tokenInfo *const token)
 		vString *const scopedName = vStringNew ();
 
 		vStringCopy (scopedName, currentContext->name);
-		vStringCatS (scopedName, ".");
+		vStringPut (scopedName, '.');
 		vStringCatS (scopedName, vStringValue (token->name));
 		tag.name = vStringValue (scopedName);
 

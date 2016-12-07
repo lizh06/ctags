@@ -1961,6 +1961,53 @@ extern void printLanguageKinds (const langType language, bool allKindFields)
 	}
 }
 
+static void printParameters (langType language, bool indent)
+{
+	const parserDefinition* lang;
+	Assert (0 <= language  &&  language < (int) LanguageCount);
+
+	initializeParser (language);
+	lang = LanguageTable [language];
+	if (lang->parameterHandlerTable != NULL)
+	{
+		unsigned int i;
+
+		for (i = 0; i < lang->parameterHandlerCount; ++i)
+		{
+			if (indent)
+				printf (Option.machinable? "%s": PR_PARAM_FMT (LANG,s), lang->name);
+			printParameter (lang->parameterHandlerTable + i, indent, Option.machinable);
+		}
+	}
+
+}
+
+extern void printLanguageParameters (const langType language)
+{
+	if (language == LANG_AUTO)
+	{
+		unsigned int i;
+
+		if (Option.withListHeader)
+			printParameterListHeader (true, Option.machinable);
+		for (i = 0; i < LanguageCount ; ++i)
+		{
+			const parserDefinition* const lang = LanguageTable [i];
+
+			if (lang->invisible)
+				continue;
+			printParameters (i, true);
+		}
+	}
+	else
+	{
+		if (Option.withListHeader)
+			printParameterListHeader (false, Option.machinable);
+
+		printParameters (language, false);
+	}
+}
+
 static void processLangAliasOption (const langType language,
 				    const char *const parameter)
 {
@@ -2388,7 +2435,7 @@ extern bool parseFile (const char *const fileName)
 			tagFileResized = createTagsWithXcmd (fileName, language, mio)? true: tagFileResized;
 #endif
 
-		teardownWriter (fileName);
+		tagFileResized = teardownWriter (fileName)? true: tagFileResized;
 
 		if (Option.filter)
 			closeTagFile (tagFileResized);
@@ -2668,11 +2715,41 @@ extern void anonGenerate (vString *buffer, const char *prefix, int kind)
 	vStringCatS(buffer,szNum);
 }
 
+
+extern void applyParameter (const langType language, const char *name, const char *args)
+{
+	parserDefinition* parser;
+
+
+	Assert (0 <= language  &&  language < (int) LanguageCount);
+
+	initializeParserOne (language);
+	parser = LanguageTable [language];
+
+	if (parser->parameterHandlerTable)
+	{
+		unsigned int i;
+
+		for (i = 0; i < parser->parameterHandlerCount; i++)
+		{
+			if (strcmp (parser->parameterHandlerTable [i].name, name) == 0)
+			{
+				parser->parameterHandlerTable [i].handleParameter (language, name, args);
+				return;
+			}
+		}
+	}
+
+	error (FATAL, "no such parameter in %s: %s", parser->name, name);
+}
+
 /*
  * A parser for CTagsSelfTest (CTST)
  */
 typedef enum {
 	K_BROKEN,
+	K_NO_LETTER,
+	K_NO_LONG_NAME,
 	KIND_COUNT
 } CTST_Kind;
 
@@ -2687,6 +2764,10 @@ static roleDesc CTST_BrokenRoles [] = {
 static kindOption CTST_Kinds[KIND_COUNT] = {
 	{true, 'b', "broken tag", "name with unwanted characters",
 	 .referenceOnly = false, ATTACH_ROLES (CTST_BrokenRoles) },
+	{true, KIND_NULL, "no letter", "kind with no letter"
+	 /* use '@' when testing. */
+	},
+	{true, 'L', NULL, "kind with no long name" },
 };
 
 static void createCTSTTags (void)
@@ -2700,7 +2781,8 @@ static void createCTSTTags (void)
 		int c = line[0];
 
 		for (i = 0; i < KIND_COUNT; i++)
-			if (c == CTST_Kinds[i].letter)
+			if ((c == CTST_Kinds[i].letter && i != K_NO_LETTER)
+				|| (c == '@' && i == K_NO_LETTER))
 			{
 				switch (i)
 				{
@@ -2710,10 +2792,17 @@ static void createCTSTTags (void)
 						e.extensionFields.scopeName = "\\Broken\tContext";
 						makeTagEntry (&e);
 						break;
+					case K_NO_LETTER:
+						initTagEntry (&e, "abnormal kindOption testing (no letter)", &CTST_Kinds[i]);
+						makeTagEntry (&e);
+						break;
+					case K_NO_LONG_NAME:
+						initTagEntry (&e, "abnormal kindOption testing (no long name)", &CTST_Kinds[i]);
+						makeTagEntry (&e);
+						break;
 				}
 			}
 	}
-
 }
 
 static parserDefinition *CTagsSelfTestParser (void)
