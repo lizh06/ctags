@@ -253,6 +253,7 @@ extern void printLanguageList (void);
 extern void printLanguageParameters (const langType language);
 extern bool doesParserRequireMemoryStream (const langType language);
 extern bool parseFile (const char *const fileName);
+extern bool parseFileWithMio (const char *const fileName, MIO *mio);
 extern bool runParserInNarrowedInputStream (const langType language,
 					       unsigned long startLine, int startCharOffset,
 					       unsigned long endLine, int endCharOffset,
@@ -286,6 +287,11 @@ extern bool checkRegex (void);
 extern void useRegexMethod (const langType language);
 extern void printRegexFlags (void);
 extern bool hasScopeActionInRegex (const langType language);
+
+/* Multiline Regex Interface */
+extern bool hasMultilineRegexPatterns (const langType language);
+extern bool matchMultilineRegex (const vString* const allLines, const langType language);
+
 
 #ifdef HAVE_COPROC
 extern bool invokeXcmd (const char* const fileName, const langType language);

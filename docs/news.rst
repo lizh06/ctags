@@ -40,6 +40,7 @@ The following parsers have been added:
 * Automake
 * Clojure
 * CSS
+* CUDA
 * D
 * DBusIntrospect *libxml*
 * Diff
@@ -97,7 +98,7 @@ Heavily improved parsers
 * Verilog
 
 
-New options
+New and extended options
 ---------------------------------------------------------------------
 
 Wildcard in options
@@ -284,7 +285,7 @@ header is easy because it starts with a `#` character.
 ``--with-list-header=no`` suppresses output of the column header.
 
 Kinds synchronization
-----------------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In Universal-ctags, as in Exuberant-ctags, most kinds are parser
 local; enabling (or disabling) a kind in a parser has no effect on
@@ -487,6 +488,23 @@ used to enable it.
 
 See :ref:`JSON output <output-json>` for more details.
 
+"always" and "never" as an argument for --tag-relative
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+..
+	NOT REVIEWED YET
+
+Even if "yes" is specified as an option argument for --tag-relative,
+absolute paths are used in tags output if an input is given as
+an absolute path. This behavior is expected in exuberant-ctags
+as written in its man-page.
+
+In addition to "yes" and "no", universal-ctags takes "never" and "always".
+
+If "never" is given, absolute paths are used in tags output regardless
+of the path representation for input file(s). If "always" is given,
+relative paths are used always.
+
 
 Defining a macro in CPreProcessor input
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -589,6 +607,13 @@ will be processed as
 
 	int x(int a,int b);
 
+``--_interactive`` Mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A new ``--_interactive`` option launches a JSON based command REPL which
+can be used to control ctags generation programatically.
+
+See :ref:`--_interactive Mode <interactive-mode>` for more details.
 
 Changes to the tags file format
 ---------------------------------------------------------------------

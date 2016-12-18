@@ -51,6 +51,7 @@
 	CsharpParser, \
 	CtagsParser, \
 	CobolParser, \
+	CUDAParser, \
 	DParser, \
 	DiffParser, \
 	DosBatchParser, \
