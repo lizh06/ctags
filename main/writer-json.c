@@ -9,12 +9,16 @@
 
 #include "general.h"  /* must always come first */
 
+#include "debug.h"
 #include "entry.h"
 #include "mio.h"
 #include "options.h"
 #include "read.h"
 #include "ptag.h"
 #include "writer.h"
+
+
+#include <string.h>
 
 #ifdef HAVE_JANSSON
 #include <jansson.h>
@@ -32,12 +36,14 @@ static int writeJsonPtagEntry (tagWriter *writer CTAGS_ATTR_UNUSED,
 				const char *const fileName,
 				const char *const pattern,
 				const char *const parserName);
+static void buildJsonFqTagCache (tagWriter *writer, tagEntryInfo *const tag);
 
 tagWriter jsonWriter = {
 	.writeEntry = writeJsonEntry,
 	.writePtagEntry = writeJsonPtagEntry,
 	.preWriteEntry = NULL,
 	.postWriteEntry = NULL,
+	.buildFqTagCache = buildJsonFqTagCache,
 	.useStdoutByDefault = true,
 };
 
@@ -46,9 +52,35 @@ static json_t* escapeFieldValue (const tagEntryInfo * tag, fieldType ftype, bool
 {
 	const char *str = renderFieldEscaped (jsonWriter.type, ftype, tag, NO_PARSER_FIELD, NULL);
 	if (str)
-		return json_string (str);
+	{
+		unsigned int dt = getFieldDataType(ftype);
+		if (dt & FIELDTYPE_STRING)
+		{
+			if (dt & FIELDTYPE_BOOL && str[0] == '\0')
+				return json_false();
+			else
+				return json_string (str);
+		}
+		else if (dt & FIELDTYPE_INTEGER)
+		{
+			long tmp;
+
+			if (strToLong (str, 10, &tmp))
+				return json_integer (tmp);
+			else
+				return NULL;
+		}
+		else if (dt & FIELDTYPE_BOOL)
+		{
+			/* TODO: This must be fixed when new boolean field is added.
+			   Currently only `file:' field use this. */
+			return json_boolean (strcmp ("-", str)); /* "-" -> false */
+		}
+		AssertNotReached ();
+		return NULL;
+	}
 	else if (returnEmptyStringAsNoValue)
-		return json_string ("");
+		return json_false();
 	else
 		return NULL;
 }
@@ -137,6 +169,14 @@ static int writeJsonEntry (tagWriter *writer CTAGS_ATTR_UNUSED,
 	json_decref (response);
 
 	return length;
+}
+
+static void buildJsonFqTagCache (tagWriter *writer, tagEntryInfo *const tag)
+{
+	renderFieldEscaped (writer->type, FIELD_SCOPE_KIND_LONG, tag,
+			    NO_PARSER_FIELD, NULL);
+	renderFieldEscaped (writer->type, FIELD_SCOPE, tag,
+			    NO_PARSER_FIELD, NULL);
 }
 
 static int writeJsonPtagEntry (tagWriter *writer CTAGS_ATTR_UNUSED,

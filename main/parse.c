@@ -25,8 +25,10 @@
 #include "parsers.h"
 #include "promise.h"
 #include "ptag.h"
+#include "ptrarray.h"
 #include "read.h"
 #include "routines.h"
+#include "trace.h"
 #include "vstring.h"
 #ifdef HAVE_ICONV
 # include "mbcs.h"
@@ -61,6 +63,9 @@ static void addParserPseudoTags (langType language);
 static void installKeywordTable (const langType language);
 static void installTagRegexTable (const langType language);
 static void installTagXpathTable (const langType language);
+static void anonResetMaybe (parserDefinition *lang);
+static void setupAnon (void);
+static void teardownAnon (void);
 
 /*
 *   DATA DEFINITIONS
@@ -809,9 +814,19 @@ commonSelector (const parserCandidate *candidates, int n_candidates)
  * language associated with the string returned by the selector.
  */
 static int
-pickLanguageBySelection (selectLanguage selector, MIO *input)
+pickLanguageBySelection (selectLanguage selector, MIO *input,
+						 parserCandidate *candidates,
+						 unsigned int nCandidates)
 {
-    const char *lang = selector(input);
+	const char *lang;
+	langType *cs = xMalloc(nCandidates, langType);
+	int i;
+
+	for (i = 0; i < nCandidates; i++)
+		cs[i] = candidates[i].lang;
+    lang = selector(input, cs, nCandidates);
+	eFree (cs);
+
     if (lang)
     {
         verbose ("		selection: %s\n", lang);
@@ -930,7 +945,7 @@ static langType getSpecLanguageCommon (const char *const spec, struct getLangCtx
 		GLC_FOPEN_IF_NECESSARY(glc, fopen_error, memStreamRequired);
 		if (selector) {
 			verbose ("	selector: %p\n", selector);
-			language = pickLanguageBySelection(selector, glc->input);
+			language = pickLanguageBySelection(selector, glc->input, candidates, n_candidates);
 		} else {
 			verbose ("	selector: NONE\n");
 		fopen_error:
@@ -1001,9 +1016,17 @@ tasteLanguage (struct getLangCtx *glc, const struct taster *const tasters, int n
     return LANG_IGNORE;
 }
 
+
+struct GetLanguageRequest {
+	enum { GLR_OPEN, GLR_DISCARD, GLR_REUSE, } type;
+	const char *const fileName;
+	MIO *mio;
+};
+
 static langType
-getFileLanguageInternal (const char *const fileName, MIO **mio)
+getFileLanguageForRequestInternal (struct GetLanguageRequest *req)
 {
+	const char *const fileName = req->fileName;
     langType language;
 
     /* ctags tries variety ways(HINTS) to choose a proper language
@@ -1037,7 +1060,7 @@ getFileLanguageInternal (const char *const fileName, MIO **mio)
     int i;
     struct getLangCtx glc = {
         .fileName = fileName,
-        .input    = NULL,
+        .input    = (req->type == GLR_REUSE)? mio_ref (req->mio): NULL,
         .err      = false,
     };
     const char* const baseName = baseFilename (fileName);
@@ -1094,8 +1117,8 @@ getFileLanguageInternal (const char *const fileName, MIO **mio)
 
 
   cleanup:
-    if (mio && glc.input)
-	    *mio = mio_ref (glc.input);
+	if (req->type == GLR_OPEN && glc.input)
+		req->mio = mio_ref (glc.input);
     GLC_FCLOSE(&glc);
     if (fstatus)
 	    eStatFree (fstatus);
@@ -1114,15 +1137,12 @@ getFileLanguageInternal (const char *const fileName, MIO **mio)
     return language;
 }
 
-static langType getFileLanguageAndKeepMIO (const char *const fileName, MIO **mio)
+static langType getFileLanguageForRequest (struct GetLanguageRequest *req)
 {
 	langType l = Option.language;
 
-	if (mio)
-		*mio = NULL;
-
 	if (l == LANG_AUTO)
-		return getFileLanguageInternal(fileName, mio);
+		return getFileLanguageForRequestInternal(req);
 	else if (! isLanguageEnabled (l))
 	{
 		error (FATAL,
@@ -1137,7 +1157,12 @@ static langType getFileLanguageAndKeepMIO (const char *const fileName, MIO **mio
 
 extern langType getFileLanguage (const char *const fileName)
 {
-	return getFileLanguageAndKeepMIO(fileName, NULL);
+	struct GetLanguageRequest req = {
+		.type = GLR_DISCARD,
+		.fileName = fileName,
+	};
+
+	return getFileLanguageForRequest (&req);
 }
 
 typedef void (*languageCallback)  (langType language, void* user_data);
@@ -2191,6 +2216,8 @@ static bool createTagsWithFallback1 (const langType language)
 	addParserPseudoTags (language);
 	tagFilePosition (&tagfpos);
 
+	anonResetMaybe (LanguageTable [language]);
+
 	while ( ( whyRescan =
 		  createTagsForFile (language, ++passCount) )
 		!= RESCAN_NONE)
@@ -2219,6 +2246,11 @@ static bool createTagsWithFallback1 (const langType language)
 		}
 	}
 
+	/* Force filling allLines buffer and kick the multiline regex parser */
+	if (hasMultilineRegexPatterns (language))
+		while (readLineFromInputFile () != NULL)
+			; /* Do nothing */
+
 	if (LanguageTable [language]->useCork)
 		uncorkTagFile();
 
@@ -2226,17 +2258,17 @@ static bool createTagsWithFallback1 (const langType language)
 }
 
 extern bool runParserInNarrowedInputStream (const langType language,
-					       unsigned long startLine, int startCharOffset,
-					       unsigned long endLine, int endCharOffset,
+					       unsigned long startLine, long startCharOffset,
+					       unsigned long endLine, long endCharOffset,
 					       unsigned long sourceLineOffset)
 {
 	bool tagFileResized;
 
 	verbose ("runParserInNarrowedInputStream: %s; "
 			 "file: %s, "
-			 "start(line: %lu, offset: %u, srcline: %lu)"
+			 "start(line: %lu, offset: %lu, srcline: %lu)"
 			 " - "
-			 "end(line: %lu, offset: %u)\n",
+			 "end(line: %lu, offset: %lu)\n",
 			 getLanguageName (language),
 			 getInputFileName (),
 			 startLine, startCharOffset, sourceLineOffset,
@@ -2354,7 +2386,7 @@ extern void freeEncodingResources (void)
 			if (EncodingMap [i])
 				eFree (EncodingMap [i]);
 		}
-		free(EncodingMap);
+		eFree (EncodingMap);
 	}
 	if (Option.inputEncoding)
 		eFree (Option.inputEncoding);
@@ -2390,11 +2422,23 @@ extern bool doesParserRequireMemoryStream (const langType language)
 
 extern bool parseFile (const char *const fileName)
 {
+	TRACE_ENTER_TEXT("Parsing file %s",fileName);
+	bool bRet = parseFileWithMio (fileName, NULL);
+	TRACE_LEAVE();
+	return bRet;
+}
+
+extern bool parseFileWithMio (const char *const fileName, MIO *mio)
+{
 	bool tagFileResized = false;
 	langType language;
-	MIO *mio;
+	struct GetLanguageRequest req = {
+		.type = mio? GLR_REUSE: GLR_OPEN,
+		.fileName = fileName,
+		.mio = mio,
+	};
 
-	language = getFileLanguageAndKeepMIO (fileName, &mio);
+	language = getFileLanguageForRequest (&req);
 	Assert (language != LANG_AUTO);
 
 	if (Option.printLanguage)
@@ -2418,7 +2462,7 @@ extern bool parseFile (const char *const fileName)
 	}
 	else
 	{
-		if (Option.filter)
+		if (Option.filter && ! Option.interactive)
 			openTagFile ();
 
 #ifdef HAVE_ICONV
@@ -2429,28 +2473,33 @@ extern bool parseFile (const char *const fileName)
 
 		setupWriter ();
 
-		tagFileResized = createTagsWithFallback (fileName, language, mio);
+		setupAnon ();
+
+		tagFileResized = createTagsWithFallback (fileName, language, req.mio);
 #ifdef HAVE_COPROC
 		if (LanguageTable [language]->method & METHOD_XCMD_AVAILABLE)
-			tagFileResized = createTagsWithXcmd (fileName, language, mio)? true: tagFileResized;
+			tagFileResized = createTagsWithXcmd (fileName, language, req.mio)? true: tagFileResized;
 #endif
 
-		tagFileResized = teardownWriter (fileName)? true: tagFileResized;
+		teardownAnon ();
 
-		if (Option.filter)
+		tagFileResized = teardownWriter (getSourceFileTagPath())? true: tagFileResized;
+
+		if (Option.filter && ! Option.interactive)
 			closeTagFile (tagFileResized);
 		addTotals (1, 0L, 0L);
 
 #ifdef HAVE_ICONV
 		closeConverter ();
 #endif
-		if (mio)
-			mio_free (mio);
+		if (req.type == GLR_OPEN && req.mio)
+			mio_free (req.mio);
 		return tagFileResized;
 	}
 
-	if (mio)
-		mio_free (mio);
+	if (req.type == GLR_OPEN && req.mio)
+		mio_free (req.mio);
+
 	return tagFileResized;
 }
 
@@ -2543,6 +2592,27 @@ static void installTagXpathTable (const langType language)
 				addTagXpath (language, lang->tagXpathTableTable[i].table + j);
 		useXpathMethod (language);
 	}
+}
+
+extern unsigned int getXpathFileSpecCount (const langType language)
+{
+	parserDefinition* lang;
+
+	Assert (0 <= language  &&  language < (int) LanguageCount);
+	lang = LanguageTable [language];
+
+	return lang->xpathFileSpecCount;
+}
+
+extern xpathFileSpec* getXpathFileSpec (const langType language, unsigned int nth)
+{
+	parserDefinition* lang;
+
+	Assert (0 <= language  &&  language < (int) LanguageCount);
+	lang = LanguageTable [language];
+
+	Assert (nth < lang->xpathFileSpecCount);
+	return lang->xpathFileSpecs + nth;
 }
 
 extern bool makeKindSeparatorsPseudoTags (const langType language,
@@ -2683,11 +2753,25 @@ extern bool makeKindDescriptionsPseudoTags (const langType language,
 *
 *   Anonymous name generator
 */
+static ptrArray *parsersUsedInCurrentInput;
 
-extern void anonReset (void)
+static void setupAnon (void)
 {
-	parserDefinition* lang = LanguageTable [getInputLanguage ()];
-	lang -> anonumousIdentiferId = 0;
+	parsersUsedInCurrentInput = ptrArrayNew (NULL);
+}
+
+static void teardownAnon (void)
+{
+	ptrArrayDelete (parsersUsedInCurrentInput);
+}
+
+static void anonResetMaybe (parserDefinition *lang)
+{
+	if (ptrArrayHas (parsersUsedInCurrentInput, lang))
+		return;
+
+	lang -> anonymousIdentiferId = 0;
+	ptrArrayAdd (parsersUsedInCurrentInput, lang);
 }
 
 static unsigned int anonHash(const unsigned char *str)
@@ -2704,14 +2788,14 @@ static unsigned int anonHash(const unsigned char *str)
 extern void anonGenerate (vString *buffer, const char *prefix, int kind)
 {
 	parserDefinition* lang = LanguageTable [getInputLanguage ()];
-	lang -> anonumousIdentiferId ++;
+	lang -> anonymousIdentiferId ++;
 
 	char szNum[32];
 
 	vStringCopyS(buffer, prefix);
 
 	unsigned int uHash = anonHash((const unsigned char *)getInputFileName());
-	sprintf(szNum,"%08x%02x%02x",uHash,lang -> anonumousIdentiferId, kind);
+	sprintf(szNum,"%08x%02x%02x",uHash,lang -> anonymousIdentiferId, kind);
 	vStringCatS(buffer,szNum);
 }
 

@@ -12,19 +12,49 @@ remove_commit_id()
     sed -i -e '/!_TAG_PROGRAM_VERSION.*/s#/[^/]*/#//#' $1
 }
 
+filesize()
+{
+    wc -c < "$1"
+}
+
 is_feature_available()
 {
     local ctags=$1
-    local feat=$2
+	local tmp=$2
+	local neg
+	local feat
 
-    if ! ${ctags} --list-features | grep -q "$feat"; then
-		skip "feature \"$feat\" is not available in $ctags"
-    fi
+	if [ "${tmp}" = '!' ]; then
+		neg=1
+		feat=$3
+	else
+		feat=$2
+	fi
+
+	if [ "${neg}" = 1 ]; then
+		if ${ctags} --list-features | grep -q "$feat"; then
+			skip "feature \"$feat\" is available in $ctags"
+		fi
+	else
+		if ! ${ctags} --list-features | grep -q "$feat"; then
+			skip "feature \"$feat\" is not available in $ctags"
+		fi
+	fi
 }
 
 exit_if_no_coproc()
 {
     is_feature_available $1 coproc
+}
+
+exit_if_win32()
+{
+	is_feature_available $1 '!' win32
+}
+
+exit_if_no_case_insensitive_filenames()
+{
+	is_feature_available $1 case-insensitive-filenames
 }
 
 run_with_format()

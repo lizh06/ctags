@@ -15,9 +15,6 @@ typedef int langType;
 struct sTagEntryInfo;
 typedef struct sTagEntryInfo tagEntryInfo;
 
-struct sFieldDesc;
-typedef struct sFieldDesc fieldDesc;
-
 struct sPtagDesc;
 typedef struct sPtagDesc ptagDesc;
 
@@ -26,4 +23,8 @@ typedef struct sKindOption kindOption;
 
 struct sParserDefinition;
 typedef struct sParserDefinition parserDefinition;
+
+struct _MIO;
+typedef const char * (*selectLanguage) (struct _MIO *, langType *, unsigned int);
+
 #endif	/* CTAGS_MAIN_TYPES_H */

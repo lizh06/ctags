@@ -59,6 +59,13 @@ typedef enum sortType {
 	SO_FOLDSORTED
 } sortType;
 
+typedef enum eTagRelative {
+	TREL_NO,
+	TREL_YES,
+	TREL_ALWAYS,
+	TREL_NEVER,
+} tagRelative;
+
 /*  This stores the command line options.
  */
 typedef struct sOptionValues {
@@ -85,7 +92,7 @@ typedef struct sOptionValues {
 	bool followLinks;    /* --link  follow symbolic links? */
 	bool filter;         /* --filter  behave as filter: files in, tags out */
 	char* filterTerminator; /* --filter-terminator  string to output */
-	bool tagRelative;    /* --tag-relative file paths relative to tag file */
+	tagRelative tagRelative;    /* --tag-relative file paths relative to tag file */
 	bool printTotals;    /* --totals  print cumulative statistics */
 	bool lineDirectives; /* --linedirectives  process #line directives */
 	bool printLanguage;  /* --print-language */
@@ -98,6 +105,7 @@ typedef struct sOptionValues {
 	unsigned int maxRecursionDepth; /* --maxdepth=<max-recursion-depth> */
 	bool machinable;		/* --machinable */
 	bool withListHeader;		/* --with-list-header */
+	bool interactive; /* --interactive */
 #ifdef DEBUG
 	long debugLevel;        /* -d  debugging output */
 	unsigned long breakLine;/* -b  input line at which to call lineBreak() */
