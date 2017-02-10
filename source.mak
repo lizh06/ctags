@@ -26,6 +26,7 @@ MAIN_HEADS =			\
 	main/interactive.h	\
 	main/keyword.h		\
 	main/kind.h		\
+	main/lxpath.h		\
 	main/main.h		\
 	main/mbcs.h		\
 	main/nestlevel.h	\
@@ -43,6 +44,8 @@ MAIN_HEADS =			\
 	main/selectors.h	\
 	main/sort.h		\
 	main/strlist.h		\
+	main/trace.h		\
+	main/tokeninfo.h	\
 	main/types.h		\
 	main/vstring.h		\
 	main/writer.h		\
@@ -80,6 +83,8 @@ MAIN_SRCS =				\
 	main/selectors.c		\
 	main/sort.c			\
 	main/strlist.c			\
+	main/trace.c			\
+	main/tokeninfo.c		\
 	main/vstring.c			\
 	main/writer.c			\
 	main/writer-etags.c		\
@@ -148,6 +153,7 @@ PARSER_SRCS =				\
 	parsers/cxx/cxx_token_chain.c		\
 	parsers/diff.c			\
 	parsers/dosbatch.c		\
+	parsers/dtd.c			\
 	parsers/dts.c			\
 	parsers/eiffel.c		\
 	parsers/erlang.c		\
@@ -160,6 +166,7 @@ PARSER_SRCS =				\
 	parsers/jprop.c			\
 	parsers/jscript.c		\
 	parsers/json.c			\
+	parsers/ldscript.c		\
 	parsers/lisp.c			\
 	parsers/lua.c			\
 	parsers/m4.c			\
@@ -177,6 +184,7 @@ PARSER_SRCS =				\
 	parsers/pythonloggingconfig.c	\
 	parsers/r.c			\
 	parsers/rexx.c			\
+	parsers/robot.c			\
 	parsers/rpmspec.c		\
 	parsers/rst.c			\
 	parsers/ruby.c			\

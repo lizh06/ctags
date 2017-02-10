@@ -153,6 +153,9 @@
     <ClCompile Include="..\parsers\rexx.c">
       <Filter>Source Files\Parsers</Filter>
     </ClCompile>
+    <ClCompile Include="..\parsers\robot.c">
+      <Filter>Source Files\Parsers</Filter>
+    </ClCompile>
     <ClCompile Include="..\parsers\ruby.c">
       <Filter>Source Files\Parsers</Filter>
     </ClCompile>
@@ -390,6 +393,9 @@
     <ClCompile Include="..\optlib\pod.c">
       <Filter>Source Files\Main</Filter>
     </ClCompile>
+    <ClCompile Include="..\optlib\elm.c">
+      <Filter>Source Files\Main</Filter>
+    </ClCompile>
     <ClCompile Include="..\parsers\protobuf.c">
       <Filter>Source Files\Main</Filter>
     </ClCompile>
@@ -397,6 +403,15 @@
       <Filter>Source Files\Main</Filter>
     </ClCompile>
     <ClCompile Include="..\main\objpool.c">
+      <Filter>Source Files\Main</Filter>
+    </ClCompile>
+    <ClCompile Include="..\main\tokeninfo.c">
+      <Filter>Source Files\Main</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parsers\ldscript.c">
+      <Filter>Source Files\Main</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parsers\dtd.c">
       <Filter>Source Files\Main</Filter>
     </ClCompile>
   </ItemGroup>
@@ -447,6 +462,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\main\parse.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\main\lxpath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\main\parsers.h">
@@ -549,6 +567,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
    <ClInclude Include="..\main\objpool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+   <ClInclude Include="..\main\tokeninfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
