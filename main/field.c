@@ -26,14 +26,14 @@
 #include "routines.h"
 
 
-struct sFieldDesc {
+typedef struct sFieldDesc {
 	fieldSpec *spec;
 	unsigned int fixed:   1;   /* fields which cannot be disabled. */
 	vString     *buffer;
 	const char* nameWithPrefix;
 	langType language;
 	fieldType sibling;
-};
+} fieldDesc;
 
 static const char *renderFieldName (const tagEntryInfo *const tag, const char *value, vString* b, bool *rejected);
 static const char *renderFieldNameNoEscape (const tagEntryInfo *const tag, const char *value CTAGS_ATTR_UNUSED, vString* b,
@@ -58,7 +58,7 @@ static const char *renderFieldFile (const tagEntryInfo *const tag, const char *v
 static const char *renderFieldPattern (const tagEntryInfo *const tag, const char *value, vString* b, bool *rejected);
 static const char *renderFieldRole (const tagEntryInfo *const tag, const char *value, vString* b, bool *rejected);
 static const char *renderFieldRefMarker (const tagEntryInfo *const tag, const char *value, vString* b, bool *rejected);
-static const char *renderFieldExtra (const tagEntryInfo *const tag, const char *value, vString* b, bool *rejected);
+static const char *renderFieldExtras (const tagEntryInfo *const tag, const char *value, vString* b, bool *rejected);
 static const char *renderFieldXpath (const tagEntryInfo *const tag, const char *value, vString* b, bool *rejected);
 static const char *renderFieldScopeKindName(const tagEntryInfo *const tag, const char *value, vString* b, bool *rejected);
 static const char *renderFieldEnd (const tagEntryInfo *const tag, const char *value, vString* b, bool *rejected);
@@ -71,14 +71,14 @@ static bool     isAccessFieldAvailable    (const tagEntryInfo *const tag);
 static bool     isImplementationFieldAvailable (const tagEntryInfo *const tag);
 static bool     isSignatureFieldAvailable (const tagEntryInfo *const tag);
 static bool     isRoleFieldAvailable      (const tagEntryInfo *const tag);
-static bool     isExtraFieldAvailable     (const tagEntryInfo *const tag);
+static bool     isExtrasFieldAvailable    (const tagEntryInfo *const tag);
 static bool     isXpathFieldAvailable     (const tagEntryInfo *const tag);
 static bool     isEndFieldAvailable       (const tagEntryInfo *const tag);
 
 
-#define DEFINE_FIELD_SPEC(L, N, V, H, ...)		\
-	DEFINE_FIELD_SPEC_FULL (L, N, V, H, NULL, __VA_ARGS__)
-#define DEFINE_FIELD_SPEC_FULL(L, N, V, H, A, ...)	\
+#define DEFINE_FIELD_SPEC(L, N, V, H, DT, ...)				\
+	DEFINE_FIELD_SPEC_FULL (L, N, V, H, NULL, DT, __VA_ARGS__)
+#define DEFINE_FIELD_SPEC_FULL(L, N, V, H, A, DT, ...)	\
 	{					\
 		.letter        = L,		\
 		.name          = N,		\
@@ -86,6 +86,7 @@ static bool     isEndFieldAvailable       (const tagEntryInfo *const tag);
 		.enabled       = V,		\
 		.renderEscaped = { __VA_ARGS__ },		\
 		.isValueAvailable = A,		\
+		.dataType = DT, \
 	}
 
 #define WITH_DEFUALT_VALUE(str) ((str)?(str):"-")
@@ -94,66 +95,87 @@ static fieldSpec fieldSpecsFixed [] = {
         /* FIXED FIELDS */
 	DEFINE_FIELD_SPEC ('N', "name",     true,
 			  "tag name (fixed field)",
+			  FIELDTYPE_STRING,
 			  [WRITER_U_CTAGS] = renderFieldName,
-			  [WRITER_E_CTAGS] = renderFieldNameNoEscape),
+			  [WRITER_E_CTAGS] = renderFieldNameNoEscape,
+			  [WRITER_JSON]    = renderFieldNameNoEscape,
+			  ),
 	DEFINE_FIELD_SPEC ('F', "input",    true,
 			   "input file (fixed field)",
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldInput,
-			   [WRITER_E_CTAGS] = renderFieldInputNoEscape),
+			   [WRITER_E_CTAGS] = renderFieldInputNoEscape,
+			   [WRITER_JSON]    = renderFieldInputNoEscape,
+		),
 	DEFINE_FIELD_SPEC ('P', "pattern",  true,
 			   "pattern (fixed field)",
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldPattern),
 };
 
 static fieldSpec fieldSpecsExuberant [] = {
 	DEFINE_FIELD_SPEC ('C', "compact",        false,
 			   "compact input line (fixed field, only used in -x option)",
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldCompactInputLine),
 
 	/* EXTENSION FIELDS */
 	DEFINE_FIELD_SPEC_FULL ('a', "access",         false,
 		      "Access (or export) of class members",
 			  isAccessFieldAvailable,
+			  FIELDTYPE_STRING,
 		      [WRITER_U_CTAGS] = renderFieldAccess),
 	DEFINE_FIELD_SPEC_FULL ('f', "file",           true,
 		      "File-restricted scoping",
 			  isFileFieldAvailable,
+			  FIELDTYPE_BOOL,
 		      [WRITER_U_CTAGS] = renderFieldFile),
 	DEFINE_FIELD_SPEC_FULL ('i', "inherits",       false,
 		      "Inheritance information",
 			  isInheritsFieldAvailable,
+			  FIELDTYPE_STRING|FIELDTYPE_BOOL,
 		      [WRITER_U_CTAGS] = renderFieldInherits),
 	DEFINE_FIELD_SPEC ('K', NULL,             false,
 		      "Kind of tag as full name",
+		      FIELDTYPE_STRING,
 		      [WRITER_U_CTAGS] = renderFieldKindName),
 	DEFINE_FIELD_SPEC ('k', NULL,             true,
 			   "Kind of tag as a single letter",
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldKindLetter),
 	DEFINE_FIELD_SPEC_FULL ('l', "language",       false,
 			   "Language of input file containing tag",
 			   isLanguageFieldAvailable,
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldLanguage),
 	DEFINE_FIELD_SPEC_FULL ('m', "implementation", false,
 			   "Implementation information",
 			   isImplementationFieldAvailable,
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldImplementation),
 	DEFINE_FIELD_SPEC ('n', "line",           false,
 			   "Line number of tag definition",
+			   FIELDTYPE_INTEGER,
 			   [WRITER_U_CTAGS] = renderFieldLineNumber),
 	DEFINE_FIELD_SPEC_FULL ('S', "signature",	     false,
 			   "Signature of routine (e.g. prototype or parameter list)",
 			   isSignatureFieldAvailable,
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldSignature),
 	DEFINE_FIELD_SPEC ('s', NULL,             true,
 			   "Scope of tag definition (`p' can be used for printing its kind)",
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldScope,
-			   [WRITER_E_CTAGS] = renderFieldScopeNoEscape),
+			   [WRITER_E_CTAGS] = renderFieldScopeNoEscape,
+			   [WRITER_JSON]    = renderFieldScopeNoEscape),
 	DEFINE_FIELD_SPEC_FULL ('t', "typeref",        true,
 			   "Type and name of a variable or typedef",
 			   isTyperefFieldAvailable,
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldTyperef),
 	DEFINE_FIELD_SPEC ('z', "kind",           false,
 			   "Include the \"kind:\" key in kind field (use k or K) in tags output, kind full name in xref output",
+			   FIELDTYPE_STRING,
 			   /* Following renderer is for handling --_xformat=%{kind};
 			      and is not for tags output. */
 			   [WRITER_U_CTAGS] = renderFieldKindName),
@@ -163,30 +185,38 @@ static fieldSpec fieldSpecsUniversal [] = {
 	DEFINE_FIELD_SPEC_FULL ('r', "role",    false,
 			   "Role",
 			   isRoleFieldAvailable,
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldRole),
 	DEFINE_FIELD_SPEC ('R',  NULL,     false,
 			   "Marker (R or D) representing whether tag is definition or reference",
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldRefMarker),
 	DEFINE_FIELD_SPEC ('Z', "scope",   false,
 			  "Include the \"scope:\" key in scope field (use s) in tags output, scope name in xref output",
+			   FIELDTYPE_STRING,
 			   /* Following renderer is for handling --_xformat=%{scope};
 			      and is not for tags output. */
 			   [WRITER_U_CTAGS] = renderFieldScope,
-			   [WRITER_E_CTAGS] = renderFieldScopeNoEscape),
-	DEFINE_FIELD_SPEC_FULL ('E', "extra",   false,
+			   [WRITER_E_CTAGS] = renderFieldScopeNoEscape,
+			   [WRITER_JSON]    = renderFieldScopeNoEscape),
+	DEFINE_FIELD_SPEC_FULL ('E', "extras",   false,
 			   "Extra tag type information",
-			   isExtraFieldAvailable,
-			   [WRITER_U_CTAGS] = renderFieldExtra),
+			   isExtrasFieldAvailable,
+			   FIELDTYPE_STRING,
+			   [WRITER_U_CTAGS] = renderFieldExtras),
 	DEFINE_FIELD_SPEC_FULL ('x', "xpath",   false,
 			   "xpath for the tag",
 			   isXpathFieldAvailable,
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldXpath),
 	DEFINE_FIELD_SPEC ('p', "scopeKind", false,
 			   "Kind of scope as full name",
+			   FIELDTYPE_STRING,
 			   [WRITER_U_CTAGS] = renderFieldScopeKindName),
 	DEFINE_FIELD_SPEC_FULL ('e', "end", false,
 			   "end lines of various items",
 			   isEndFieldAvailable,
+			   FIELDTYPE_INTEGER,
 			   [WRITER_U_CTAGS] = renderFieldEnd),
 };
 
@@ -336,6 +366,7 @@ extern bool doesFieldHaveValue (fieldType type, const tagEntryInfo *tag)
 #define PR_FIELD_WIDTH_LANGUAGE  16
 #define PR_FIELD_WIDTH_DESC      30
 #define PR_FIELD_WIDTH_XFMT      6
+#define PR_FIELD_WIDTH_JSTYPE    6
 #define PR_FIELD_WIDTH_ENABLED   7
 
 #define PR_FIELD_STR(X) PR_FIELD_WIDTH_##X
@@ -352,6 +383,8 @@ extern bool doesFieldHaveValue (fieldType type, const tagEntryInfo *tag)
 	" "					\
 	PR_FIELD_FMT (XFMT,s)		\
 	" "					\
+	PR_FIELD_FMT (JSTYPE,s)		\
+	" "					\
 	PR_FIELD_FMT (DESC,s)			\
 	"\n"
 
@@ -360,8 +393,9 @@ static void printField (fieldType i)
 	unsigned char letter = fieldDescs[i].spec->letter;
 	const char *name;
 	const char *language;
+	char  typefields [] = "---";
 
-	if (letter == FIELD_LETTER_NO_USE)
+	if (letter == NUL_FIELD_LETTER)
 		letter = '-';
 
 	if (! fieldDescs[i].spec->name)
@@ -374,12 +408,23 @@ static void printField (fieldType i)
 	else
 		language = getLanguageName (fieldDescs[i].language);
 
-	printf((Option.machinable? "%c\t%s\t%s\t%s\t%s\t%s\n": MAKE_FIELD_FMT(c)),
+	{
+		unsigned int bmask, offset;
+		unsigned int dt = getFieldDataType(i);
+		for (bmask = 1, offset = 0;
+			 bmask < FIELDTYPE_END_MARKER;
+			 bmask <<= 1, offset++)
+			if (dt & bmask)
+				typefields[offset] = fieldDataTypeFalgs[offset];
+	}
+
+	printf((Option.machinable? "%c\t%s\t%s\t%s\t%s\t%s\t%s\n": MAKE_FIELD_FMT(c)),
 	       letter,
 	       name,
 	       isFieldEnabled (i)? "on": "off",
 	       language,
 	       getFieldDesc (i)->spec->renderEscaped? "TRUE": "FALSE",
+		   typefields,
 	       fieldDescs[i].spec->description? fieldDescs[i].spec->description: "NONE");
 }
 
@@ -388,8 +433,8 @@ extern void printFields (int language)
 	unsigned int i;
 
 	if (Option.withListHeader)
-		printf ((Option.machinable? "%s\t%s\t%s\t%s\t%s\t%s\n": MAKE_FIELD_FMT(s)),
-			"#LETTER", "NAME", "ENABLED", "LANGUAGE", "XFMT", "DESCRIPTION");
+		printf ((Option.machinable? "%s\t%s\t%s\t%s\t%s\t%s\t%s\n": MAKE_FIELD_FMT(s)),
+			"#LETTER", "NAME", "ENABLED", "LANGUAGE", "XFMT", "JSTYPE", "DESCRIPTION");
 
 	for (i = 0; i < fieldDescUsed; i++)
 	{
@@ -744,7 +789,7 @@ static const char *renderFieldRefMarker (const tagEntryInfo *const tag,
 	return renderAsIs (b, c);
 }
 
-static const char *renderFieldExtra (const tagEntryInfo *const tag,
+static const char *renderFieldExtras (const tagEntryInfo *const tag,
 				     const char *value CTAGS_ATTR_UNUSED,
 				     vString* b,
 					 bool *rejected)
@@ -856,7 +901,7 @@ static bool     isRoleFieldAvailable      (const tagEntryInfo *const tag)
 	return (tag->extensionFields.roleIndex != ROLE_INDEX_DEFINITION)? true: false;
 }
 
-static bool     isExtraFieldAvailable     (const tagEntryInfo *const tag)
+static bool     isExtrasFieldAvailable     (const tagEntryInfo *const tag)
 {
 	int i;
 	for (i = 0; i < sizeof (tag->extra); i++)
@@ -895,7 +940,7 @@ static bool isFieldFixed (fieldType type)
 extern bool enableField (fieldType type, bool state, bool warnIfFixedField)
 {
 	fieldSpec *spec = getFieldDesc(type)->spec;
-	bool old = spec->enabled? true: false;
+	bool old = spec->enabled;
 	if (isFieldFixed (type))
 	{
 		if ((!state) && warnIfFixedField)
@@ -938,6 +983,11 @@ extern bool isCommonField (fieldType type)
 extern int     getFieldOwner (fieldType type)
 {
 	return getFieldDesc(type)->language;
+}
+
+extern unsigned int getFieldDataType (fieldType type)
+{
+	return getFieldDesc(type)->spec->dataType;
 }
 
 extern bool isFieldRenderable (fieldType type)
@@ -1007,6 +1057,9 @@ extern int defineField (fieldSpec *spec, langType language)
 
 	if (spec->renderEscaped [WRITER_DEFAULT] == NULL)
 		spec->renderEscaped [WRITER_DEFAULT] = defaultRenderer;
+
+	if (! spec->dataType)
+		spec->dataType = FIELDTYPE_STRING;
 
 	fdesc->spec = spec;
 

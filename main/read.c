@@ -80,9 +80,9 @@ typedef struct sInputLineFposMap {
 
 typedef struct sNestedInputStreamInfo {
 	unsigned long startLine;
-	int startCharOffset;
+	long startCharOffset;
 	unsigned long endLine;
-	int endCharOffset;
+	long endCharOffset;
 } nestedInputStreamInfo;
 
 typedef struct sInputFile {
@@ -260,7 +260,7 @@ static void freeLineFposMap (inputLineFposMap *lineFposMap)
 {
 	if (lineFposMap->pos)
 	{
-		free (lineFposMap->pos);
+		eFree (lineFposMap->pos);
 		lineFposMap->pos = NULL;
 		lineFposMap->count = 0;
 		lineFposMap->size = 0;
@@ -1028,8 +1028,8 @@ out:
 }
 
 extern void   pushNarrowedInputStream (const langType language,
-				       unsigned long startLine, int startCharOffset,
-				       unsigned long endLine, int endCharOffset,
+				       unsigned long startLine, long startCharOffset,
+				       unsigned long endLine, long endCharOffset,
 				       unsigned long sourceLineOffset)
 {
 	long p, q;

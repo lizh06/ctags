@@ -54,7 +54,11 @@
 	CUDAParser, \
 	DParser, \
 	DiffParser, \
+	DtdParser, \
+	DTSParser, \
 	DosBatchParser, \
+	EiffelParser, \
+  ElmParser, \
 	ErlangParser, \
 	FortranParser, \
 	GdbinitParser, \
@@ -65,6 +69,8 @@
 	JavaPropertiesParser, \
 	JavaScriptParser, \
 	JsonParser, \
+	LdScriptParser, \
+	LispParser, \
 	LuaParser, \
 	M4Parser, \
 	ManParser, \
@@ -85,6 +91,7 @@
 	PythonLoggingConfigParser, \
 	RParser, \
 	RexxParser, \
+	RobotParser, \
 	RpmSpecParser, \
 	RstParser, \
 	RubyParser, \

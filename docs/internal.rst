@@ -81,7 +81,7 @@ for example.
 promise API
 ......................................................................
 (Currently the tagging via promise API is disabled by default.
- Use `--extra=+s` optoin for enabling it.)
+ Use `--extras=+s` option for enabling it.)
 
 Background and Idea
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
@@ -250,8 +250,25 @@ Parser combination
 Parser written in C
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Tag entfry info
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _tokeninfo:
+
+tokenInfo API
+......................................................................
+
+.. NOT REVIEWED YET
+
+In Exuberant-ctags, a developer can write a parser anyway; only input
+stream and tagEntryInfo data structure is given.
+
+However, while maintaining Universal-ctags I (Masatake YAMATO) think
+we should have a framework for writing parser. Of course the framework
+is optional; you can still write a parser without the framework.
+
+To design a framework, I have studied how @b4n (Colomban Wendling)
+writes parsers. tokenInfo API is the first fruit of my study.
+
+TBW
+
 
 Output tag stream
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -379,7 +396,7 @@ If a parser uses the cork for recording and emitting scope
 information, ctags can reuse it for generating full qualified(FQ)
 tags. Set `requestAutomaticFQTag` field of `parserDefinition` to
 `TRUE` then the main part of ctags emits FQ tags on behalf of the parser
-if `--extra=+q` is given.
+if `--extras=+q` is given.
 
 An example can be found in DTS parser:
 
