@@ -54,11 +54,14 @@
 	CsharpParser, \
 	CtagsParser, \
 	CobolParser, \
+	CUDAParser, \
 	DParser, \
 	DiffParser, \
+	DtdParser, \
 	DTSParser, \
 	DosBatchParser, \
 	EiffelParser, \
+  ElmParser, \
 	ErlangParser, \
 	FalconParser, \
 	FlexParser, \
@@ -71,6 +74,7 @@
 	JavaPropertiesParser, \
 	JavaScriptParser, \
 	JsonParser, \
+	LdScriptParser, \
 	LispParser, \
 	LuaParser, \
 	M4Parser, \
@@ -92,6 +96,7 @@
 	PythonLoggingConfigParser, \
 	RParser, \
 	RexxParser, \
+	RobotParser, \
 	RpmSpecParser, \
 	RstParser, \
 	RubyParser, \
