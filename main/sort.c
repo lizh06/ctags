@@ -216,8 +216,16 @@ static void writeSortedTags (
 		 *  pattern) if this is not an xref file.
 		 */
 		if (i == 0  ||  Option.xref  ||  strcmp (table [i], table [i-1]) != 0)
+		{
+			char *q = table[i];
+			if (*q != '!') {
+				char *p = strchr(q, '\t');
+				strcpy(p+1, p+2);
+			}
+
 			if (mio_puts (mio, table [i]) == EOF)
 				failedSort (mio, NULL);
+		}
 	}
 	if (toStdout)
 		mio_flush (mio);
@@ -255,13 +263,30 @@ extern void internalSortTags (const bool toStdout, MIO* mio, size_t numTags)
 			;  /* ignore blank lines */
 		else
 		{
-			const size_t stringSize = strlen (line) + 1;
+			size_t stringSize = strlen (line) + 1;
+
+			char *delim = strstr(line, ";\"\t");
+			if (delim) stringSize += 1;
 
 			table [i] = (char *) malloc (stringSize);
 			if (table [i] == NULL)
 				failedSort (mio, "out of memory");
 			DebugStatement ( mallocSize += stringSize; )
-			strcpy (table [i], line);
+
+			if (*line == '!' || !delim)
+				strcpy (table [i], line);
+
+			else
+			{
+				/* Make tag type to be sorted before regex expr */
+
+				const char *p = strchr(line,'\t');
+				int n = p - line + 1;
+				char *q = table[i];
+				strncpy(q, line, n);
+				q[n] = delim[3];
+				strcpy(&q[n+1], p+1);
+			}
 			++i;
 		}
 	}
