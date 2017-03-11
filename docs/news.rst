@@ -1018,7 +1018,7 @@ whether to include extra tag entries for certain kinds of information.
 This option is available in Universal-ctags, too.
 
 In Universal-ctags it is extended; a parser can define its own
-extra flags. They can be controlled with ``--extras-<LANG>=[+|-]{...}`.
+extra flags. They can be controlled with ``--extras-<LANG>=[+|-]{...}``.
 
 See some examples:
 
@@ -1031,7 +1031,7 @@ See some examples:
 	p       pseudo                 FALSE   NONE             Include pseudo tags
 	q       qualified              FALSE   NONE             Include an extra ...
 	r       reference              FALSE   NONE             Include reference tags
-	s       subparser              FALSE   NONE             Include tags ...
+	g       guest                  FALSE   NONE             Include tags ...
 	-       whitespaceSwapped      TRUE    Robot            Include tags swapping ...
 
 See the `LANGUAGE` column. NONE means the extra flags are language
