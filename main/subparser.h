@@ -14,8 +14,8 @@
 
 #include "general.h"
 
+#include "dependency.h"
 #include "types.h"
-#include "read.h"
 
 
 typedef enum eSubparserRunDirection {
@@ -51,8 +51,8 @@ extern subparser *getNextSubparser(subparser *last);
 	VAR = NULL;								\
 	while ((VAR = getNextSubparser (VAR)) != NULL)
 
-#define enterSubparser(S) pushLanguage (getSubparserLanguage ((subparser *)S))
-#define leaveSubparser()  popLanguage ()
+extern void enterSubparser(subparser *subparser);
+extern void leaveSubparser(void);
 
 extern subparser* getSubparserRunningBaseparser (void);
 extern void chooseExclusiveSubparser (subparser *s, void *data);
@@ -61,6 +61,10 @@ extern void chooseExclusiveSubparser (subparser *s, void *data);
 #define RUN_DEFAULT_SUBPARSERS -1
 extern void scheduleRunningBaseparser (int dependencyIndex);
 
-extern void attachSubparser (langType base, subparser *sub);
+extern subparser *getFirstSubparser(struct slaveControlBlock *controlBlock);
+extern void useDefaultSubparsers (struct slaveControlBlock *controlBlock);
+extern void useSpecifiedSubparser (struct slaveControlBlock *controlBlock, subparser *s);
+extern void setupSubparsersInUse (struct slaveControlBlock *controlBlock);
+extern subparser* teardownSubparsersInUse (struct slaveControlBlock *controlBlock);
 
 #endif	/* CTAGS_MAIN_SUBPARSER_H */
