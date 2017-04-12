@@ -90,6 +90,7 @@
 	PythonParser, \
 	PythonLoggingConfigParser, \
 	RParser, \
+	RSpecParser, \
 	RexxParser, \
 	RobotParser, \
 	RpmSpecParser, \

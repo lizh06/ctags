@@ -1,0 +1,7 @@
+#NAME                          BASEPARSER           DIRECTION
+YumRepo                        Iniconf              base <= sub
+SystemdUnit                    Iniconf              base <= sub
+PythonLoggingConfig            Iniconf              base <> sub
+Autoconf                       M4                   base <> sub
+Automake                       Make                 base <= sub
+RSpec                          Ruby                 base => sub
