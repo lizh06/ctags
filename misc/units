@@ -68,6 +68,7 @@ L_SKIPPED_BY_LANGUAGES=
 L_SKIPPED_BY_ILOOP=
 L_KNOWN_BUGS=
 L_FAILED_BY_TIMEED_OUT=
+L_BROKEN_ARGS_CTAGS=
 
 #
 # TODO
@@ -420,6 +421,20 @@ direq ()
     return $?
 }
 
+anon_normalize ()
+{
+    local ctags=$1
+    local input_actual=$2
+
+    # TODO: "Units" should not be hardcoded.
+    local input_expected="./Units${input_actual#*/Units}"
+
+    local actual=$(${CTAGS} --quiet --options=NONE --_anonhash="${input_actual}")
+    local expected=$(${CTAGS} --quiet --options=NONE --_anonhash="${input_expected}")
+
+    sed -e s/${actual}/${expected}/g
+}
+
 run_tcase ()
 {
     local input="$1"
@@ -494,6 +509,7 @@ run_tcase ()
     local timeout_value
     local tmp
 
+    local broke_args_ctags
 
     #
     # Filtered by UNIT
@@ -507,6 +523,10 @@ run_tcase ()
     #
     _CMDLINE="${CTAGS} --verbose --options=NONE --libexec-dir=${LIBEXECDIR} --libexec-dir=+$t --data-dir=+$t -o -"
     [ -f "${fargs}" ] && _CMDLINE="${_CMDLINE} --options=${fargs}"
+
+    if [ -f "${fargs}" ] && ! ${_CMDLINE} --_force-quit=0 > /dev/null 2>&1; then
+	broke_args_ctags=1
+    fi
 
     #
     # Filtered by LANGUAGES
@@ -542,6 +562,10 @@ run_tcase ()
     elif [ "$WITH_TIMEOUT" = 0 ] && [ "${class}" = 'i' ]; then
 	L_SKIPPED_BY_ILOOP="$L_SKIPPED_BY_ILOOP ${category}/${name}"
 	run_result skip "${oresult}" "may cause an infinite loop"
+	return 1
+    elif [ "$broke_args_ctags" = 1 ]; then
+	run_result error '/dev/null' "broken args.ctags?"
+	L_BROKEN_ARGS_CTAGS="${L_BROKEN_ARGS_CTAGS} ${category}/${name}/"
 	return 1
     fi
 
@@ -627,7 +651,9 @@ run_tcase ()
 	return 0
     fi
 
-    ${output_type}_basename_filter < "${orawout}" | "$ffilter" > "${ofiltered}"
+    ${output_type}_basename_filter < "${orawout}" | \
+	anon_normalize "${CTAGS}" "${input}" | \
+	$ffilter > "${ofiltered}"
 
     {
 	diff -U 0 -I '^!_TAG' --strip-trailing-cr "${fexpected}" "${ofiltered}" > "${odiff}"
@@ -739,6 +765,12 @@ run_summary ()
     printf '  %-40s' "#FIXED:"
     count_list $L_FIXED
     for t in $L_FIXED; do
+	echo "	${t#${_DEFAULT_CATEGORY}/}"
+    done
+
+    printf '  %-40s' "#FAILED (broken args.ctags?):"
+    count_list $L_BROKEN_ARGS_CTAGS
+    for t in $L_BROKEN_ARGS_CTAGS; do
 	echo "	${t#${_DEFAULT_CATEGORY}/}"
     done
 
@@ -958,7 +990,10 @@ action_run ()
 
     run_summary "${build_dir}"
 
-    if [ -n "${L_FAILED_BY_STATUS}" ] || [ -n "${L_FAILED_BY_DIFF}" ] || [ -n "${L_FAILED_BY_TIMEED_OUT}" ]; then
+    if [ -n "${L_FAILED_BY_STATUS}" ] ||
+	   [ -n "${L_FAILED_BY_DIFF}" ] ||
+	   [ -n "${L_FAILED_BY_TIMEED_OUT}" ] ||
+	   [ -n "${L_BROKEN_ARGS_CTAGS}" ]; then
 	return 1
     else
 	return 0
