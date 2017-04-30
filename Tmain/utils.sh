@@ -21,6 +21,7 @@ is_feature_available()
 {
     local ctags=$1
 	local tmp=$2
+	local o="--quiet --options=NONE"
 	local neg
 	local feat
 
@@ -32,11 +33,11 @@ is_feature_available()
 	fi
 
 	if [ "${neg}" = 1 ]; then
-		if ${ctags} --list-features | grep -q "$feat"; then
+		if ${ctags} $o --list-features | grep -q "$feat"; then
 			skip "feature \"$feat\" is available in $ctags"
 		fi
 	else
-		if ! ${ctags} --list-features | grep -q "$feat"; then
+		if ! ${ctags} $o --list-features | grep -q "$feat"; then
 			skip "feature \"$feat\" is not available in $ctags"
 		fi
 	fi
@@ -63,4 +64,27 @@ run_with_format()
     local format=$1
     shift
     ${CTAGS} --quiet --options=NONE --output-format=$format "$@" -o - input.*
+}
+
+exit_status_for_input_c()
+{
+	local ctags=$1
+	shift
+
+	local remove_file=$1
+	shift
+
+	printf "%s => " "$*"
+	${ctags} --quiet --options=NONE "$@" input.c > /dev/null
+	local result_local=$?
+
+	if [ "$remove_file" != "none" ]; then
+		rm -f "$remove_file"
+	fi
+
+	if [ "$result_local" = 0 ]; then
+		echo "ok"
+	else
+		echo "failed"
+	fi
 }
