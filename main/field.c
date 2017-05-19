@@ -24,6 +24,7 @@
 #include "options.h"
 #include "read.h"
 #include "routines.h"
+#include "trashbox.h"
 
 
 typedef struct sFieldObject {
@@ -237,6 +238,7 @@ extern void initFieldObjects (void)
 	  + ARRAY_SIZE (fieldDefinitionsExuberant)
 	  + ARRAY_SIZE (fieldDefinitionsUniversal);
 	fieldObjects = xMalloc (fieldObjectAllocated, fieldObject);
+	TRASH_BOX(&fieldObjects, eFreeIndirect);
 
 	fieldObjectUsed = 0;
 
@@ -280,6 +282,7 @@ extern void initFieldObjects (void)
 			strcat (nameWithPrefix, CTAGS_FIELD_PREFIX);
 			strcat (nameWithPrefix, fobj->def->name);
 			fobj->nameWithPrefix = nameWithPrefix;
+			TRASH_BOX(nameWithPrefix, eFree);
 		}
 		else
 			fobj->nameWithPrefix = NULL;
@@ -469,7 +472,7 @@ static const char *renderEscapedName (const char* s,
 		{
 			verbose ("Unexpected character (0 < *c && *c < 0x20) included in a tagEntryInfo: %s\n", base);
 			verbose ("File: %s, Line: %lu, Lang: %s, Kind: %c\n",
-				 tag->inputFileName, tag->lineNumber, tag->language, tag->kind->letter);
+				 tag->inputFileName, tag->lineNumber, getLanguageName(tag->langType), tag->kind->letter);
 			verbose ("Escape the character\n");
 			break;
 		}
@@ -590,7 +593,7 @@ extern const char* renderFieldEscaped (writerType writer,
 	Assert (tag);
 	Assert (fobj->def->renderEscaped);
 
-	fobj->buffer = vStringNewOrClear (fobj->buffer);
+	fobj->buffer = vStringNewOrClearWithAutoRelease (fobj->buffer);
 
 	if (index >= 0)
 	{
@@ -655,7 +658,7 @@ static const char *renderFieldCompactInputLine (const tagEntryInfo *const tag,
 	const char *line;
 	static vString *tmp;
 
-	tmp = vStringNewOrClear (tmp);
+	tmp = vStringNewOrClearWithAutoRelease (tmp);
 
 	line = readLineFromBypassAnyway (tmp, tag, NULL);
 	if (line)
@@ -712,10 +715,12 @@ static const char *renderFieldLanguage (const tagEntryInfo *const tag,
 					vString* b,
 					bool *rejected)
 {
-	const char *l = tag->language;
+	const char *l;
 
-	if (Option.lineDirectives && tag->sourceLanguage)
-		l = tag->sourceLanguage;
+	if (Option.lineDirectives && (tag->sourceLangType != LANG_IGNORE))
+		l = getLanguageName(tag->sourceLangType);
+	else
+		l = getLanguageName(tag->langType);
 
 	return renderAsIs (b, WITH_DEFUALT_VALUE(l));
 }
@@ -862,7 +867,7 @@ static const char *renderFieldEnd (const tagEntryInfo *const tag,
 
 static bool     isLanguageFieldAvailable (const tagEntryInfo *const tag)
 {
-	return (tag->language != NULL)? true: false;
+	return (tag->langType == LANG_IGNORE)? false: true;
 }
 
 static bool     isTyperefFieldAvailable  (const tagEntryInfo *const tag)
@@ -1071,6 +1076,7 @@ extern int defineField (fieldDefinition *def, langType language)
 	strcat (nameWithPrefix, CTAGS_FIELD_PREFIX);
 	strcat (nameWithPrefix, def->name);
 	fobj->nameWithPrefix = nameWithPrefix;
+	TRASH_BOX(nameWithPrefix, eFree);
 
 	fobj->language = language;
 	fobj->sibling  = FIELD_UNKNOWN;
