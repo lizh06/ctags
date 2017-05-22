@@ -61,7 +61,7 @@
 	DTSParser, \
 	DosBatchParser, \
 	EiffelParser, \
-  ElmParser, \
+	ElmParser, \
 	ErlangParser, \
 	FalconParser, \
 	FlexParser, \
@@ -69,7 +69,7 @@
 	GdbinitParser, \
 	GoParser, \
 	HtmlParser, \
-        IniconfParser, \
+	IniconfParser, \
 	ITclParser, \
 	JavaParser, \
 	JavaPropertiesParser, \
@@ -110,6 +110,7 @@
 	SqlParser, \
 	SystemdUnitParser, \
 	TclParser, \
+	TclOOParser, \
 	TexParser, \
 	TTCNParser, \
 	VeraParser, \
