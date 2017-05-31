@@ -249,6 +249,8 @@ static optionDescription LongOptionDescription [] = {
 #else
  {0,"       Uses the specified type of EX command to locate tags [mix]."},
 #endif
+ {1,"  --extradef-<LANG>=name,desc"},
+ {1,"       Define new extra for <LANG>. \"--extra-<LANG>=+{name}\" enables it."},
  {1,"  --extras=[+|-]flags"},
  {1,"      Include extra tag entries for selected information (flags: \"Ffq.\") [F]."},
  {1,"  --extras-<LANG|*>=[+|-]flags"},
@@ -410,7 +412,7 @@ static optionDescription LongOptionDescription [] = {
  {1,"  --version"},
  {1,"       Print version identifier to standard output."},
  {1,"  --with-list-header=[yes|no]"},
- {1,"       Preprend the column descriptions in --list- output. [yes]"},
+ {1,"       Prepend the column descriptions in --list- output. [yes]"},
  {1,"       --list-extras, --list-fields, --list-kinds-full, and --list-params support this option."},
  {1,"       Specify before --list-* option."},
 #ifdef HAVE_COPROC
@@ -428,6 +430,8 @@ static optionDescription LongOptionDescription [] = {
  {1,"       of loading option files."},
  {1,"  --_fatal-warnings"},
  {1,"       Make all warnings fatal."},
+ {1,"  --_fielddef-<LANG>=name,description"},
+ {1,"       EXPERIMENTAL, Define new field for <LANG>."},
  {1,"  --_force-quit=[num]"},
  {1,"       Quit when the option is processed. Useful to debug the chain"},
  {1,"       of loading option files."},
@@ -1981,7 +1985,7 @@ static void processListRolesOptions (const char *const option CTAGS_ATTR_UNUSED,
 		vString* vstr = vStringNewInit (parameter);
 		vStringCatS (vstr, (sep? "*": ".*"));
 		processListRolesOptions (option, vStringValue (vstr));
-		/* The control should never reache here. */
+		/* The control should never reached here. */
 	}
 
 	kindletters = sep + 1;
@@ -2519,7 +2523,7 @@ static void processPatternLengthLimit(const char *const option, const char *cons
 		error (FATAL, "-%s: Invalid pattern length limit", option);
 }
 
-static bool* redirectToXtag(const booleanOption *const option)
+static bool* redirectToXtag(booleanOption *const option)
 {
 	/* WARNING/TODO: This function breaks capsulization. */
 	xtagType t = (xtagType)option->pValue;
@@ -2766,7 +2770,7 @@ static bool processLangSpecificFieldsOption (const char *const option,
 	if (language == LANG_IGNORE)
 	{
 		error (WARNING, "Unknown language: %s (ignoring \"--%s\")", lang, option);
-		/* The option is consumed in tihs function. */
+		/* The option is consumed in this function. */
 		return true;
 	}
 
@@ -2867,7 +2871,7 @@ static bool processLangSpecificExtraOption (const char *const option,
 	if (language == LANG_IGNORE)
 	{
 		error (WARNING, "Unknown language: %s (ignoring \"--%s\")", lang, option);
-		/* The option is consumed in tihs function. */
+		/* The option is consumed in this function. */
 		return true;
 	}
 
@@ -2964,6 +2968,10 @@ static void processLongOption (
 		;
 	else if (processLangSpecificFieldsOption(option, parameter))
 		 ;
+	else if (processExtradefOption(option, parameter))
+		;
+	else if (processFielddefOption(option, parameter))
+		;
 	else if (processLangSpecificExtraOption(option, parameter))
 		;
 	else if (processParametricOption (option, parameter))

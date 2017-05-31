@@ -24,6 +24,7 @@
 #include "xtag.h"
 #include "mio.h"
 #include "nestlevel.h"
+#include "ptrarray.h"
 
 /*
 *   MACROS
@@ -37,6 +38,7 @@
 typedef struct sTagField {
 	fieldType  ftype;
 	const char* value;
+	bool valueOwner;			/* used only in parserFieldsDynamic */
 } tagField;
 
 /*  Information about the current tag candidate.
@@ -60,6 +62,7 @@ struct sTagEntryInfo {
 	const char *name;             /* name of the tag */
 	const kindDefinition *kind;	      /* kind descriptor */
 	uint8_t extra[ ((XTAG_COUNT) / 8) + 1 ];
+	uint8_t *extraDynamic;		/* Dynamically allocated but freed by per parser TrashBox */
 
 	struct {
 		const char* access;
@@ -90,8 +93,9 @@ struct sTagEntryInfo {
 
 #define PRE_ALLOCATED_PARSER_FIELDS 5
 #define NO_PARSER_FIELD -1
-	unsigned int usedParserFields;
+	int usedParserFields;
 	tagField     parserFields [PRE_ALLOCATED_PARSER_FIELDS];
+	ptrArray *   parserFieldsDynamic;
 
 	/* Following source* fields are used only when #line is found
 	   in input and --line-directive is given in ctags command line. */
@@ -171,5 +175,6 @@ extern bool isTagExtraBitMarked (const tagEntryInfo *const tag, xtagType extra);
 
 extern void attachParserField (tagEntryInfo *const tag, fieldType ftype, const char* value);
 extern void attachParserFieldToCorkEntry (int index, fieldType ftype, const char* value);
+extern const tagField* getParserField (const tagEntryInfo * tag, int index);
 
 #endif  /* CTAGS_MAIN_ENTRY_H */

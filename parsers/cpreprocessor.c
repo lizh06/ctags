@@ -1256,7 +1256,7 @@ static hashTable * defineMacroTable;
 
 /*  Determines whether or not "name" should be ignored, per the ignore list.
  */
-extern const cppMacroInfo * cppFindMacro(const char * name)
+extern const cppMacroInfo * cppFindMacro(const char *const name)
 {
 	if(!defineMacroTable)
 		return NULL;
@@ -1639,7 +1639,7 @@ static void saveMacro(const char * macro)
 					while(*c == '#')
 						c++;
 
-					// we just skip this part and the followin spaces
+					// we just skip this part and the following spaces
 					while(*c && isspacetab(*c))
 						c++;
 
@@ -1705,17 +1705,17 @@ static void initializeCpp (const langType language)
 	Cpp.lang = language;
 
 	defineMacroTable = makeMacroTable ();
-	TRASH_BOX(defineMacroTable,hashTableDelete);
+	DEFAULT_TRASH_BOX(defineMacroTable,hashTableDelete);
 }
 
 static void CpreProInstallIgnoreToken (const langType language, const char *optname, const char *arg)
 {
 	if (arg == NULL || arg[0] == '\0')
 	{
-		TRASH_BOX_TAKE_BACK(defineMacroTable);
+		DEFAULT_TRASH_BOX_TAKE_BACK(defineMacroTable);
 		hashTableDelete(defineMacroTable);
 		defineMacroTable = makeMacroTable ();
-		TRASH_BOX(defineMacroTable,hashTableDelete);
+		DEFAULT_TRASH_BOX(defineMacroTable,hashTableDelete);
 
 		verbose ("    clearing list\n");
 	} else {

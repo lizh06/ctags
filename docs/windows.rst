@@ -52,6 +52,10 @@ If you want to build a debug version using ``mk_mvc.mak``, you must specify ``DE
 
         nmake -f mk_mvc.mak DEBUG=1
 
+If you want to create PDB files for debugging even for a release version, you must specify ``PDB=1`` like below::
+
+        nmake -f mk_mvc.mak PDB=1
+
 GCC
 .............................................................................
 
@@ -76,7 +80,7 @@ If you want to build a debug version, you must specify ``DEBUG=1`` like below::
 
         make -f mk_mingw.mak DEBUG=1
 
-**MSYS**
+**MSYS / MSYS2**
 
 From their site: MSYS is a collection of GNU utilities such as bash, make, gawk and grep to allow building of applications and programs which depend on traditional UNIX tools to be present. It is intended to supplement MinGW and the deficiencies of the cmd shell.
 
@@ -85,6 +89,26 @@ MSYS comes in two flavors. The original from MinGW and a MSYS2 http://sourceforg
 MSYS is old but still works. You can build ctags with it using ``make -f mk_mingw.mak``. The Autotools are too old on MSYS so you cannot use them.
 
 MSYS2 is a more maintained version of MSYS, but specially geared towards MinGW-w64. You can also use Autotools to build ctags.
+If you use Autotools you can enable parsers which require jansson, libxml2 or libyaml, and can also do the Units testing with ``make units``.
+
+The following packages are needed to build a full-featured version:
+
+- base-devel (make, autoconf)
+- mingw-w64-{i686,x86_64}-toolchain (mingw-w64-{i686,x86_64}-gcc, mingw-w64-{i686,x86_64}-pkg-config)
+- mingw-w64-{i686,x86_64}-jansson
+- mingw-w64-{i686,x86_64}-libxml2
+- mingw-w64-{i686,x86_64}-libyaml
+- mingw-w64-{i686,x86_64}-xz
+
+If you want to build a single static-linked binary, you can use the following command:
+
+.. code-block:: bash
+
+        ./autogen.sh
+        ./configure --disable-external-sort EXTRA_CFLAGS=-DLIBXML_STATIC LDFLAGS=-static LIBS='-lz -llzma -lws2_32'
+        make
+
+``--disable-external-sort`` is a recommended option for Windows builds.
 
 **Cygwin**
 
@@ -102,7 +126,7 @@ You can also build a native Windows version using Autotools.
 	./configure --host=i686-w64-mingw32 --disable-external-sort
 	make
 
-If you use Autotools you can also do the Units testing with `make units`. Some tests fail, that needs to be investigated.
+If you use Autotools you can also do the Units testing with ``make units``.
 
 Some anti-virus software slows down the build and test process significantly, especially when ``./configure`` is running and during the Units tests. In that case it could help to temporarily disable them. But be aware of the risks when you disable your anti-virus software.
 
@@ -121,7 +145,7 @@ Microsoft Visual Studio
 
 As already mentioned Microsoft Visual Studio 2013 has the free Express and Community editions. For ctags the Windows Desktop Express Edition is enough to get the job done. The IDE has a proper debugger. Project files for VS2013 can be found in the win32 directory.
 
-Please know that when files are added to the sources.mak, these files need to be added to the .vcproj and .vcproj.filters files as well. The XML of these files should not be a problem.
+Please know that when files are added to the sources.mak, these files need to be added to the .vcxproj and .vcxproj.filters files as well. The XML of these files should not be a problem.
 
 Code::Blocks
 .............................................................................

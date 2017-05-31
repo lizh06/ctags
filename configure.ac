@@ -8,7 +8,7 @@
 
 AC_PREREQ([2.59])
 AC_INIT([universal-ctags],[0.0.0])
-AM_INIT_AUTOMAKE([foreign subdir-objects])
+AM_INIT_AUTOMAKE([foreign subdir-objects tar-ustar])
 AM_SILENT_RULES([yes])
 AC_CONFIG_HEADERS([config.h])
 if ! test -e "${srcdir}/config.h.in"; then
@@ -179,8 +179,8 @@ AC_ARG_ENABLE(external-sort,
 		[use internal sort algorithm instead of sort program])])
 
 AC_ARG_ENABLE(iconv,
-	[AS_HELP_STRING([--enable-iconv],
-		[support multibyte character encoding])])
+	[AS_HELP_STRING([--disable-iconv],
+		[disable multibyte character encoding support])])
 
 AC_ARG_ENABLE(custom-config,
 	[AS_HELP_STRING([--enable-custom-config=FILE],
@@ -301,7 +301,7 @@ AC_SYS_LARGEFILE
 AC_CHECK_PROGS([perl_found], [perl], [yes], [no])
 AM_CONDITIONAL([RUN_OPTLIB2C], [test "${perl_found}" = "yes"])
 
-AC_PATH_PROGS(RST2MAN, [rst2man rst2man.py], [no])
+AC_PATH_PROGS(RST2MAN, [rst2man rst2man.py rst2man3 rst2man3.py], [no])
 AM_CONDITIONAL([HAVE_RST2MAN], [test "x$RST2MAN" != "xno"])
 
 # Checks for operating environment
@@ -664,7 +664,7 @@ fi
 # Process library configuration options
 # -------------------------------------
 
-if test "$enable_iconv" = yes ; then
+if test "$enable_iconv" != no ; then
 	save_LIBS="$LIBS"
 	LIBS="$LIBS -liconv"
 	AC_MSG_CHECKING(for iconv_open with -liconv)

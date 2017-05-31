@@ -32,7 +32,8 @@ bool cxxParserParseGenericTypedef(void)
 	{
 		if(!cxxParserParseUpToOneOf(
 				CXXTokenTypeSemicolon | CXXTokenTypeEOF |
-				CXXTokenTypeClosingBracket | CXXTokenTypeKeyword
+				CXXTokenTypeClosingBracket | CXXTokenTypeKeyword,
+				false
 			))
 		{
 			CXX_DEBUG_LEAVE_TEXT("Failed to parse fast statement");
@@ -129,8 +130,8 @@ bool cxxParserParseGenericTypedef(void)
 //
 // Note that not all syntaxes involving parentheses are valid.
 // Examples of what is NOT valid:
-// 
-//    [typedef] unsigned (int)(*x)() 
+//
+//    [typedef] unsigned (int)(*x)()
 //    [typedef] int[] x;
 //
 // So:
@@ -160,7 +161,7 @@ void cxxParserExtractTypedef(
 	vStringDelete(pX);
 #endif
 
-	// Atleast something like
+	// At least something like
 	//   a b;
 
 	if(pChain->iCount < (bExpectTerminatorAtEnd ? 3 : 2))
@@ -187,7 +188,7 @@ void cxxParserExtractTypedef(
 	//   -> y is x
 	//   -> z is x *
 
-	// The angle brackets are not necessairly condensed in chains here
+	// The angle brackets are not necessarily condensed in chains here
 	// since we were parsing a generic statement which expected less-than
 	// and greater-than operators to be present. We need to take care of that.
 
@@ -226,7 +227,7 @@ skip_to_comma_or_end:
 				// and go ahead
 				goto skip_to_comma_or_end;
 			}
-			
+
 			if(cxxTokenTypeIs(pComma,CXXTokenTypeParenthesisChain))
 			{
 				// We keep track only of the first one
@@ -269,7 +270,7 @@ skip_to_comma_or_end:
 
 		if(cxxTokenTypeIs(t,CXXTokenTypeIdentifier))
 		{
-			// Use the identifer at end, whatever comes before
+			// Use the identifier at end, whatever comes before
 			CXX_DEBUG_PRINT("Identifier seems to be at end: %s",vStringValue(t->pszWord));
 			pTParentChain = pChain;
 		} else if(pFirstParenthesis)
@@ -277,7 +278,7 @@ skip_to_comma_or_end:
 			// look for the last nested identifier in here
 			// e.g.
 			// typedef void (WINAPI *func_t) (void);
-			// We exepect func_t we want to capture is at the end of parenthesis chain.
+			// We expect func_t we want to capture is at the end of parenthesis chain.
 			CXX_DEBUG_PRINT("Identifier not at end, but got parenthesis chain");
 			t = cxxTokenChainLastPossiblyNestedTokenOfType(
 					pFirstParenthesis->pChain,

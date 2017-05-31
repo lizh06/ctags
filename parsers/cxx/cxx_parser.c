@@ -66,7 +66,8 @@ void cxxParserNewStatement(void)
 //
 bool cxxParserParseAndCondenseCurrentSubchain(
 		unsigned int uInitialSubchainMarkerTypes,
-		bool bAcceptEOF
+		bool bAcceptEOF,
+		bool bCanReduceInnerElements
 	)
 {
 	CXXTokenChain * pCurrentChain = g_cxx.pTokenChain;
@@ -93,7 +94,8 @@ bool cxxParserParseAndCondenseCurrentSubchain(
 		uTokenTypes |= CXXTokenTypeEOF;
 	bool bRet = cxxParserParseAndCondenseSubchainsUpToOneOf(
 			uTokenTypes,
-			uInitialSubchainMarkerTypes
+			uInitialSubchainMarkerTypes,
+			bCanReduceInnerElements
 		);
 	g_cxx.pTokenChain = pCurrentChain;
 	g_cxx.pToken = pCurrentChain->pTail;
@@ -103,11 +105,11 @@ bool cxxParserParseAndCondenseCurrentSubchain(
 
 //
 // This function parses input until one of the specified tokens appears.
-// The current token is NOT checked agains the specified tokens.
+// The current token is NOT checked against the specified tokens.
 //
 // The algorithm will also build subchains of matching
 // pairs ([...],(...),<...>,{...}): within the subchain analysis
-// of uTokenTypes is completly disabled. Subchains do nest.
+// of uTokenTypes is completely disabled. Subchains do nest.
 //
 // Returns true if it stops before EOF or it stops at EOF and CXXTokenTypeEOF
 // is present in uTokenTypes. Returns false in all the other stop conditions
@@ -115,10 +117,12 @@ bool cxxParserParseAndCondenseCurrentSubchain(
 //
 bool cxxParserParseAndCondenseSubchainsUpToOneOf(
 		unsigned int uTokenTypes,
-		unsigned int uInitialSubchainMarkerTypes
+		unsigned int uInitialSubchainMarkerTypes,
+		bool bCanReduceInnerElements
 	)
 {
-	CXX_DEBUG_ENTER_TEXT("Token types = 0x%x(%s)", uTokenTypes, cxxDebugTypeDecode(uTokenTypes));
+	CXX_DEBUG_ENTER_TEXT("Token types = 0x%x(%s), reduce = %d", uTokenTypes, cxxDebugTypeDecode(uTokenTypes),
+						 bCanReduceInnerElements);
 	if(!cxxParserParseNextToken())
 	{
 		CXX_DEBUG_LEAVE_TEXT("Found EOF");
@@ -139,6 +143,20 @@ bool cxxParserParseAndCondenseSubchainsUpToOneOf(
 
 		if(cxxTokenTypeIsOneOf(g_cxx.pToken,uTokenTypes))
 		{
+			if (bCanReduceInnerElements)
+			{
+				enum CXXTokenType eSentinelType = g_cxx.pToken->eType >> 4;
+				CXXToken *pTmp = g_cxx.pToken->pPrev, *pReducingCandidate;
+				while (pTmp && (!cxxTokenTypeIsOneOf (pTmp, eSentinelType)))
+				{
+					pReducingCandidate = pTmp;
+					pTmp = pTmp->pPrev;
+					pTmp->pNext = pReducingCandidate->pNext;
+					pReducingCandidate->pNext->pPrev = pTmp;
+					CXX_DEBUG_PRINT("reduce inner token: %p",pReducingCandidate);
+					cxxTokenDestroy (pReducingCandidate);
+				}
+			}
 			CXX_DEBUG_LEAVE_TEXT(
 					"Got terminator token '%s' 0x%x",
 					vStringValue(g_cxx.pToken->pszWord),
@@ -171,7 +189,8 @@ bool cxxParserParseAndCondenseSubchainsUpToOneOf(
 			} else {
 				if(!cxxParserParseAndCondenseCurrentSubchain(
 						uInitialSubchainMarkerTypes,
-						(uTokenTypes & CXXTokenTypeEOF)
+						(uTokenTypes & CXXTokenTypeEOF),
+						bCanReduceInnerElements
 					)
 				)
 				{
@@ -202,7 +221,7 @@ bool cxxParserParseAndCondenseSubchainsUpToOneOf(
 			continue; // jump up to avoid checking for mismatched pairs below
 		}
 
-		// Check for mismatched brackets/parenthis
+		// Check for mismatched brackets/parentheses
 		// Note that if we were looking for one of [({ then we would have matched
 		// it at the top of the for
 		if(cxxTokenTypeIsOneOf(g_cxx.pToken,uFinalSubchainMarkerTypes))
@@ -228,10 +247,10 @@ bool cxxParserParseAndCondenseSubchainsUpToOneOf(
 
 //
 // This function parses input until one of the specified tokens appears.
-// The current token is NOT checked agains the specified tokens.
+// The current token is NOT checked against the specified tokens.
 //
 // The algorithm will also build subchains of matching pairs ([...],(...),{...}).
-// Within the subchain analysis of uTokenTypes is completly disabled.
+// Within the subchain analysis of uTokenTypes is completely disabled.
 // Subchains do nest.
 //
 // Please note that this function will skip entire scopes (matching {} pairs)
@@ -239,13 +258,15 @@ bool cxxParserParseAndCondenseSubchainsUpToOneOf(
 // This is usually what you want, unless you're really expecting a scope to begin
 // in the current statement.
 //
-bool cxxParserParseUpToOneOf(unsigned int uTokenTypes)
+bool cxxParserParseUpToOneOf(unsigned int uTokenTypes,
+							 bool bCanReduceInnerElements)
 {
 	return cxxParserParseAndCondenseSubchainsUpToOneOf(
 			uTokenTypes,
 			CXXTokenTypeOpeningBracket |
 				CXXTokenTypeOpeningParenthesis |
-				CXXTokenTypeOpeningSquareParenthesis
+				CXXTokenTypeOpeningSquareParenthesis,
+			bCanReduceInnerElements
 		);
 }
 
@@ -259,7 +280,8 @@ bool cxxParserSkipToSemicolonOrEOF(void)
 	if(cxxTokenTypeIsOneOf(g_cxx.pToken,CXXTokenTypeSemicolon | CXXTokenTypeEOF))
 		return true;
 
-	return cxxParserParseUpToOneOf(CXXTokenTypeSemicolon | CXXTokenTypeEOF);
+	return cxxParserParseUpToOneOf(CXXTokenTypeSemicolon | CXXTokenTypeEOF,
+								   false);
 }
 
 // This has to be called when pointing to a double-colon token
@@ -400,7 +422,7 @@ static bool cxxParserParseEnumStructClassOrUnionFullDeclarationTrailer(
 	int iFileLine = getInputLineNumber();
 
 	if(!cxxParserParseUpToOneOf(CXXTokenTypeEOF | CXXTokenTypeSemicolon | CXXTokenTypeOpeningBracket
-								| CXXTokenTypeAssignment))
+								| CXXTokenTypeAssignment, false))
 	{
 		CXX_DEBUG_LEAVE_TEXT("Failed to parse up to EOF/semicolon");
 		return false;
@@ -478,7 +500,7 @@ static bool cxxParserParseEnumStructClassOrUnionFullDeclarationTrailer(
 	  To be tolerant and handle unrecognized case, we
 	  put the code for skipping here. */
 	if(cxxTokenTypeIs(g_cxx.pToken,CXXTokenTypeAssignment) &&
-	   (!cxxParserParseUpToOneOf(CXXTokenTypeEOF | CXXTokenTypeSemicolon)))
+	   (!cxxParserParseUpToOneOf(CXXTokenTypeEOF | CXXTokenTypeSemicolon, true)))
 	{
 		CXX_DEBUG_LEAVE_TEXT("Failed to parse up to EOF/semicolon");
 		return false;
@@ -525,7 +547,8 @@ bool cxxParserParseEnum(void)
 	if(!cxxParserParseUpToOneOf(
 			CXXTokenTypeEOF | CXXTokenTypeSemicolon | CXXTokenTypeKeyword |
 				CXXTokenTypeSingleColon | CXXTokenTypeParenthesisChain |
-				CXXTokenTypeOpeningBracket
+				CXXTokenTypeOpeningBracket,
+			false
 		))
 	{
 		CXX_DEBUG_LEAVE_TEXT("Could not parse enum name");
@@ -547,7 +570,8 @@ bool cxxParserParseEnum(void)
 
 		if(!cxxParserParseUpToOneOf(
 				CXXTokenTypeEOF | CXXTokenTypeSemicolon | CXXTokenTypeSingleColon |
-					CXXTokenTypeParenthesisChain | CXXTokenTypeOpeningBracket
+				CXXTokenTypeParenthesisChain | CXXTokenTypeOpeningBracket,
+				false
 			))
 		{
 			CXX_DEBUG_LEAVE_TEXT("Could not parse enum name");
@@ -657,8 +681,8 @@ bool cxxParserParseEnum(void)
 		pTypeBegin = g_cxx.pToken;
 
 		if(!cxxParserParseUpToOneOf(
-				CXXTokenTypeEOF | CXXTokenTypeSemicolon | CXXTokenTypeOpeningBracket
-			))
+				CXXTokenTypeEOF | CXXTokenTypeSemicolon | CXXTokenTypeOpeningBracket,
+				false))
 		{
 			CXX_DEBUG_LEAVE_TEXT("Could not parse enum type");
 			return false;
@@ -768,7 +792,8 @@ bool cxxParserParseEnum(void)
 		cxxTokenChainClear(g_cxx.pTokenChain);
 
 		if(!cxxParserParseUpToOneOf(
-				CXXTokenTypeComma | CXXTokenTypeClosingBracket | CXXTokenTypeEOF
+				CXXTokenTypeComma | CXXTokenTypeClosingBracket | CXXTokenTypeEOF,
+				false
 			))
 		{
 			CXX_DEBUG_LEAVE_TEXT("Failed to parse enum contents");
@@ -869,7 +894,7 @@ static bool cxxParserParseClassStructOrUnionInternal(
 
 	for(;;)
 	{
-		bRet = cxxParserParseUpToOneOf(uTerminatorTypes);
+		bRet = cxxParserParseUpToOneOf(uTerminatorTypes, false);
 
 		if(!bRet)
 		{
@@ -877,6 +902,14 @@ static bool cxxParserParseClassStructOrUnionInternal(
 			CXX_DEBUG_LEAVE_TEXT("Could not parse class/struct/union name");
 			return false;
 		}
+
+		// skip alignas specifier:
+		// struct alignas(n) ...
+		//               ^ g_cxx.pToken points this.
+		if(cxxTokenTypeIs(g_cxx.pToken,CXXTokenTypeParenthesisChain) &&
+		   cxxTokenTypeIs(g_cxx.pToken->pPrev,CXXTokenTypeKeyword) &&
+		   g_cxx.pToken->pPrev->eKeyword == CXXKeywordALIGNAS)
+				continue;
 
 		if(!cxxTokenTypeIs(g_cxx.pToken,CXXTokenTypeSmallerThanSign))
 			break;
@@ -888,12 +921,13 @@ static bool cxxParserParseClassStructOrUnionInternal(
 		// }
 
 		// FIXME: Should we add the specialisation arguments somewhere?
-		//        Maye as a separate field?
+		//        Maybe as a separate field?
 
 		bRet = cxxParserParseAndCondenseCurrentSubchain(
 					CXXTokenTypeOpeningParenthesis | CXXTokenTypeOpeningBracket |
 						CXXTokenTypeOpeningSquareParenthesis |
 						CXXTokenTypeSmallerThanSign,
+					false,
 					false
 				);
 
@@ -939,7 +973,7 @@ static bool cxxParserParseClassStructOrUnionInternal(
 			(!(uInitialKeywordState & CXXParserKeywordStateSeenTypedef))
 		)
 	{
-		CXX_DEBUG_PRINT("Maybe KnR funciton definition?");
+		CXX_DEBUG_PRINT("Maybe KnR function definition?");
 
 		switch(cxxParserMaybeParseKnRStyleFunctionDefinition())
 		{
@@ -987,7 +1021,7 @@ static bool cxxParserParseClassStructOrUnionInternal(
 		}
 
 		// Skip the initialization (which almost certainly contains a block)
-		if(!cxxParserParseUpToOneOf(CXXTokenTypeEOF | CXXTokenTypeSemicolon))
+		if(!cxxParserParseUpToOneOf(CXXTokenTypeEOF | CXXTokenTypeSemicolon, true))
 		{
 			CXX_DEBUG_LEAVE_TEXT("Failed to parse up to EOF/semicolon");
 			return false;
@@ -1088,7 +1122,8 @@ static bool cxxParserParseClassStructOrUnionInternal(
 		cxxTokenChainClear(g_cxx.pTokenChain);
 
 		if(!cxxParserParseUpToOneOf(
-				CXXTokenTypeEOF | CXXTokenTypeSemicolon | CXXTokenTypeOpeningBracket
+				CXXTokenTypeEOF | CXXTokenTypeSemicolon | CXXTokenTypeOpeningBracket,
+				false
 			))
 		{
 			cxxTokenDestroy(pClassName);
@@ -1452,7 +1487,8 @@ bool cxxParserParseAccessSpecifier(void)
 	// skip to the next :, without leaving scope.
 	if(!cxxParserParseUpToOneOf(
 			CXXTokenTypeSingleColon | CXXTokenTypeSemicolon |
-				CXXTokenTypeClosingBracket | CXXTokenTypeEOF
+				CXXTokenTypeClosingBracket | CXXTokenTypeEOF,
+			false
 		))
 	{
 		CXX_DEBUG_LEAVE_TEXT("Failed to parse up to the next ;");
@@ -1470,7 +1506,8 @@ bool cxxParserParseIfForWhileSwitch(void)
 
 	if(!cxxParserParseUpToOneOf(
 			CXXTokenTypeParenthesisChain | CXXTokenTypeSemicolon |
-				CXXTokenTypeOpeningBracket | CXXTokenTypeEOF
+				CXXTokenTypeOpeningBracket | CXXTokenTypeEOF,
+			false
 		))
 	{
 		CXX_DEBUG_LEAVE_TEXT("Failed to parse if/for/while/switch up to parenthesis");

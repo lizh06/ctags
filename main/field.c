@@ -238,7 +238,7 @@ extern void initFieldObjects (void)
 	  + ARRAY_SIZE (fieldDefinitionsExuberant)
 	  + ARRAY_SIZE (fieldDefinitionsUniversal);
 	fieldObjects = xMalloc (fieldObjectAllocated, fieldObject);
-	TRASH_BOX(&fieldObjects, eFreeIndirect);
+	DEFAULT_TRASH_BOX(&fieldObjects, eFreeIndirect);
 
 	fieldObjectUsed = 0;
 
@@ -282,7 +282,7 @@ extern void initFieldObjects (void)
 			strcat (nameWithPrefix, CTAGS_FIELD_PREFIX);
 			strcat (nameWithPrefix, fobj->def->name);
 			fobj->nameWithPrefix = nameWithPrefix;
-			TRASH_BOX(nameWithPrefix, eFree);
+			DEFAULT_TRASH_BOX(nameWithPrefix, eFree);
 		}
 		else
 			fobj->nameWithPrefix = NULL;
@@ -592,13 +592,15 @@ extern const char* renderFieldEscaped (writerType writer,
 
 	Assert (tag);
 	Assert (fobj->def->renderEscaped);
+	Assert (tag->usedParserFields > index);
 
 	fobj->buffer = vStringNewOrClearWithAutoRelease (fobj->buffer);
 
 	if (index >= 0)
 	{
-		Assert ( tag->usedParserFields > index );
-		value = tag->parserFields[ index ].value;
+		const tagField *f = getParserField (tag, index);
+
+		value = f->value;
 	}
 	else
 		value = NULL;
@@ -801,8 +803,9 @@ static const char *renderFieldExtras (const tagEntryInfo *const tag,
 {
 	int i;
 	bool hasExtra = false;
+	int c = countXtags();
 
-	for (i = 0; i < XTAG_COUNT; i++)
+	for (i = 0; i < c; i++)
 	{
 		const char *name = getXtagName (i);
 
@@ -912,6 +915,8 @@ static bool     isExtrasFieldAvailable     (const tagEntryInfo *const tag)
 	for (i = 0; i < sizeof (tag->extra); i++)
 	{
 		if (tag->extra [i])
+			return true;
+		else if (tag->extraDynamic)
 			return true;
 	}
 
@@ -1076,7 +1081,7 @@ extern int defineField (fieldDefinition *def, langType language)
 	strcat (nameWithPrefix, CTAGS_FIELD_PREFIX);
 	strcat (nameWithPrefix, def->name);
 	fobj->nameWithPrefix = nameWithPrefix;
-	TRASH_BOX(nameWithPrefix, eFree);
+	DEFAULT_TRASH_BOX(nameWithPrefix, eFree);
 
 	fobj->language = language;
 	fobj->sibling  = FIELD_UNKNOWN;
