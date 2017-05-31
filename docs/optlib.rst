@@ -533,7 +533,7 @@ Next example is based on an issue #219 posted by @andreicristianpetcu::
 
 ``{_multiline=N}``
 
-	This tells the patern should be applied to whole file
+	This tells the pattern should be applied to whole file
 	contents, not line by line.  ``N`` is the number of a group in the
 	pattern. The specified group is used to record the line number
 	and the pattern of tag. In the above example 3 is
@@ -541,6 +541,122 @@ Next example is based on an issue #219 posted by @andreicristianpetcu::
 	file contents is used.
 
 NOTE: This flag doesn't work well with scope related flags and ``exclusive`` flags.
+
+.. _extras:
+
+Conditional tagging with extras
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. NOT REVIEWED YET
+
+If a pattern matching should be done only when an extra is enabled,
+mark a pattern with ``{_extra=XNAME}``. Here ``XNAME`` is the name of
+extra. You must define ``XNAME`` with ``--extradef-<LANG>=XNAME,DESCRIPTION`` option
+before defining a pattern marked ``{_extra=XNAME}``.
+
+.. code-block:: python
+
+	if __name__ == '__main__':
+		do_something()
+
+To capture above lines in a python program(*input.py*), an extra can be used.
+
+.. code-block:: ctags
+
+	--extradef-Python=main,__main__ entry points
+	--regex-Python=/^if __name__ == '__main__':/__main__/f/{_extra=main}
+
+The above optlib(*python-main.ctags*) introduces ``main`` extra to Python parser.
+The pattern matching is done only when the ``main`` is enabled.
+
+.. code-block:: ctags
+
+	$ ./ctags --options=python-main.ctags -o - --extras-Python='+{main}' input.py
+	__main__	input.py	/^if __name__ == '__main__':$/;"	f		
+
+Attaching parser own fields
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. NOT REVIEWED YET
+
+Exuberant-ctags allows one of the specified group in a regex pattern can be
+used as a part of the name of a tagEntry. Universal-ctags offers using
+the other groups in the regex pattern.
+
+A optlib parser can have its own fields. The groups can be used as a
+value of the fields of a tagEntry.
+
+Let's think about *Unknown*, an imaginary language.
+Here is an source file(``input.unknown``) written in *Unknown*:
+
+    public func foo(n, m);
+    protected func bar(n);
+    private func baz(n,...);
+
+With `--regex-Unknown=...` Exuberant-ctags can capture `foo`, `bar`, and `baz`
+as names. Universal-ctags can attach extra context information to the
+names as values for fields. Let's focus on `bar`. `protected` is a
+keyword to control how widely the identifier `bar` can be accessed.
+`(n)` is the parameter list of `bar`. `protected` and `(n)` are
+extra context information of `bar`.
+
+With following optlib file(``unknown.ctags``)), ctags can attach
+`protected` to protection field and `(n)` to signature field.
+
+.. code-block:: ctags
+
+    --langdef=unknown
+    --kinddef-unknown=f,func,functions
+    --map-unknown=+.unknown
+
+    --_fielddef-unknown=protection,access scope
+    --_fielddef-unknown=signature,signatures
+
+    --regex-unknown=/^((public|protected|private) +)?func ([^\(]+)\((.*)\)/\3/f/{_field=protection:\1}{_field=signature:(\4)}
+
+    --fields-unknown=+'{protection}{signature}'
+
+For the line `    protected func bar(n);` you will get following tags output::
+
+	bar	input.unknown	/^protected func bar(n);$/;"	f	protection:protected	signature:(n)
+
+Let's see the detail of ``unknown.ctags``.
+
+.. code-block:: ctags
+
+    --_fielddef-unknown=protection,access scope
+
+`--_fielddef-<LANG>=name,description` defines a new field for a parser
+specified by `<LANG>`.  Before defining a new field for the parser,
+the parser must be defined with `--langdef=<LANG>`. `protection` is
+the field name used in tags output. `access scope` is the description
+used in the output of ``--list-fields`` and ``--list-fields=Unknown``.
+
+.. code-block:: ctags
+
+    --_fielddef-unknown=signature,signatures
+
+This defines a field named `signature`.
+
+.. code-block:: ctags
+
+    --regex-unknown=/^((public|protected|private) +)?func ([^\(]+)\((.*)\)/\3/f/{_field=protection:\1}{_field=signature:(\4)}
+
+This option requests making a tag for the name that is specified with the group 3 of the
+pattern, attaching the group 1 as a value for `protection` field to the tag, and attaching
+the group 4 as a value for `signature` field to the tag. You can use the long regex flag
+`_field` for attaching fields to a tag with following notation rule::
+
+  {_field=FIELDNAME:GROUP}
+
+
+`--fields-<LANG>=[+|-]{FIELDNAME}` can be used to enable or disable specified field.
+
+When defining a new parser own field, it is disabled by default. Enable the
+field explicitly to use the field. See :ref:`Parser own fields <parser-own-fields>`
+about `--fields-<LANG>` option.
+
+`passwd` parser is a simple example that uses `--fields-<LANG>` option.
 
 
 Submitting an optlib to universal-ctags project

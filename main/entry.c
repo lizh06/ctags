@@ -36,6 +36,8 @@
 # include <io.h>
 #endif
 
+#include <stdint.h>
+
 #include "debug.h"
 #include "entry.h"
 #include "field.h"
@@ -46,8 +48,10 @@
 #include "ptag.h"
 #include "read.h"
 #include "routines.h"
+#include "ptrarray.h"
 #include "sort.h"
 #include "strlist.h"
+#include "trashbox.h"
 #include "writer.h"
 #include "xtag.h"
 
@@ -817,8 +821,8 @@ extern void getTagScopeInformation (tagEntryInfo *const tag,
 
 
 static int   makePatternStringCommon (const tagEntryInfo *const tag,
-				      int putc_func (char , void *),
-				      int puts_func (const char* , void *),
+				      int (* putc_func) (char , void *),
+				      int (* puts_func) (const char* , void *),
 				      void *output)
 {
 	int length = 0;
@@ -886,17 +890,54 @@ extern char* makePatternString (const tagEntryInfo *const tag)
 	return vStringDeleteUnwrap (pattern);
 }
 
+static tagField * tagFieldNew(fieldType ftype, const char *value, bool valueOwner)
+{
+	tagField *f = xMalloc (1, tagField);
+
+	f->ftype = ftype;
+	f->value = value;
+	f->valueOwner = valueOwner;
+	return f;
+}
+
+static void tagFieldDelete (tagField * f)
+{
+	if (f->valueOwner)
+		eFree((void *)f->value);
+	eFree (f);
+}
+
+static void attachParserFieldGeneric (tagEntryInfo *const tag, fieldType ftype, const char * value,
+									  bool valueOwner)
+{
+	if (tag->usedParserFields < PRE_ALLOCATED_PARSER_FIELDS)
+	{
+		tag->parserFields [tag->usedParserFields].ftype = ftype;
+		tag->parserFields [tag->usedParserFields].value = value;
+		tag->parserFields [tag->usedParserFields].valueOwner = valueOwner;
+		tag->usedParserFields++;
+	}
+	else if (tag->parserFieldsDynamic == NULL)
+	{
+		tag->parserFieldsDynamic = ptrArrayNew((ptrArrayDeleteFunc)tagFieldDelete);
+		PARSER_TRASH_BOX(tag->parserFieldsDynamic, ptrArrayDelete);
+		attachParserFieldGeneric (tag, ftype, value, valueOwner);
+	}
+	else
+	{
+		tagField *f = tagFieldNew (ftype, value, valueOwner);
+		ptrArrayAdd(tag->parserFieldsDynamic, f);
+		tag->usedParserFields++;
+	}
+}
+
 extern void attachParserField (tagEntryInfo *const tag, fieldType ftype, const char * value)
 {
-	Assert (tag->usedParserFields < PRE_ALLOCATED_PARSER_FIELDS);
-
-	tag->parserFields [tag->usedParserFields].ftype = ftype;
-	tag->parserFields [tag->usedParserFields].value = value;
-	tag->usedParserFields++;
+	attachParserFieldGeneric (tag, ftype, value, false);
 }
 
 extern void attachParserFieldToCorkEntry (int index,
-					 fieldType type,
+					 fieldType ftype,
 					 const char *value)
 {
 	tagEntryInfo * tag;
@@ -909,7 +950,20 @@ extern void attachParserFieldToCorkEntry (int index,
 	Assert (tag != NULL);
 
 	v = eStrdup (value);
-	attachParserField (tag, type, v);
+	attachParserFieldGeneric (tag, ftype, v, true);
+}
+
+extern const tagField* getParserField (const tagEntryInfo * tag, int index)
+{
+	if (!(index < tag->usedParserFields))
+		return NULL;
+	else if (index < PRE_ALLOCATED_PARSER_FIELDS)
+		return tag->parserFields + index;
+	else
+	{
+		unsigned int n = index - PRE_ALLOCATED_PARSER_FIELDS;
+		return ptrArrayItem(tag->parserFieldsDynamic, n);
+	}
 }
 
 static void copyParserFields (const tagEntryInfo *const tag, tagEntryInfo* slot)
@@ -919,14 +973,19 @@ static void copyParserFields (const tagEntryInfo *const tag, tagEntryInfo* slot)
 
 	for (i = 0; i < tag->usedParserFields; i++)
 	{
-		value = tag->parserFields [i].value;
+		const tagField *f = getParserField (tag, i);
+		Assert(f);
+
+		value = f->value;
 		if (value)
 			value = eStrdup (value);
 
-		attachParserField (slot,
-				   tag->parserFields [i].ftype,
-				   value);
+		attachParserFieldGeneric (slot,
+								  f->ftype,
+								  value,
+								  true);
 	}
+
 }
 
 static void recordTagEntryInQueue (const tagEntryInfo *const tag, tagEntryInfo* slot)
@@ -959,25 +1018,46 @@ static void recordTagEntryInQueue (const tagEntryInfo *const tag, tagEntryInfo* 
 		slot->extensionFields.xpath = eStrdup (slot->extensionFields.xpath);
 #endif
 
+	if (slot->extraDynamic)
+	{
+		int n = countXtags () - XTAG_COUNT;
+		slot->extraDynamic = xCalloc ((n / 8) + 1, uint8_t);
+		memcpy (slot->extraDynamic, tag->extraDynamic, (n / 8) + 1);
+	}
+
 	if (slot->sourceFileName)
 		slot->sourceFileName = eStrdup (slot->sourceFileName);
 
+
 	slot->usedParserFields = 0;
+	slot->parserFieldsDynamic = NULL;
 	copyParserFields (tag, slot);
+	if (slot->parserFieldsDynamic)
+		PARSER_TRASH_BOX_TAKE_BACK(slot->parserFieldsDynamic);
 }
 
 extern void clearParserFields (tagEntryInfo *const tag)
 {
-	unsigned int i;
+	unsigned int i, n;
 	const char* value;
 
-	for (i = 0; i < tag->usedParserFields; i++)
+	if ( tag->usedParserFields < PRE_ALLOCATED_PARSER_FIELDS )
+		n = tag->usedParserFields;
+	else
+		n = PRE_ALLOCATED_PARSER_FIELDS;
+
+	for (i = 0; i < n; i++)
 	{
 		value = tag->parserFields[i].value;
-		if (value)
+		if (value && tag->parserFields[i].valueOwner)
 			eFree ((char *)value);
 		tag->parserFields[i].value = NULL;
 		tag->parserFields[i].ftype = FIELD_UNKNOWN;
+	}
+	if (tag->parserFieldsDynamic)
+	{
+		ptrArrayDelete (tag->parserFieldsDynamic);
+		tag->parserFieldsDynamic = NULL;
 	}
 }
 
@@ -1010,6 +1090,9 @@ static void clearTagEntryInQueue (tagEntryInfo* slot)
 	if (slot->extensionFields.xpath)
 		eFree ((char *)slot->extensionFields.xpath);
 #endif
+
+	if (slot->extraDynamic)
+		eFree (slot->extraDynamic);
 
 	if (slot->sourceFileName)
 		eFree ((char *)slot->sourceFileName);
@@ -1231,7 +1314,7 @@ extern int makeQualifiedTagEntry (const tagEntryInfo *const e)
 			if (sep == NULL)
 			{
 				/* No root separator. The name of the
-				   oritinal tag and that of full qualified tag
+				   optional tag and that of full qualified tag
 				   are the same; recording the full qualified tag
 				   is meaningless. */
 				return r;
@@ -1243,7 +1326,7 @@ extern int makeQualifiedTagEntry (const tagEntryInfo *const e)
 
 		x.name = vStringValue (fqn);
 		/* makeExtraTagEntry of c.c doesn't clear scope
-		   releated fields. */
+		   related fields. */
 #if 0
 		x.extensionFields.scopeKind = NULL;
 		x.extensionFields.scopeName = NULL;
@@ -1347,24 +1430,64 @@ extern void    markTagExtraBit     (tagEntryInfo *const tag, xtagType extra)
 {
 	unsigned int index;
 	unsigned int offset;
+	uint8_t *slot;
 
-	Assert (extra < XTAG_COUNT);
 	Assert (extra != XTAG_UNKNOWN);
 
-	index = (extra / 8);
-	offset = (extra % 8);
-	tag->extra [ index ] |= (1 << offset);
+	if (extra < XTAG_COUNT)
+	{
+		index = (extra / 8);
+		offset = (extra % 8);
+		slot = tag->extra;
+	}
+	else if (tag->extraDynamic)
+	{
+		Assert (extra < countXtags ());
+
+		index = ((extra - XTAG_COUNT) / 8);
+		offset = ((extra - XTAG_COUNT) % 8);
+		slot = tag->extraDynamic;
+	}
+	else
+	{
+		Assert (extra < countXtags ());
+
+		int n = countXtags () - XTAG_COUNT;
+		tag->extraDynamic = xCalloc ((n / 8) + 1, uint8_t);
+		PARSER_TRASH_BOX(tag->extraDynamic, eFree);
+		markTagExtraBit (tag, extra);
+		return;
+	}
+
+	slot [ index ] |= (1 << offset);
 }
 
 extern bool isTagExtraBitMarked (const tagEntryInfo *const tag, xtagType extra)
 {
-	unsigned int index = (extra / 8);
-	unsigned int offset = (extra % 8);
+	unsigned int index;
+	unsigned int offset;
+	const uint8_t *slot;
 
-	Assert (extra < XTAG_COUNT);
 	Assert (extra != XTAG_UNKNOWN);
 
-	return !! ((tag->extra [ index ]) & (1 << offset));
+	if (extra < XTAG_COUNT)
+	{
+		index = (extra / 8);
+		offset = (extra % 8);
+		slot = tag->extra;
+
+	}
+	else if (!tag->extraDynamic)
+		return false;
+	else
+	{
+		Assert (extra < countXtags ());
+		index = ((extra - XTAG_COUNT) / 8);
+		offset = ((extra - XTAG_COUNT) % 8);
+		slot = tag->extraDynamic;
+
+	}
+	return !! ((slot [ index ]) & (1 << offset));
 }
 
 extern unsigned long numTagsAdded(void)

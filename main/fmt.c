@@ -64,16 +64,18 @@ static int printTagField (fmtSpec* fspec, MIO* fp, const tagEntryInfo * tag)
 	else
 	{
 		unsigned int findex;
+		const tagField *f;
 
 		for (findex = 0; findex < tag->usedParserFields; findex++)
 		{
-			if (isParserFieldCompatibleWithFtype (tag->parserFields + findex, ftype))
+			f = getParserField(tag, findex);
+			if (isParserFieldCompatibleWithFtype (f, ftype))
 				break;
 		}
 
 		if (findex == tag->usedParserFields)
 			str = "";
-		else if (isFieldEnabled (tag->parserFields [findex].ftype))
+		else if (isFieldEnabled (f->ftype))
 			/* TODO: Don't use WRITER_XREF directly */
 			str = renderFieldEscaped (WRITER_XREF, tag->parserFields [findex].ftype,
 						  tag, findex, NULL);
@@ -278,7 +280,7 @@ extern fmtElement *fmtNew (const char*  fmtString)
 				if (width)
 				{
 					if(!strToLong (vStringValue (width), 0, &column_width))
-						error (FATAL | PERROR, "coverting failed: %s", vStringValue (width));
+						error (FATAL | PERROR, "converting failed: %s", vStringValue (width));
 					vStringDelete (width);
 					width = NULL;
 					column_width *= justification_right;

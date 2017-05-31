@@ -29,8 +29,8 @@ Fully rewritten parsers
 * C++ (see :ref:`The new C/C++ parser <cxx>`)
 * Python (see :ref:`The new Python parser <python>`)
 * HTML (see :ref:`The new HTML parser <html>`)
-* Tcl
-* ITcl
+* Tcl (see :ref:`The new Tcl parser <tcl>`)
+* ITcl (see :ref:`The new Tcl parser <tcl>`)
 
 New parsers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -59,11 +59,13 @@ The following parsers have been added:
 * Maven2 *libxml*
 * M4
 * ObjectiveC
+* passwd
 * Perl6
 * Pod *optlib*
 * PropertiyList(plist) *libxml*
 * Protobuf
 * PythonLoggingConfig
+* QemuHX *optlib*
 * R
 * RelaxNG *libxml*
 * reStructuredText
@@ -73,7 +75,7 @@ The following parsers have been added:
 * SystemdUnit
 * SystemVerilog
 * SVG *libxml*
-* TclOO
+* TclOO (see :ref:`The new Tcl parser <tcl>`)
 * TTCN
 * WindRes
 * XSLT v1.0 *libxml*
@@ -641,7 +643,7 @@ the consistency of dynamically defined kinds in a language.
 A kind letter defined with ``--kinddef-<LANG>`` can be referred in
 ``--kinddef-<LANG>``.
 
-Previsouly you had to write in your optlib::
+Previously you had to write in your optlib::
 
     --regex-elm=/^([[:lower:]_][[:alnum:]_]*)[^=]*=$/\1/f,function,Functions/{scope=set}
     --regex-elm=/^[[:blank:]]+([[:lower:]_][[:alnum:]_]*)[^=]*=$/\1/f,function,Functions/{scope=ref}
@@ -654,13 +656,29 @@ With new ``--kinddef-<LANG>`` you can write the same things like::
 
 We can say now "kind" is a first class object in Universal-ctags.
 
+..
+	NOT REVIEWED YET
+
+Defining an extra
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A new ``--extradef-<LANG>=name,description`` option allows you to
+defining a parser own extra which turning on and off can be
+referred from a regex based parser for ``<LANG>``.
+
+See :ref:`Conditional tagging with extras <extras>` for more details.
+
+
+..
+	NOT REVIEWED YET
 
 .. _defining-subparsers:
 
 Defining a subparser
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-..
-	NOT REVIEWED YET
+
+Basic
+......................................................................
 
 About the concept of subparser, see :ref:`Tagging definitions of higher(upper) level language (sub/base) <base-sub-parsers>`.
 
@@ -718,7 +736,7 @@ The output is change as follows with `linux` parser:
 Using only `--regex-C=...` you can capture `setpriority`.
 However, there were concerns about kind confliction; when introducing
 a new kind with `--regex-C=...`, you cannot use a letter and name already
-used in C parser and `--regex-C=...` options sepcified in the other places.
+used in C parser and `--regex-C=...` options specified in the other places.
 
 You can use a newly defined subparser as a new namespace of kinds.
 In addition you can enable/disable with the subparser usable
@@ -731,6 +749,122 @@ In addition you can enable/disable with the subparser usable
 	    set_one_prio   function          C
 	 SYSCALL_DEFINE3   function          C
 
+Directions
+......................................................................
+
+As explained in :ref:`Tagging definitions of higher(upper) level language (sub/base) <base-sub-parsers>`,
+you can choose direction(s) how a base parser and a guest parser work together with
+long flags putting after `--langdef=Foo{base=Bar}`.
+
+========================  ======================
+C level notation          Command line long flag
+========================  ======================
+SUBPARSER_BASE_RUNS_SUB   shared
+SUBPARSER_SUB_RUNS_BASE   dedicated
+SUBPARSER_BASE_RUNS_SUB   bidirectional
+========================  ======================
+
+Let's see actual difference of behaviors.
+
+
+The examples are taken from #1409 submitted by @sgraham on github
+Universal-ctags repository.
+
+`input.cc` and `input.mojom` are input files, and have the same
+contents::
+
+     ABC();
+    int main(void)
+    {
+    }
+
+C++ parser can capture `main` as a function. Mojom subparser defined in the
+later runs on C++ parser and is for capturing `ABC`.
+
+shared combination
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+`{shared}` is specified, for `input.cc`, both tags capture by C++ parser
+and mojom parser are recorded to tags file. For `input.mojom`, only
+tags captured by mojom parser are recorded to tags file.
+
+mojom-shared.ctags:
+
+.. code-block:: ctags
+
+    --langdef=mojom{base=C++}{shared}
+    --map-mojom=+.mojom
+    --kinddef-mojom=f,function,functions
+    --regex-mojom=/^[ ]+([a-zA-Z]+)\(/\1/f/
+
+tags for `input.cc`::
+
+    ABC	input.cc	/^ ABC();$/;"	f	language:mojom
+    main	input.cc	/^int main(void)$/;"	f	language:C++	typeref:typename:int
+
+tags for `input.mojom`::
+
+  ABC	input.mojom	/^ ABC();$/;"	f	language:mojom
+
+Mojom parser uses C++ parser internally but tags captured by C++ parser are
+dropped in the output.
+
+`{shared}` is the default behavior. If none of `{shared}`, `{dedicated}`, nor
+`{bidirectional}` is specified, it implies `{shared}`.
+
+
+dedicated combination
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+`{dedicated}` is specified, for `input.cc`, only tags capture by C++
+parser are recorded to tags file. For `input.mojom`, both tags capture
+by C++ parser and mojom parser are recorded to tags file.
+
+mojom-dedicated.ctags:
+
+.. code-block:: ctags
+
+    --langdef=mojom{base=C++}{dedicated}
+    --map-mojom=+.mojom
+    --kinddef-mojom=f,function,functions
+    --regex-mojom=/^[ ]+([a-zA-Z]+)\(/\1/f/
+
+tags for `input.cc`::
+
+    main	input.cc	/^int main(void)$/;"	f	language:C++	typeref:typename:int
+
+tags for `input.mojom`::
+
+    ABC	input.mojom	/^ ABC();$/;"	f	language:mojom
+    main	input.mojom	/^int main(void)$/;"	f	language:C++	typeref:typename:int
+
+Mojom parser works only when `.mojom` file is given as input.
+
+bidirectional combination
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+`{bidirectional}` is specified, both tags capture by C++ parser and
+mojom parser are recorded to tags file for either input `input.cc` and
+`input.mojom`.
+
+mojom-bidirectional.ctags:
+
+.. code-block:: ctags
+
+    --langdef=mojom{base=C++}{bidirectional}
+    --map-mojom=+.mojom
+    --kinddef-mojom=f,function,functions
+    --regex-mojom=/^[ ]+([a-zA-Z]+)\(/\1/f/
+
+tags for `input.cc`::
+
+    ABC	input.cc	/^ ABC();$/;"	f	language:mojom
+    main	input.cc	/^int main(void)$/;"	f	language:C++	typeref:typename:int
+
+tags for `input.mojom`::
+
+    ABC	input.cc	/^ ABC();$/;"	f	language:mojom
+    main	input.cc	/^int main(void)$/;"	f	language:C++	typeref:typename:int
+
+Listing subparsers
+......................................................................
 Subparsers can be listed with ``--list-subparser``:
 
 .. code-block:: console
@@ -738,7 +872,7 @@ Subparsers can be listed with ``--list-subparser``:
     $ ./ctags --options=NONE --options=./linux.ctags --list-subparsers=C
     ctags: Notice: No options will be read from files or environment
     #NAME                          BASEPARSER           DIRECTION
-    linux                          C                    base => sub
+    linux                          C                    base => sub {shared}
 
 Changes to the tags file format
 ---------------------------------------------------------------------
@@ -1031,6 +1165,8 @@ separator; the third line has higher priority than the first.
 This pseudo tag represents output mode: u-ctags or e-ctags.
 
 See also :ref:`Compatible output and weakness <compat-output>`.
+
+.. _parser-own-fields:
 
 Parser own fields
 ---------------------------------------------------------------------

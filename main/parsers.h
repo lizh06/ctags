@@ -87,6 +87,7 @@
 	OldCppParser, \
 	OldCParser, \
 	OcamlParser, \
+	PasswdParser, \
 	PascalParser, \
 	PerlParser, \
 	Perl6Parser, \
@@ -95,6 +96,7 @@
 	ProtobufParser, \
 	PythonParser, \
 	PythonLoggingConfigParser, \
+	QemuHXParser, \
 	RParser, \
 	RSpecParser, \
 	RexxParser, \

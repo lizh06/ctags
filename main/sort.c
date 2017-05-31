@@ -193,7 +193,7 @@ static int compareTags (const void *const one, const void *const two)
 }
 
 static void writeSortedTags (
-		char **const table, const size_t numTags, const bool toStdout)
+		char **const table, const size_t numTags, const bool toStdout, bool newlineReplaced)
 {
 	MIO *mio;
 	size_t i;
@@ -223,6 +223,8 @@ static void writeSortedTags (
 
 			if (mio_puts (mio, table [i]) == EOF)
 				failedSort (mio, NULL);
+			else if (newlineReplaced)
+				mio_putc (mio, '\n');
 		}
 	}
 	if (toStdout)
@@ -236,11 +238,12 @@ extern void internalSortTags (const bool toStdout, MIO* mio, size_t numTags)
 	const char *line;
 	size_t i;
 	int (*cmpFunc)(const void *, const void *);
+	bool newlineReplaced = false;
 
 	/*  Allocate a table of line pointers to be sorted.
 	 */
 	const size_t tableSize = numTags * sizeof (char *);
-	char **const table = (char **) malloc (tableSize);  /* line pointers */
+	char **table = (char **) malloc (tableSize);  /* line pointers */
 	DebugStatement ( size_t mallocSize = tableSize; )  /* cumulative total */
 
 
@@ -273,17 +276,21 @@ extern void internalSortTags (const bool toStdout, MIO* mio, size_t numTags)
 
 			if (*line == '!' || !delim)
 				strcpy (table [i], line);
-
 			else
 			{
 				/* Make tag type to be sorted before regex expr */
-
 				const char *p = strchr(line,'\t');
 				int n = p - line + 1;
 				char *q = table[i];
 				strncpy(q, line, n);
 				q[n] = delim[3];
 				strcpy(&q[n+1], p+1);
+			}
+
+			if (table[i][stringSize - 2] == '\n')
+			{
+				table[i][stringSize - 2] = '\0';
+				newlineReplaced = true;
 			}
 			++i;
 		}
@@ -295,7 +302,7 @@ extern void internalSortTags (const bool toStdout, MIO* mio, size_t numTags)
 	 */
 	qsort (table, numTags, sizeof (*table), cmpFunc);
 
-	writeSortedTags (table, numTags, toStdout);
+	writeSortedTags (table, numTags, toStdout, newlineReplaced);
 
 	PrintStatus (("sort memory: %ld bytes\n", (long) mallocSize));
 	for (i = 0 ; i < numTags ; ++i)

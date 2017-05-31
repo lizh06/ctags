@@ -234,7 +234,7 @@ extern void initXtagObjects (void)
 
 	xtagObjectAllocated = ARRAY_SIZE (xtagDefinitions);
 	xtagObjects = xMalloc (xtagObjectAllocated, xtagObject);
-	TRASH_BOX(&xtagObjects, eFreeIndirect);
+	DEFAULT_TRASH_BOX(&xtagObjects, eFreeIndirect);
 
 	for (int i = 0; i < ARRAY_SIZE (xtagDefinitions); i++)
 	{
@@ -293,6 +293,12 @@ extern int defineXtag (xtagDefinition *def, langType language)
 	xobj->sibling  = XTAG_UNKNOWN;
 
 	updateSiblingXtag (def->xtype, def->name);
+
+	verbose ("Add extra[%d]: %s,%s in %s\n",
+			 def->xtype,
+			 def->name, def->description,
+			 getLanguageName (language));
+
 	return def->xtype;
 }
 
