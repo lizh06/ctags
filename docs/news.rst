@@ -83,13 +83,11 @@ The following parsers have been added:
 * Yaml *libyaml*
 * YumRepo
 * Zephir
-* CoffeeScript *xcmd*
 * ctags option library *optlib*
 * Myrddin
 * RSpec *optlib*
 
 See "Option library" for details on *optlib*.
-See "External parser command" for details on *xcmd*.
 Libxml2 is required to use the parser(s) marked with *libxml*.
 Libyaml is required to use the parser(s) marked with *libyaml*.
 
@@ -389,6 +387,8 @@ In this example, ``role`` is prefixed.
 ``--maxdepth`` option
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. IN MAN PAGE
+
 ``--maxdepth`` limits the depth of directory recursion enabled with
 the ``-R`` option.
 
@@ -455,6 +455,8 @@ the langmap in a parser-centric manner.
 
 Guessing parser from file contents (``-G`` option)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. IN MAN PAGE
 
 See "Choosing a proper parser in ctags" section.
 
