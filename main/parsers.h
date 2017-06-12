@@ -43,7 +43,8 @@
 	AutomakeParser, \
 	AwkParser, \
 	BasicParser, \
-	CoffeeScriptParser, \
+	BetaParser, \
+	ClojureParser, \
 	CParser, \
 	CppParser, \
 	CPreProParser, \
