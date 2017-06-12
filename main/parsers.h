@@ -61,6 +61,7 @@
 	EiffelParser, \
 	ElmParser, \
 	ErlangParser, \
+	FlexParser, \
 	FortranParser, \
 	GdbinitParser, \
 	GoParser, \
