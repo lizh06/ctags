@@ -80,6 +80,8 @@ AH_TEMPLATE([NON_CONST_PUTENV_PROTOTYPE],
 	doesn't declare its argument as "const char *".])
 AH_TEMPLATE([MSDOS_STYLE_PATH],
 	[Define to 1 if your system uses MS-DOS style path.])
+AH_TEMPLATE([ENABLE_GCOV],
+	[Define to 1 if gcov is instrumented.])
 
 
 # Report system info
@@ -290,6 +292,7 @@ fi
 if test "${enable_coverage_gcov}" = "yes"; then
 	COVERAGE_CFLAGS="--coverage"
 	COVERAGE_LDFLAGS="--coverage"
+	AC_DEFINE(ENABLE_GCOV)
 fi
 AC_SUBST([COVERAGE_CFLAGS])
 AC_SUBST([COVERAGE_LDFLAGS])
@@ -385,7 +388,6 @@ fi
 AC_CHECK_HEADERS([dirent.h errno.h fcntl.h io.h limits.h stat.h stdlib.h string.h])
 AC_CHECK_HEADERS([time.h types.h unistd.h])
 AC_CHECK_HEADERS([sys/dir.h sys/stat.h sys/times.h sys/types.h sys/wait.h])
-
 
 # Checks for header file macros
 # -----------------------------
@@ -617,6 +619,19 @@ AS_IF([test "x$enable_json" != "xno"], [
 			           AC_MSG_ERROR([jansson not found])])])
 ])
 AM_CONDITIONAL(HAVE_JANSSON, test "x$have_jansson" = xyes)
+
+AH_TEMPLATE([HAVE_SECCOMP],
+	[Define this value if libseccomp is available.])
+AC_ARG_ENABLE([seccomp],
+	[AS_HELP_STRING([--disable-seccomp],
+		[disable seccomp support])])
+AS_IF([test "x$enable_seccomp" != "xno"], [
+	PKG_CHECK_MODULES(SECCOMP, libseccomp,
+			       [have_seccomp=yes
+			       AC_DEFINE(HAVE_SECCOMP)],
+			       [AS_IF([test "x$enable_seccomp" = "xyes"], [
+			           AC_MSG_ERROR([libseccomp not found])])])
+])
 
 AC_ARG_ENABLE([yaml],
 	[AS_HELP_STRING([--disable-yaml],
