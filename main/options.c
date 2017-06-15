@@ -136,47 +136,51 @@ static const char *const HeaderExtensions [] = {
 };
 
 optionValues Option = {
-	false,      /* -a */
-	false,      /* -B */
-	false,      /* -e */
+	.append = false,
+	.backward = false,
+	.etags = false,
+	.locate =
 #ifdef MACROS_USE_PATTERNS
-	EX_PATTERN, /* -n, --excmd */
+	EX_PATTERN
 #else
-	EX_MIX,     /* -n, --excmd */
+	EX_MIX
 #endif
-	false,      /* -R */
-	SO_SORTED,  /* -u, --sort */
-	false,      /* -V */
-	false,      /* -x */
+	,
+	.recurse = false,
+	.sorted = SO_SORTED,
+	.verbose = false,
+	.xref = false,
 	.customXfmt = NULL,
-	NULL,       /* -L */
-	NULL,       /* -o */
-	NULL,       /* -h */
-	NULL,		/* --config-filename */
-	NULL,       /* --etags-include */
-	DEFAULT_FILE_FORMAT,/* --format */
+	.fileList = NULL,
+	.tagFileName = NULL,
+	.headerExt = NULL,
+	.configFilename = NULL,
+	.etagsInclude = NULL,
+	.tagFileFormat = DEFAULT_FILE_FORMAT,
 #ifdef HAVE_ICONV
-	NULL,		/* --input-encoding */
-	NULL,		/* --output-encoding */
+	.inputEncoding= NULL,
+	.outputEncoding = NULL,
 #endif
-	LANG_AUTO,  /* --lang */
-	true,       /* --links */
-	false,      /* --filter */
-	NULL,       /* --filter-terminator */
-	false,      /* --tag-relative */
-	false,      /* --totals */
-	false,      /* --line-directives */
-	false,	    /* --print-language */
-	false,	    /* --guess-language-eagerly(-G) */
-	false,	    /* --quiet */
-	false,	    /* --_fatal-warnings */
+	.language = LANG_AUTO,
+	.followLinks = true,
+	.filter = false,
+	.filterTerminator = NULL,
+	.tagRelative = false,
+	.printTotals = false,
+	.lineDirectives = false,
+	.printLanguage =false,
+	.guessLanguageEagerly = false,
+	.quiet = false,
+	.fatalWarnings = false,
 	.patternLengthLimit = 96,
 	.putFieldPrefix = false,
 	.maxRecursionDepth = 0xffffffff,
 	.machinable = false,
 	.withListHeader = true,
+	.interactive = false,
 #ifdef DEBUG
-	0, 0        /* -d, -b */
+	.debugLevel = 0,
+	.breakLine = 0,
 #endif
 };
 
@@ -313,14 +317,12 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Output list of alias patterns."},
  {1,"  --list-extensions=[language|all]"},
  {1,"       Output list of language extensions in mapping."},
- {1,"  --list-extras"},
+ {1,"  --list-extras=[language|all]"},
  {1,"       Output list of extra tag flags."},
  {1,"  --list-features"},
  {1,"       Output list of features."},
  {1,"  --list-fields=[language|all]"},
  {1,"       Output list of fields. This works with --machinable."},
- {1,"  --list-file-kind"},
- {1,"       List kind letter for file."},
  {1,"  --list-kinds=[language|all]"},
  {1,"       Output a list of all tag kinds for specified language or all."},
  {1,"  --list-kinds-full=[language|all]"},
@@ -418,12 +420,21 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Make all warnings fatal."},
  {1,"  --_fielddef-<LANG>=name,description"},
  {1,"       EXPERIMENTAL, Define new field for <LANG>."},
+ {1,"  --_force-initializing"},
+ {1,"       Initialize all parsers in early stage"},
  {1,"  --_force-quit=[num]"},
  {1,"       Quit when the option is processed. Useful to debug the chain"},
  {1,"       of loading option files."},
 #ifdef HAVE_JANSSON
- {0,"  --_interactive"},
+ {0,"  --_interactive"
+#ifdef HAVE_SECCOMP
+  "=[default|sandbox]"
+#endif
+ },
  {0,"       Enter interactive mode (json over stdio)."},
+#ifdef HAVE_SECCOMP
+ {0,"       Enter file I/O limited interactive mode if sandbox is specified. [default]"},
+#endif
 #endif
  {1,"  --_list-roles=[[language|all]:[kindletters|*]]"},
  {1,"       Output list of all roles of tag kind(s) specified for language(s)."},
@@ -485,11 +496,17 @@ static const char *const Features [] = {
 	"json",
 	"interactive",
 #endif
+#ifdef HAVE_SECCOMP
+	"sandbox",
+#endif
 #ifdef HAVE_LIBYAML
 	"yaml",
 #endif
 #ifdef CASE_INSENSITIVE_FILENAMES
 	"case-insensitive-filenames",
+#endif
+#ifdef ENABLE_GCOV
+	"gcov",
 #endif
 	NULL
 };
@@ -1431,11 +1448,34 @@ static void processHelpOption (
 #ifdef HAVE_JANSSON
 static void processInteractiveOption (
 		const char *const option CTAGS_ATTR_UNUSED,
-		const char *const parameter CTAGS_ATTR_UNUSED)
+		const char *const parameter)
 {
+	static struct interactiveModeArgs args;
+
 	Option.interactive = true;
+
+	if (parameter && (strcmp (parameter, "sandbox") == 0))
+		args.sandbox = true;
+	else if (parameter && (strcmp (parameter, "default") == 0))
+		args.sandbox = false;
+	else if ((!parameter) || *parameter == '\0')
+		args.sandbox = false;
+	else
+		error (FATAL, "Unknown option argument \"%s\" for --%s option",
+			   parameter, option);
+
+#ifndef HAVE_SECCOMP
+	if (args.sandbox)
+		error (FATAL, "sandbox submode is not supported on this platform");
+#endif
+
+#ifdef ENABLE_GCOV
+	if (args.sandbox)
+		error (FATAL, "sandbox submode does not work if gcov is instrumented");
+#endif
+
 	Option.sorted = SO_UNSORTED;
-	setMainLoop (interactiveLoop, NULL);
+	setMainLoop (interactiveLoop, &args);
 	setErrorPrinter (jsonErrorPrinter, NULL);
 	setTagWriter (WRITER_JSON);
 	enablePtag (PTAG_JSON_OUTPUT_VERSION, true);
@@ -2325,6 +2365,13 @@ static void processEchoOption (const char *const option, const char *const param
 	notice ("%s", parameter);
 }
 
+static void processForceInitOption (const char *const option CTAGS_ATTR_UNUSED,
+				    const char *const parameter)
+{
+	verbose ("force initializing all built-in parsers\n");
+	initializeParser (LANG_AUTO);
+}
+
 static void processForceQuitOption (const char *const option CTAGS_ATTR_UNUSED,
 				    const char *const parameter)
 {
@@ -2472,9 +2519,6 @@ static parametricOption ParametricOptions [] = {
 	{ "filter-terminator",      processFilterTerminatorOption,  true,   STAGE_ANY },
 	{ "format",                 processFormatOption,            true,   STAGE_ANY },
 	{ "help",                   processHelpOption,              true,   STAGE_ANY },
-#ifdef HAVE_JANSSON
-	{ "_interactive",            processInteractiveOption,       true,   STAGE_ANY },
-#endif
 	{ "if0",                    processIf0Option,               false,  STAGE_ANY },
 #ifdef HAVE_ICONV
 	{ "input-encoding",         processInputEncodingOption,     false,  STAGE_ANY },
@@ -2512,7 +2556,11 @@ static parametricOption ParametricOptions [] = {
 	{ "version",                processVersionOption,           true,   STAGE_ANY },
 	{ "_anonhash",              processAnonHashOption,          false,  STAGE_ANY },
 	{ "_echo",                  processEchoOption,              false,  STAGE_ANY },
+	{ "_force-initializing",    processForceInitOption,         false, STAGE_ANY },
 	{ "_force-quit",            processForceQuitOption,         false,  STAGE_ANY },
+#ifdef HAVE_JANSSON
+	{ "_interactive",           processInteractiveOption,       true,   STAGE_ANY },
+#endif
 	{ "_xformat",               processXformatOption,           false,  STAGE_ANY },
 };
 
