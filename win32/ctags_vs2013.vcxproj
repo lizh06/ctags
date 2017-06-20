@@ -98,6 +98,7 @@
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">TurnOffAllWarnings</WarningLevel>
     </ClCompile>
     <ClCompile Include="..\main\args.c" />
+    <ClCompile Include="..\main\colprint.c" />
     <ClCompile Include="..\main\debug.c" />
     <ClCompile Include="..\main\dependency.c" />
     <ClCompile Include="..\main\entry.c" />
@@ -157,6 +158,7 @@
     <ClCompile Include="..\parsers\cobol.c" />
     <ClCompile Include="..\parsers\cpreprocessor.c" />
     <ClCompile Include="..\parsers\css.c" />
+    <ClCompile Include="..\parsers\ctags-aspell.c" />
     <ClCompile Include="..\parsers\cxx\cxx.c" />
     <ClCompile Include="..\parsers\cxx\cxx_debug.c" />
     <ClCompile Include="..\parsers\cxx\cxx_debug_type.c" />
@@ -236,6 +238,7 @@
     <ClInclude Include="..\fnmatch\fnmatch.h" />
     <ClInclude Include="..\gnu_regex\regex.h" />
     <ClInclude Include="..\main\args.h" />
+    <ClInclude Include="..\main\colprint.h" />
     <ClInclude Include="..\main\ctags.h" />
     <ClInclude Include="..\main\debug.h" />
     <ClInclude Include="..\main\dependency.h" />

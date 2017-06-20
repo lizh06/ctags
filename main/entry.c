@@ -192,7 +192,7 @@ extern void makeFileTag (const char *const fileName)
 	markTagExtraBit (&tag, XTAG_FILE_NAMES);
 
 	tag.lineNumber = 1;
-	if (isFieldEnabled (FIELD_END))
+	if (isFieldEnabled (FIELD_END_LINE))
 	{
 		/* isFieldEnabled is called again in the rendering
 		   stage. However, it is called here for avoiding
@@ -1254,6 +1254,28 @@ extern size_t        countEntryInCorkQueue (void)
 	return TagFile.corkQueue.count;
 }
 
+static void makeTagEntriesForSubwords (tagEntryInfo *const subtag)
+{
+	stringList *list;
+
+	subtag->extensionFields.scopeIndex = CORK_NIL;
+	markTagExtraBit (subtag, XTAG_SUBWORD);
+
+	list = stringListNewBySplittingWordIntoSubwords(subtag->name);
+	for (unsigned int i = 0; i < stringListCount(list); i++)
+	{
+		vString *subword = stringListItem (list, i);
+
+		subtag->name = vStringValue(subword);
+
+		if (TagFile.cork)
+			queueTagEntry (subtag);
+		else
+			writeTagEntry (subtag);
+	}
+	stringListDelete (list);
+}
+
 extern int makeTagEntry (const tagEntryInfo *const tag)
 {
 	int r = CORK_NIL;
@@ -1281,6 +1303,12 @@ extern int makeTagEntry (const tagEntryInfo *const tag)
 		r = queueTagEntry (tag);
 	else
 		writeTagEntry (tag);
+
+	if (isXtagEnabled (XTAG_SUBWORD))
+	{
+		tagEntryInfo subtag = *tag;
+		makeTagEntriesForSubwords (&subtag);
+	}
 out:
 	return r;
 }
