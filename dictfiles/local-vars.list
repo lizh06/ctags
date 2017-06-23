@@ -4,6 +4,7 @@ baselang
 bmask
 buf
 descs
+deflt
 dev
 dictfile
 dirs
@@ -30,6 +31,8 @@ kletters
 kname
 langs
 len
+mlt
+mltest
 msg
 mydict
 ndefs
