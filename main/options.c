@@ -71,7 +71,7 @@
 # define DEFAULT_FILE_FORMAT  2
 #endif
 
-#if defined (HAVE_OPENDIR) || defined (HAVE_FINDFIRST) || defined (HAVE__FINDFIRST)
+#if defined (HAVE_OPENDIR) || defined (HAVE__FINDFIRST)
 # define RECURSE_SUPPORTED
 #endif
 
@@ -344,6 +344,8 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Output list of language patterns in mapping."},
  {1,"  --list-maps=[language|all]"},
  {1,"       Output list of language mappings(both extensions and patterns)."},
+ {1,"  --list-mline-regex-flags"},
+ {1,"       Output list of flags which can be used in a multiline regex parser definition."},
  {1,"  --list-params=[language|all]"},
  {1,"       Output list of language parameters. This works with --machinable."},
  {0,"  --list-pseudo-tags"},
@@ -372,6 +374,8 @@ static optionDescription LongOptionDescription [] = {
 #else
  {1,"       Not supported on this platform."},
 #endif
+ {1,"  --mline-regex-<LANG>=/line_pattern/name_pattern/[flags]"},
+ {1,"       Define multiline regular expression for locating tags in specific language."},
  {1,"  --options=file"},
  {1,"       Specify file from which command line options should be read."},
 #ifdef HAVE_ICONV
@@ -2068,6 +2072,14 @@ static void processListRegexFlagsOptions (
 	exit (0);
 }
 
+static void processListMultilineRegexFlagsOptions (
+		const char *const option CTAGS_ATTR_UNUSED,
+		const char *const parameter CTAGS_ATTR_UNUSED)
+{
+	printMultilineRegexFlags (localOption.withListHeader, localOption.machinable, stdout);
+	exit (0);
+}
+
 static void processListLangdefFlagsOptions (
 		const char *const option CTAGS_ATTR_UNUSED,
 		const char *const parameter CTAGS_ATTR_UNUSED)
@@ -2665,6 +2677,7 @@ static parametricOption ParametricOptions [] = {
 	{ "list-maps",              processListMapsOption,          true,   STAGE_ANY },
 	{ "list-map-extensions",    processListMapExtensionsOption, true,   STAGE_ANY },
 	{ "list-map-patterns",      processListMapPatternsOption,   true,   STAGE_ANY },
+	{ "list-mline-regex-flags", processListMultilineRegexFlagsOptions, true, STAGE_ANY },
 	{ "list-params",            processListParametersOption,    true,   STAGE_ANY },
 	{ "list-pseudo-tags",       processListPseudoTagsOptions,   true,   STAGE_ANY },
 	{ "list-regex-flags",       processListRegexFlagsOptions,   true,   STAGE_ANY },
@@ -3030,7 +3043,21 @@ static bool processRegexOption (const char *const option,
 	if (language == LANG_IGNORE)
 		return false;
 
-	processLanguageRegexOption (language, parameter);
+	processLanguageRegexOption (language, REG_PARSER_SINGLE_LINE, parameter);
+
+	return true;
+}
+
+static bool processMultilineRegexOption (const char *const option,
+										 const char *const parameter)
+{
+	langType language;
+
+	language = getLanguageComponentInOption (option, "mline-regex-");
+	if (language == LANG_IGNORE)
+		return false;
+
+	processLanguageRegexOption (language, REG_PARSER_MULTI_LINE, parameter);
 
 	return true;
 }
@@ -3065,6 +3092,8 @@ static void processLongOption (
 	else if (processAliasOption (option, parameter))
 		;
 	else if (processRegexOption (option, parameter))
+		;
+	else if (processMultilineRegexOption (option, parameter))
 		;
 	else if (processMapOption (option, parameter))
 		;
