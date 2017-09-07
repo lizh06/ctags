@@ -91,6 +91,7 @@
 	PhpParser, \
 	PodParser, \
 	ProtobufParser, \
+	PuppetManifestParser, \
 	PythonParser, \
 	PythonLoggingConfigParser, \
 	QemuHXParser, \
