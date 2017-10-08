@@ -7,7 +7,13 @@ clean-local: clean-units clean-tmain
 
 CTAGS_TEST = ./ctags$(EXEEXT)
 READ_TEST = ./readtags$(EXEEXT)
-TIMEOUT=
+
+if HAVE_TIMEOUT
+TIMEOUT = 1
+else
+TIMEOUT = 0
+endif
+
 LANGUAGES=
 CATEGORIES=
 UNITS=
@@ -17,7 +23,6 @@ UNITS=
 #
 # SHELL must be dash or bash.
 #
-fuzz: TIMEOUT := $(shell timeout --version > /dev/null 2>&1 && echo 1 || echo 0)
 fuzz: $(CTAGS_TEST)
 	@ \
 	if test -n "$${ZSH_VERSION+set}"; then set -o SH_WORD_SPLIT; fi; \
@@ -62,18 +67,29 @@ chop: $(CTAGS_TEST)
 		$${VALGRIND} --run-shrink \
 		--with-timeout=$(TIMEOUT)"; \
 	$(SHELL) $${c} $(srcdir)/Units
+slap: $(CTAGS_TEST)
+	@ \
+	if test -n "$${ZSH_VERSION+set}"; then set -o SH_WORD_SPLIT; fi; \
+	if test x$(VG) = x1; then		\
+		VALGRIND=--with-valgrind;	\
+	fi;					\
+	c="$(srcdir)/misc/units slap \
+		--ctags=$(CTAGS_TEST) \
+		--languages=$(LANGUAGES) \
+		$${VALGRIND} --run-shrink \
+		--with-timeout=$(TIMEOUT)"; \
+	$(SHELL) $${c} $(srcdir)/Units
 
 #
 # UNITS Target
 #
-units: TIMEOUT := $(shell timeout --version > /dev/null 2>&1 && echo 10 || echo 0)
 units: $(CTAGS_TEST)
 	@ \
 	if test -n "$${ZSH_VERSION+set}"; then set -o SH_WORD_SPLIT; fi; \
 	if test x$(VG) = x1; then		\
 		VALGRIND=--with-valgrind;	\
 	fi;					\
-	if test x$(TRAVIS) = x1 || test x$(APPVEYOR) = x1; then	\
+	if ! test x$(TRAVIS)$(APPVEYOR)$(CIRCLECI) = x; then	\
 		SHOW_DIFF_OUTPUT=--show-diff-output;		\
 	fi;							\
 	builddir=$$(pwd); \
@@ -85,9 +101,9 @@ units: $(CTAGS_TEST)
 		--categories=$(CATEGORIES) \
 		--units=$(UNITS) \
 		$${VALGRIND} --run-shrink \
-		--with-timeout=$(TIMEOUT) \
+		--with-timeout=`expr $(TIMEOUT) '*' 10`\
 		$${SHOW_DIFF_OUTPUT}"; \
-	 TRAVIS=$(TRAVIS) APPVEYOR=$(APPVEYOR) \
+	 TRAVIS=$(TRAVIS) APPVEYOR=$(APPVEYOR) CIRCLECI=$(CIRCLECI)\
 		 $(SHELL) $${c} $(srcdir)/Units $${builddir}/Units
 
 clean-units:
@@ -105,7 +121,7 @@ tmain: $(CTAGS_TEST)
 	if test x$(VG) = x1; then		\
 		VALGRIND=--with-valgrind;	\
 	fi;					\
-	if test x$(TRAVIS) = x1 || test x$(APPVEYOR) = x1; then	\
+	if ! test x$(TRAVIS)$(APPVEYOR)$(CIRCLECI) = x; then	\
 		SHOW_DIFF_OUTPUT=--show-diff-output;		\
 	fi;							\
 	builddir=$$(pwd); \
@@ -116,7 +132,7 @@ tmain: $(CTAGS_TEST)
 		--units=$(UNITS) \
 		$${VALGRIND} \
 		$${SHOW_DIFF_OUTPUT}"; \
-	TRAVIS=$(TRAVIS) APPVEYOR=$(APPVEYOR) \
+	TRAVIS=$(TRAVIS) APPVEYOR=$(APPVEYOR) CIRCLECI=$(CIRCLECI)\
 		$(SHELL) $${c} $(srcdir)/Tmain $${builddir}/Tmain
 
 clean-tmain:

@@ -301,10 +301,17 @@ fi
 AC_MSG_RESULT(${in_git_repo})
 
 AC_CHECK_PROGS([GIT], [git])
-if ! test "${GIT+set}" = "set"; then
+if ! test "${GIT:+set}" = "set"; then
 	in_git_repo=no
 fi
 AM_CONDITIONAL([BUILD_IN_GIT_REPO], [test "x${in_git_repo}" = "xyes"])
+
+have_timeout=no
+AC_CHECK_PROGS([TESTING_TIMEOUT], [timeout])
+if test "${TESTING_TIMEOUT:+set}" = "set"; then
+	have_timeout=yes
+fi
+AM_CONDITIONAL([HAVE_TIMEOUT], [test "x${have_timeout}" = "xyes"])
 
 
 # Check for temporary directory
@@ -478,6 +485,7 @@ AC_SUBST([FNMATCH_CPPFLAGS])
 AC_CHECK_HEADERS(fnmatch.h)
 AM_CONDITIONAL([HAVE_FNMATCH], [test "x$have_fnmatch" = "xyes"])
 
+AC_CHECK_FUNCS(asprintf)
 AC_CHECK_FUNCS(strstr)
 AC_CHECK_FUNCS(strcasecmp stricmp, break)
 AC_CHECK_FUNCS(strncasecmp strnicmp, break)
