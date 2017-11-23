@@ -40,6 +40,7 @@
 	AsmParser, \
 	AspParser, \
 	AutoconfParser, \
+	AutoItParser, \
 	AutomakeParser, \
 	AwkParser, \
 	BasicParser, \
