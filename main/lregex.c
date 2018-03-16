@@ -35,7 +35,6 @@
 #include "parse.h"
 #include "read.h"
 #include "routines.h"
-#include "ptrarray.h"
 #include "trashbox.h"
 
 static bool regexAvailable = false;
@@ -447,7 +446,7 @@ static regexPattern * refPattern (regexPattern * ptrn)
 static regexPattern * newPattern (regex_t* const pattern,
 								  enum regexParserType regptype)
 {
-	regexPattern*ptrn = xCalloc(1, regexPattern);
+	regexPattern *ptrn = xCalloc(1, regexPattern);
 
 	ptrn->pattern = pattern;
 	ptrn->exclusive = false;
@@ -1347,21 +1346,29 @@ static regexPattern *addTagRegexInternal (struct lregexControlBlock *lcb,
 
 	if (cp != NULL)
 	{
-		char kind;
+		char kindLetter;
 		char* kindName;
 		char* description;
+		kindDefinition* fileKind;
 
-		parseKinds (kinds, &kind, &kindName, &description);
-		if (kind == getLanguageKind (lcb->owner, KIND_FILE_INDEX)->letter)
+		parseKinds (kinds, &kindLetter, &kindName, &description);
+		fileKind = getLanguageKind (lcb->owner, KIND_FILE_INDEX);
+		if (kindLetter == fileKind->letter)
 			error (FATAL,
 				   "Kind letter \'%c\' used in regex definition \"%s\" of %s language is reserved in ctags main",
-				   kind,
+				   kindLetter,
+				   regex,
+				   getLanguageName (lcb->owner));
+		else if (kindName && (strcmp (kindName, fileKind->name) == 0))
+			error (FATAL,
+				   "Kind name \"%s\" used in regex definition \"%s\" of %s language is reserved in ctags main",
+				   kindName,
 				   regex,
 				   getLanguageName (lcb->owner));
 
 		rptr = addCompiledTagPattern (lcb, table_index,
 									  regptype, cp, name,
-									  kind, kindName, description, flags,
+									  kindLetter, kindName, description, flags,
 									  disabled);
 		rptr->pattern_string = escapeRegexPattern(regex);
 		if (kindName)
