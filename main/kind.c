@@ -142,11 +142,6 @@ extern int  defineKind (struct kindControlBlock* kcb, kindDefinition *def,
 	return def->id;
 }
 
-extern bool isKindEnabled (struct kindControlBlock* kcb, int kindIndex)
-{
-	return kcb->kind [kindIndex].def->enabled;
-}
-
 extern bool isRoleEnabled (struct kindControlBlock* kcb, int kindIndex, int roleIndex)
 {
 	return kcb->kind [kindIndex].def->roles[roleIndex].enabled;
