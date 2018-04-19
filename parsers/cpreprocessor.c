@@ -105,7 +105,7 @@ typedef enum {
 	CPREPRO_MACRO_KIND_UNDEF_ROLE,
 } cPreProMacroRole;
 
-static roleDesc CPREPROMacroRoles [] = {
+static roleDefinition CPREPROMacroRoles [] = {
 	RoleTemplateUndef,
 };
 
@@ -115,7 +115,7 @@ typedef enum {
 	CPREPRO_HEADER_KIND_LOCAL_ROLE,
 } cPreProHeaderRole;
 
-static roleDesc CPREPROHeaderRoles [] = {
+static roleDefinition CPREPROHeaderRoles [] = {
 	RoleTemplateSystem,
 	RoleTemplateLocal,
 };
@@ -742,7 +742,7 @@ static int directiveDefine (const int c, bool undef)
 			p = cppGetcFromUngetBufferOrFile ();
 			if (p == '(')
 			{
-				signature = vStringNewOrClear (signature);
+				signature = vStringNewOrClearWithAutoRelease (signature);
 				do {
 					if (!isspacetab(p))
 						vStringPut (signature, p);

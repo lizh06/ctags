@@ -34,31 +34,31 @@ struct rejection {
 	bool rejectedInThisInput;
 };
 
-tagWriter uCtagsWriter = {
-	.writeEntry = writeCtagsEntry,
-	.writePtagEntry = writeCtagsPtagEntry,
-	.preWriteEntry = NULL,
-	.postWriteEntry = NULL,
-	.buildFqTagCache = buildCtagsFqTagCache,
-	.defaultFileName = CTAGS_FILE,
-};
-
 static void *beginECtagsFile (tagWriter *writer CTAGS_ATTR_UNUSED, MIO * mio CTAGS_ATTR_UNUSED)
 {
 	static struct rejection rej;
 
-	rej.rejectedInThisInput = false;
-
-	return &rej;
+	if (escapeMetacharacters())
+		return NULL;
+	else
+	{
+		rej.rejectedInThisInput = false;
+		return &rej;
+	}
 }
 
 static bool endECTagsFile (tagWriter *writer, MIO * mio CTAGS_ATTR_UNUSED, const char* filename CTAGS_ATTR_UNUSED)
 {
-	struct rejection *rej = writer->private;
-	return rej->rejectedInThisInput;
+	if (escapeMetacharacters())
+		return false;
+	else
+	{
+		struct rejection *rej = writer->private;
+		return rej->rejectedInThisInput;
+	}
 }
 
-tagWriter eCtagsWriter = {
+tagWriter ctagsWriter = {
 	.writeEntry = writeCtagsEntry,
 	.writePtagEntry = writeCtagsPtagEntry,
 	.preWriteEntry = beginECtagsFile,
@@ -215,7 +215,7 @@ static int addExtensionFields (tagWriter *writer, MIO *mio, const tagEntryInfo *
 	length += renderExtensionFieldMaybe (writer, FIELD_ACCESS, tag, sep, mio);
 	length += renderExtensionFieldMaybe (writer, FIELD_IMPLEMENTATION, tag, sep, mio);
 	length += renderExtensionFieldMaybe (writer, FIELD_SIGNATURE, tag, sep, mio);
-	length += renderExtensionFieldMaybe (writer, FIELD_ROLE, tag, sep, mio);
+	length += renderExtensionFieldMaybe (writer, FIELD_ROLES, tag, sep, mio);
 	length += renderExtensionFieldMaybe (writer, FIELD_EXTRAS, tag, sep, mio);
 	length += renderExtensionFieldMaybe (writer, FIELD_XPATH, tag, sep, mio);
 	length += renderExtensionFieldMaybe (writer, FIELD_END_LINE, tag, sep, mio);
