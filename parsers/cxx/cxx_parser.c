@@ -157,7 +157,7 @@ bool cxxParserParseAndCondenseCurrentSubchain(
 		}
 		pFakeLast->eType = eTermType;
 		pFakeLast->pChain = NULL;
-		
+
 		cxxTokenChainAppend(g_cxx.pTokenChain,pFakeLast);
 	}
 
@@ -761,6 +761,7 @@ bool cxxParserParseEnum(void)
 
 
 	int iPushedScopes = 0;
+	bool bAnonymous = false;
 
 	if(pEnumName)
 	{
@@ -803,6 +804,7 @@ bool cxxParserParseEnum(void)
 		cxxTokenChainTake(g_cxx.pTokenChain,pEnumName);
 	} else {
 		pEnumName = cxxTokenCreateAnonymousIdentifier(CXXTagKindENUM);
+		bAnonymous = true;
 		CXX_DEBUG_PRINT(
 				"Enum name is %s (anonymous)",
 				vStringValue(pEnumName->pszWord)
@@ -818,6 +820,9 @@ bool cxxParserParseEnum(void)
 	{
 		// FIXME: this is debatable
 		tag->isFileScope = !isInputHeaderFile();
+
+		if (bAnonymous)
+			markTagExtraBit (tag, XTAG_ANONYMOUS);
 
 		CXXToken * pTypeName = NULL;
 		vString * pszProperties = NULL;
@@ -918,6 +923,7 @@ static bool cxxParserParseClassStructOrUnionInternal(
 	unsigned int uInitialKeywordState = g_cxx.uKeywordState;
 	int iInitialTokenCount = g_cxx.pTokenChain->iCount;
 	CXXToken * pLastToken = cxxTokenChainLast(g_cxx.pTokenChain);
+	bool bAnonymous = false;
 
 	/*
 		Spec is:
@@ -962,18 +968,30 @@ static bool cxxParserParseClassStructOrUnionInternal(
 			return false;
 		}
 
-		// skip alignas specifier:
-		// struct alignas(n) ...
-		//               ^ g_cxx.pToken points this.
-		if(cxxTokenTypeIs(g_cxx.pToken,CXXTokenTypeParenthesisChain) &&
-		   cxxTokenTypeIs(g_cxx.pToken->pPrev,CXXTokenTypeKeyword) &&
-		   g_cxx.pToken->pPrev->eKeyword == CXXKeywordALIGNAS)
-				continue;
+		if(
+			cxxTokenTypeIs(g_cxx.pToken,CXXTokenTypeParenthesisChain) &&
+			(
+				(
+					// struct alignas(n) ...
+					cxxTokenIsKeyword(g_cxx.pToken->pPrev,CXXKeywordALIGNAS)
+				) || (
+					// things like __builtin_align__(16)
+					!cxxParserTokenChainLooksLikeFunctionParameterList(g_cxx.pToken->pChain,NULL)
+				)
+			)
+		)
+			continue;
 
 		if(!cxxTokenTypeIs(g_cxx.pToken,CXXTokenTypeSmallerThanSign))
 			break;
 
 		// Probably a template specialisation
+		if(!cxxParserCurrentLanguageIsCPP())
+		{
+			cxxKeywordEnableFinal(false);
+			CXX_DEBUG_LEAVE_TEXT("Template specialization in C language?");
+			return false;
+		}
 
 		// template<typename T> struct X<int>
 		// {
@@ -982,13 +1000,7 @@ static bool cxxParserParseClassStructOrUnionInternal(
 		// FIXME: Should we add the specialisation arguments somewhere?
 		//        Maybe as a separate field?
 
-		bRet = cxxParserParseAndCondenseCurrentSubchain(
-					CXXTokenTypeOpeningParenthesis | CXXTokenTypeOpeningBracket |
-						CXXTokenTypeOpeningSquareParenthesis |
-						CXXTokenTypeSmallerThanSign,
-					false,
-					false
-				);
+		bRet = cxxParserParseTemplateAngleBracketsToSeparateChain();
 
 		if(!bRet)
 		{
@@ -1008,6 +1020,7 @@ static bool cxxParserParseClassStructOrUnionInternal(
 			CXX_DEBUG_LEAVE_TEXT("Found parenthesis after typedef: parsing as generic typedef");
 			return cxxParserParseGenericTypedef();
 		}
+
 		// probably a function declaration/prototype
 		// something like struct x * func()....
 		// do not clear statement
@@ -1054,7 +1067,6 @@ static bool cxxParserParseClassStructOrUnionInternal(
 	if(iInitialTokenCount > 1)
 		cxxParserCleanupEnumStructClassOrUnionPrefixChain(eKeyword,pLastToken);
 
-	// FIXME: This block is duplicated in enum
 	if(cxxTokenTypeIs(g_cxx.pToken,CXXTokenTypeSemicolon))
 	{
 		if(g_cxx.pTokenChain->iCount > 3)
@@ -1062,7 +1074,7 @@ static bool cxxParserParseClassStructOrUnionInternal(
 			// [typedef] struct X Y; <-- typedef has been removed!
 			if(uInitialKeywordState & CXXParserKeywordStateSeenTypedef)
 				cxxParserExtractTypedef(g_cxx.pTokenChain,true);
-			else
+			else if(!(g_cxx.uKeywordState & CXXParserKeywordStateSeenFriend))
 				cxxParserExtractVariableDeclarations(g_cxx.pTokenChain,0);
 		}
 
@@ -1163,6 +1175,7 @@ static bool cxxParserParseClassStructOrUnionInternal(
 				iPushedScopes++;
 			} else {
 				// it's a syntax error, but be tolerant
+				cxxTokenDestroy(pNamespaceBegin);
 			}
 			pNamespaceBegin = pNext->pNext;
 		}
@@ -1174,6 +1187,7 @@ static bool cxxParserParseClassStructOrUnionInternal(
 		cxxTokenChainTake(g_cxx.pTokenChain,pClassName);
 	} else {
 		pClassName = cxxTokenCreateAnonymousIdentifier(uTagKind);
+		bAnonymous = true;
 		CXX_DEBUG_PRINT(
 				"Class/struct/union name is %s (anonymous)",
 				vStringValue(pClassName->pszWord)
@@ -1225,6 +1239,9 @@ static bool cxxParserParseClassStructOrUnionInternal(
 
 	if(tag)
 	{
+		if (bAnonymous)
+			markTagExtraBit (tag, XTAG_ANONYMOUS);
+
 		if(g_cxx.pTokenChain->iCount > 0)
 		{
 			// Strip inheritance type information
@@ -1449,13 +1466,24 @@ check_function_signature:
 
 	if(cxxParserLookForFunctionSignature(g_cxx.pTokenChain,&oInfo,NULL))
 	{
-		int iScopesPushed = cxxParserEmitFunctionTags(&oInfo,CXXTagKindPROTOTYPE,CXXEmitFunctionTagsPushScopes,NULL);
-		while(iScopesPushed > 0)
+		CXX_DEBUG_PRINT("Found function prototype");
+
+		if(g_cxx.uKeywordState & CXXParserKeywordStateSeenFriend)
 		{
-			cxxScopePop();
-			iScopesPushed--;
+			// class X {
+			//   friend void aFunction();
+			// };
+			// 'aFunction' is NOT X::aFunction() and in complex cases we can't figure
+			// out its proper scope. Better avoid emitting this one.
+			CXX_DEBUG_PRINT("But it has been preceeded by the 'friend' keyword: this is not a real prototype");
+		} else {
+			int iScopesPushed = cxxParserEmitFunctionTags(&oInfo,CXXTagKindPROTOTYPE,CXXEmitFunctionTagsPushScopes,NULL);
+			while(iScopesPushed > 0)
+			{
+				cxxScopePop();
+				iScopesPushed--;
+			}
 		}
-		CXX_DEBUG_LEAVE_TEXT("Found function prototype");
 
 		if(oInfo.pTrailingComma)
 		{
@@ -1479,6 +1507,7 @@ check_function_signature:
 			goto check_function_signature;
 		}
 
+		CXX_DEBUG_LEAVE();
 		return;
 	}
 
