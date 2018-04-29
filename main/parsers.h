@@ -79,6 +79,7 @@
 	M4Parser, \
 	ManParser, \
 	MakefileParser, \
+	MarkdownParser, \
 	MatLabParser, \
 	MyrddinParser, \
 	ObjcParser, \
