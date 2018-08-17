@@ -99,6 +99,9 @@
     <ClCompile Include="..\main\nestlevel.c">
       <Filter>Source Files\Main</Filter>
     </ClCompile>
+    <ClCompile Include="..\main\numarray.c">
+      <Filter>Source Files\Main</Filter>
+    </ClCompile>
     <ClCompile Include="..\main\objpool.c">
       <Filter>Source Files\Main</Filter>
     </ClCompile>
@@ -169,6 +172,9 @@
       <Filter>Source Files\Main</Filter>
     </ClCompile>
     <ClCompile Include="..\optlib\RSpec.c">
+      <Filter>Source Files\optlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\optlib\cmake.c">
       <Filter>Source Files\optlib</Filter>
     </ClCompile>
     <ClCompile Include="..\optlib\ctags-optlib.c">
@@ -549,6 +555,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\main\nestlevel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\main\numarray.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\main\objpool.h">

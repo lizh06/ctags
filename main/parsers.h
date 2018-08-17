@@ -46,6 +46,7 @@
 	BasicParser, \
 	BetaParser, \
 	ClojureParser, \
+	CMakeParser, \
 	CParser, \
 	CppParser, \
 	CPreProParser, \
