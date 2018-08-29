@@ -152,6 +152,7 @@
     <ClCompile Include="..\optlib\qemuhx.c" />
     <ClCompile Include="..\parsers\ada.c" />
     <ClCompile Include="..\parsers\ant.c" />
+    <ClCompile Include="..\parsers\asciidoc.c" />
     <ClCompile Include="..\parsers\asm.c" />
     <ClCompile Include="..\parsers\asp.c" />
     <ClCompile Include="..\parsers\autoconf.c" />
@@ -195,6 +196,7 @@
     <ClCompile Include="..\parsers\falcon.c" />
     <ClCompile Include="..\parsers\flex.c" />
     <ClCompile Include="..\parsers\fortran.c" />
+    <ClCompile Include="..\parsers\fypp.c" />
     <ClCompile Include="..\parsers\go.c" />
     <ClCompile Include="..\parsers\html.c" />
     <ClCompile Include="..\parsers\iniconf.c" />

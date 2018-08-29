@@ -38,6 +38,7 @@
 #define PARSER_LIST \
 	AdaParser, \
 	AntParser, \
+	AsciidocParser, \
 	AsmParser, \
 	AspParser, \
 	AutoconfParser, \
@@ -67,6 +68,7 @@
 	FalconParser, \
 	FlexParser, \
 	FortranParser, \
+	FyppParser,	   \
 	GdbinitParser, \
 	GoParser, \
 	HtmlParser, \
