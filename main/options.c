@@ -169,6 +169,7 @@ optionValues Option = {
 	.putFieldPrefix = false,
 	.maxRecursionDepth = 0xffffffff,
 	.interactive = false,
+	.mtablePrintTotals = false,
 #ifdef DEBUG
 	.debugLevel = 0,
 	.breakLine = 0,
@@ -310,6 +311,8 @@ static optionDescription LongOptionDescription [] = {
  {1,"       Indicate whether symbolic links should be followed [yes]."},
  {1,"  --list-aliases=[language|all]"},
  {1,"       Output list of alias patterns."},
+ {1,"  --list-excludes"},
+ {1,"       Output list of exclude patterns for excluding files/directories."},
  {1,"  --list-extras=[language|all]"},
  {1,"       Output list of extra tag flags."},
  {1,"  --list-features"},
@@ -465,6 +468,8 @@ static optionDescription ExperimentalLongOptionDescription [] = {
  {1,"       Copy patterns of a regex table to another regex table."},
  {1,"  --_mtable-regex-<LANG>=table/line_pattern/name_pattern/[flags]"},
  {1,"       Define multitable regular expression for locating tags in specific language."},
+ {1,"  --_mtable-totals=[yes|no]"},
+ {1,"       Print statistics about mtable usage [no]."},
  {1,"  --_roledef-<LANG>=kind_letter.role_name,role_desc"},
  {1,"       Define new role for kind specified with <kind_letter> in <LANG>."},
  {1,"  --_tabledef-<LANG>=name"},
@@ -1393,6 +1398,37 @@ static void printOptionDescriptions (const optionDescription *const optDesc)
 			puts (optDesc [i].description);
 	}
 }
+
+
+static int excludesCompare (struct colprintLine *a, struct colprintLine *b)
+{
+	return strcmp (colprintLineGetColumn (a, 0), colprintLineGetColumn (b, 0));
+}
+
+static void processListExcludesOption(const char *const option CTAGS_ATTR_UNUSED,
+				      const char *const parameter CTAGS_ATTR_UNUSED)
+{
+	int i;
+	struct colprintTable *table = colprintTableNew ("L:NAME", NULL);
+
+	const int max = Excluded ? stringListCount (Excluded) : 0;
+
+	for (i = 0; i < max; ++i)
+	{
+		struct colprintLine * line = colprintTableGetNewLine (table);
+		colprintLineAppendColumnVString (line, stringListItem (Excluded, i));
+	}
+
+	colprintTableSort (table, excludesCompare);
+	colprintTablePrint (table, 0, localOption.withListHeader, localOption.machinable, stdout);
+	colprintTableDelete (table);
+
+	if (i == 0)
+		putchar ('\n');
+
+	exit (0);
+}
+
 
 static void printFeatureList (void)
 {
@@ -2661,6 +2697,7 @@ static parametricOption ParametricOptions [] = {
 	{ "langmap",                processLanguageMapOption,       false,  STAGE_ANY },
 	{ "license",                processLicenseOption,           true,   STAGE_ANY },
 	{ "list-aliases",           processListAliasesOption,       true,   STAGE_ANY },
+	{ "list-excludes",          processListExcludesOption,      true,   STAGE_ANY },
 	{ "list-extras",            processListExtrasOption,        true,   STAGE_ANY },
 	{ "list-features",          processListFeaturesOption,      true,   STAGE_ANY },
 	{ "list-fields",            processListFieldsOption,        true,   STAGE_ANY },
@@ -2723,6 +2760,7 @@ static booleanOption BooleanOptions [] = {
 	{ "verbose",        &Option.verbose,                false, STAGE_ANY },
 	{ "with-list-header", &localOption.withListHeader,       true,  STAGE_ANY },
 	{ "_fatal-warnings",&Option.fatalWarnings,          false, STAGE_ANY },
+	{ "_mtable-totals", &Option.mtablePrintTotals,      false, STAGE_ANY },
 };
 
 /*

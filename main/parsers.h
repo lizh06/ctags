@@ -37,6 +37,7 @@
 /* Add the name of any new parser definition function here */
 #define PARSER_LIST \
 	AntParser, \
+	AsciidocParser, \
 	AsmParser, \
 	AspParser, \
 	AutoconfParser, \
@@ -65,6 +66,7 @@
 	ErlangParser, \
 	FlexParser, \
 	FortranParser, \
+	FyppParser,	   \
 	GdbinitParser, \
 	GoParser, \
 	HtmlParser, \

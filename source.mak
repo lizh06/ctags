@@ -135,6 +135,7 @@ PARSER_HEADS = \
 PARSER_SRCS =				\
 	parsers/ada.c			\
 	parsers/ant.c			\
+	parsers/asciidoc.c		\
 	parsers/asm.c			\
 	parsers/asp.c			\
 	parsers/autoconf.c		\
@@ -178,6 +179,7 @@ PARSER_SRCS =				\
 	parsers/falcon.c		\
 	parsers/flex.c			\
 	parsers/fortran.c		\
+	parsers/fypp.c			\
 	parsers/go.c			\
 	parsers/html.c			\
 	parsers/iniconf.c		\

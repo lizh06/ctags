@@ -24,6 +24,7 @@
 #include "main.h"
 #include "routines.h"
 #include "options.h"
+#include "promise.h"
 #include "trashbox.h"
 #ifdef HAVE_ICONV
 # include "mbcs.h"
@@ -62,9 +63,6 @@ typedef struct sInputFileInfo {
 					   on the input stream.
 					   This is needed for nested stream. */
 	bool isHeader;           /* is input file a header file? */
-
-	/* language of input file */
-	inputLangInfo langInfo;
 } inputFileInfo;
 
 typedef struct sComputPos {
@@ -118,6 +116,8 @@ typedef struct sInputFile {
 	int thinDepth;
 } inputFile;
 
+static inputLangInfo inputLang;
+static langType sourceLang;
 
 /*
 *   FUNCTION DECLARATIONS
@@ -172,7 +172,7 @@ extern MIOPos getInputFilePositionForLine (unsigned int line)
 
 extern langType getInputLanguage (void)
 {
-	return langStackTop (&File.input.langInfo.stack);
+	return langStackTop (&inputLang.stack);
 }
 
 extern const char *getInputLanguageName (void)
@@ -233,7 +233,7 @@ extern const char *getSourceFileTagPath (void)
 
 extern langType getSourceLanguage (void)
 {
-	return File.source.langInfo.type;
+	return sourceLang;
 }
 
 extern unsigned long getSourceLineNumber (void)
@@ -369,7 +369,6 @@ static void setOwnerDirectoryOfInputFile (const char *const fileName)
 
 static void setInputFileParametersCommon (inputFileInfo *finfo, vString *const fileName,
 					  const langType language,
-					  void (* setLang) (inputLangInfo *, langType),
 					  stringList *holder)
 {
 	if (finfo->name != NULL)
@@ -401,8 +400,6 @@ static void setInputFileParametersCommon (inputFileInfo *finfo, vString *const f
 							 getTagFileDirectory ()));
 
 	finfo->isHeader = isIncludeFile (vStringValue (fileName));
-
-	setLang (& (finfo->langInfo), language);
 }
 
 static void resetLangOnStack (inputLangInfo *langInfo, langType lang)
@@ -427,23 +424,18 @@ static void clearLangOnStack (inputLangInfo *langInfo)
 	langStackClear (& langInfo->stack);
 }
 
-static void setLangToType  (inputLangInfo *langInfo, langType lang)
-{
-	langInfo->type = lang;
-}
-
 static void setInputFileParameters (vString *const fileName, const langType language)
 {
 	setInputFileParametersCommon (&File.input, fileName,
-				      language, pushLangOnStack,
-				      NULL);
+				      language, NULL);
+	pushLangOnStack(&inputLang, language);
 }
 
 static void setSourceFileParameters (vString *const fileName, const langType language)
 {
 	setInputFileParametersCommon (&File.source, fileName,
-				      language, setLangToType,
-				      File.sourceTagPathHolder);
+				      language, File.sourceTagPathHolder);
+	sourceLang = language;
 }
 
 static bool setSourceFileName (vString *const fileName)
@@ -742,9 +734,9 @@ extern void resetInputFile (const langType language)
 	if (hasLanguageMultilineRegexPatterns (language))
 		File.allLines = vStringNew ();
 
-	resetLangOnStack (& (File.input.langInfo), language);
+	resetLangOnStack (& inputLang, language);
 	File.input.lineNumber = File.input.lineNumberOrigin;
-	setLangToType (& (File.source.langInfo), language);
+	sourceLang = language;
 	File.source.lineNumber = File.source.lineNumberOrigin;
 }
 
@@ -752,7 +744,7 @@ extern void closeInputFile (void)
 {
 	if (File.mio != NULL)
 	{
-		clearLangOnStack (& (File.input.langInfo));
+		clearLangOnStack (& inputLang);
 
 		/*  The line count of the file is 1 too big, since it is one-based
 		 *  and is incremented upon each newline.
@@ -1120,7 +1112,8 @@ out:
 extern void   pushNarrowedInputStream (
 				       unsigned long startLine, long startCharOffset,
 				       unsigned long endLine, long endCharOffset,
-				       unsigned long sourceLineOffset)
+				       unsigned long sourceLineOffset,
+				       int promise)
 {
 	long p, q;
 	MIOPos original;
@@ -1153,9 +1146,16 @@ extern void   pushNarrowedInputStream (
 
 	invalidatePatternCache();
 
-	subio = mio_new_mio (File.mio, p, q - p);
+	size_t size = q - p;
+	subio = mio_new_mio (File.mio, p, size);
 	if (subio == NULL)
 		error (FATAL, "memory for mio may be exhausted");
+
+	runModifiers (promise,
+				  startLine, startCharOffset,
+				  endLine, endCharOffset,
+				  mio_memory_get_data (subio, NULL),
+				  size);
 
 	BackupFile = File;
 
@@ -1211,12 +1211,12 @@ extern void   popNarrowedInputStream  (void)
 
 extern void pushLanguage (const langType language)
 {
-	pushLangOnStack (&File.input.langInfo, language);
+	pushLangOnStack (& inputLang, language);
 }
 
 extern langType popLanguage (void)
 {
-	return popLangOnStack (&File.input.langInfo);
+	return popLangOnStack (& inputLang);
 }
 
 static void langStackInit (langStack *langStack)
