@@ -146,7 +146,8 @@ extern int makeSimpleTag (
 {
 	int r = CORK_NIL;
 
-	if (isInputLanguageKindEnabled(kindIndex) &&  name != NULL  &&  vStringLength (name) > 0)
+	/* do not check for kind being disabled - that happens later in makeTagEntry() */
+	if (name != NULL  &&  vStringLength (name) > 0)
 	{
 		tagEntryInfo e;
 		initTagEntry (&e, vStringValue (name), kindIndex);
@@ -1601,10 +1602,6 @@ static void initializeParserOne (langType lang)
 	   xtag definitions. */
 	installTagRegexTable (lang);
 
-	if (hasLanguageScopeActionInRegex (lang)
-	    || parser->def->requestAutomaticFQTag)
-		parser->def->useCork = true;
-
 	if (parser->def->initialize != NULL)
 		parser->def->initialize (lang);
 
@@ -3045,6 +3042,13 @@ static bool doesParserUseCork (parserDefinition *parser)
 	if (parser->useCork)
 		return true;
 
+	if (hasLanguageScopeActionInRegex (parser->id)
+	    || parser->requestAutomaticFQTag)
+	{
+		parser->useCork = true;
+		return true;
+	}
+
 	pushLanguage (parser->id);
 	foreachSubparser(tmp, true)
 	{
@@ -3161,7 +3165,8 @@ static bool createTagsWithFallback1 (const langType language,
 extern bool runParserInNarrowedInputStream (const langType language,
 					       unsigned long startLine, long startCharOffset,
 					       unsigned long endLine, long endCharOffset,
-					       unsigned long sourceLineOffset)
+					       unsigned long sourceLineOffset,
+					       int promise)
 {
 	bool tagFileResized;
 
@@ -3178,7 +3183,8 @@ extern bool runParserInNarrowedInputStream (const langType language,
 	pushNarrowedInputStream (
 				 startLine, startCharOffset,
 				 endLine, endCharOffset,
-				 sourceLineOffset);
+				 sourceLineOffset,
+				 promise);
 	tagFileResized = createTagsWithFallback1 (language, NULL);
 	popNarrowedInputStream  ();
 	return tagFileResized;

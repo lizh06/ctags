@@ -112,13 +112,12 @@ extern char *readLineRaw (vString *const vLine, MIO *const mio);
 
 /* Bypass: reading from fp in inputFile WITHOUT updating fields in input fields */
 extern char *readLineFromBypass (vString *const vLine, MIOPos location, long *const pSeekValue);
-extern char *readLineFromBypassSlow (vString *const vLine, unsigned long lineNumber,
-				     const char *pattern, long *const pSeekValue);
 
 extern void   pushNarrowedInputStream (
 				       unsigned long startLine, long startCharOffset,
 				       unsigned long endLine, long endCharOffset,
-				       unsigned long sourceLineOffset);
+				       unsigned long sourceLineOffset,
+				       int promise);
 extern void   popNarrowedInputStream  (void);
 
 extern void     pushLanguage(const langType language);
