@@ -66,6 +66,7 @@
 	ErlangParser, \
 	FlexParser, \
 	FortranParser, \
+	FyppParser,	   \
 	GdbinitParser, \
 	GoParser, \
 	HtmlParser, \
