@@ -11,6 +11,7 @@
 #include "keyword.h"
 #include "read.h"
 #include "main.h"
+#include "numarray.h"
 #include "objpool.h"
 #include "routines.h"
 #include "vstring.h"
@@ -20,7 +21,7 @@
 /*
  *	 MACROS
  */
-#define MAX_SIGNATURE_LENGTH 512
+#define MAX_COLLECTOR_LENGTH 512
 #define isType(token,t) (bool) ((token)->type == (t))
 #define isKeyword(token,k) (bool) ((token)->keyword == (k))
 #define isStartIdentChar(c) (isalpha (c) ||  (c) == '_' || (c) > 128) /* XXX UTF-8 */
@@ -73,7 +74,13 @@ typedef struct sTokenInfo {
 	vString *string;		/* the name of the token */
 	unsigned long lineNumber;	/* line number of tag */
 	MIOPos filePosition;		/* file position of line containing name */
+	int c;						/* Used in AppendTokenToVString */
 } tokenInfo;
+
+typedef struct sCollector {
+	vString *str;
+	size_t last_len;
+} collector;
 
 /*
 *   DATA DEFINITIONS
@@ -81,7 +88,6 @@ typedef struct sTokenInfo {
 
 static int Lang_go;
 static objPool *TokenPool = NULL;
-static vString *signature = NULL;
 
 typedef enum {
 	GOTAG_UNDEFINED = -1,
@@ -222,13 +228,60 @@ static void parseIdentifier (vString *const string, const int firstChar)
 	ungetcToInputFile (c);		/* always unget, LF might add a semicolon */
 }
 
-static void readToken (tokenInfo *const token)
+static void collectorPut (collector *collector, char c)
+{
+	collector->last_len = vStringLength (collector->str);
+	vStringPut (collector->str, c);
+}
+
+static void collectorCatS (collector *collector, char *cstr)
+{
+	collector->last_len = vStringLength (collector->str);
+	vStringCatS (collector->str, cstr);
+}
+
+static void collectorCat (collector *collector, vString *str)
+{
+	collector->last_len = vStringLength (collector->str);
+	vStringCat (collector->str, str);
+}
+
+static void appendTokenToVString (const tokenInfo *const token, collector *collector)
+{
+	if (token->type == TOKEN_LEFT_ARROW)
+		collectorCatS (collector, "<-");
+	else if (token->type == TOKEN_STRING)
+	{
+		// only struct member annotations can appear in function prototypes
+		// so only `` type strings are possible
+		collector->last_len = vStringLength (collector->str);
+		vStringPut(collector->str, '`');
+		vStringCat(collector->str, token->string);
+		vStringPut(collector->str, '`');
+	}
+	else if (token->type == TOKEN_IDENTIFIER || token->type == TOKEN_KEYWORD)
+		collectorCat (collector, token->string);
+	else if (token->c != EOF)
+		collectorPut (collector, token->c);
+}
+
+static void collectorTruncate (collector *collector, bool dropLast)
+{
+	if (dropLast)
+		vStringTruncate (collector->str, collector->last_len);
+
+	vStringStripLeading (collector->str);
+	vStringStripTrailing (collector->str);
+}
+
+static void readTokenFull (tokenInfo *const token, collector *collector)
 {
 	int c;
 	static tokenType lastTokenType = TOKEN_NONE;
 	bool firstWhitespace = true;
 	bool whitespace;
 
+	token->c = EOF;
 	token->type = TOKEN_NONE;
 	token->keyword = KEYWORD_NONE;
 	vStringClear (token->string);
@@ -249,10 +302,10 @@ getNextChar:
 			c = ';';  // semicolon injection
 		}
 		whitespace = c == '\t'  ||  c == ' ' ||  c == '\r' || c == '\n';
-		if (signature && whitespace && firstWhitespace && vStringLength (signature) < MAX_SIGNATURE_LENGTH)
+		if (collector && whitespace && firstWhitespace && vStringLength (collector->str) < MAX_COLLECTOR_LENGTH)
 		{
 			firstWhitespace = false;
-			vStringPut(signature, ' ');
+			collectorPut (collector, ' ');
 		}
 	}
 	while (whitespace);
@@ -386,28 +439,20 @@ getNextChar:
 			break;
 	}
 
-	if (signature && vStringLength (signature) < MAX_SIGNATURE_LENGTH)
-	{
-		if (token->type == TOKEN_LEFT_ARROW)
-			vStringCatS(signature, "<-");
-		else if (token->type == TOKEN_STRING)
-		{
-			// only struct member annotations can appear in function prototypes
-			// so only `` type strings are possible
-			vStringPut(signature, '`');
-			vStringCat(signature, token->string);
-			vStringPut(signature, '`');
-		}
-		else if (token->type == TOKEN_IDENTIFIER || token->type == TOKEN_KEYWORD)
-			vStringCat(signature, token->string);
-		else if (c != EOF)
-			vStringPut(signature, c);
-	}
+	token->c = c;
+
+	if (collector && vStringLength (collector->str) < MAX_COLLECTOR_LENGTH)
+		appendTokenToVString (token, collector);
 
 	lastTokenType = token->type;
 }
 
-static bool skipToMatchedNoRead (tokenInfo *const token)
+static void readToken (tokenInfo *const token)
+{
+	readTokenFull (token, NULL);
+}
+
+static bool skipToMatchedNoRead (tokenInfo *const token, collector *collector)
 {
 	int nest_level = 0;
 	tokenType open_token = token->type;
@@ -435,7 +480,7 @@ static bool skipToMatchedNoRead (tokenInfo *const token)
 	nest_level++;
 	while (nest_level > 0 && !isType (token, TOKEN_EOF))
 	{
-		readToken (token);
+		readTokenFull (token, collector);
 		if (isType (token, open_token))
 			nest_level++;
 		else if (isType (token, close_token))
@@ -445,19 +490,19 @@ static bool skipToMatchedNoRead (tokenInfo *const token)
 	return true;
 }
 
-static void skipToMatched (tokenInfo *const token)
+static void skipToMatched (tokenInfo *const token, collector *collector)
 {
-	if (skipToMatchedNoRead (token))
-		readToken (token);
+	if (skipToMatchedNoRead (token, collector))
+		readTokenFull (token, collector);
 }
 
-static bool skipType (tokenInfo *const token)
+static bool skipType (tokenInfo *const token, collector *collector)
 {
 	// Type      = TypeName | TypeLit | "(" Type ")" .
 	// Skips also function multiple return values "(" Type {"," Type} ")"
 	if (isType (token, TOKEN_OPEN_PAREN))
 	{
-		skipToMatched (token);
+		skipToMatched (token, collector);
 		return true;
 	}
 
@@ -466,12 +511,12 @@ static bool skipType (tokenInfo *const token)
 	// PackageName    = identifier .
 	if (isType (token, TOKEN_IDENTIFIER))
 	{
-		readToken (token);
+		readTokenFull (token, collector);
 		if (isType (token, TOKEN_DOT))
 		{
-			readToken (token);
+			readTokenFull (token, collector);
 			if (isType (token, TOKEN_IDENTIFIER))
-				readToken (token);
+				readTokenFull (token, collector);
 		}
 		return true;
 	}
@@ -480,9 +525,9 @@ static bool skipType (tokenInfo *const token)
 	// InterfaceType      = "interface" "{" { MethodSpec ";" } "}" .
 	if (isKeyword (token, KEYWORD_struct) || isKeyword (token, KEYWORD_interface))
 	{
-		readToken (token);
+		readTokenFull (token, collector);
 		// skip over "{}"
-		skipToMatched (token);
+		skipToMatched (token, collector);
 		return true;
 	}
 
@@ -491,8 +536,8 @@ static bool skipType (tokenInfo *const token)
 	// ElementType = Type .
 	if (isType (token, TOKEN_OPEN_SQUARE))
 	{
-		skipToMatched (token);
-		return skipType (token);
+		skipToMatched (token, collector);
+		return skipType (token, collector);
 	}
 
 	// PointerType = "*" BaseType .
@@ -500,18 +545,18 @@ static bool skipType (tokenInfo *const token)
 	// ChannelType = ( "chan" [ "<-" ] | "<-" "chan" ) ElementType .
 	if (isType (token, TOKEN_STAR) || isKeyword (token, KEYWORD_chan) || isType (token, TOKEN_LEFT_ARROW))
 	{
-		readToken (token);
-		return skipType (token);
+		readTokenFull (token, collector);
+		return skipType (token, collector);
 	}
 
 	// MapType     = "map" "[" KeyType "]" ElementType .
 	// KeyType     = Type .
 	if (isKeyword (token, KEYWORD_map))
 	{
-		readToken (token);
+		readTokenFull (token, collector);
 		// skip over "[]"
-		skipToMatched (token);
-		return skipType (token);
+		skipToMatched (token, collector);
+		return skipType (token, collector);
 	}
 
 	// FunctionType   = "func" Signature .
@@ -520,13 +565,13 @@ static bool skipType (tokenInfo *const token)
 	// Parameters     = "(" [ ParameterList [ "," ] ] ")" .
 	if (isKeyword (token, KEYWORD_func))
 	{
-		readToken (token);
+		readTokenFull (token, collector);
 		// Parameters, skip over "()"
-		skipToMatched (token);
+		skipToMatched (token, collector);
 		// Result is parameters or type or nothing.  skipType treats anything
 		// surrounded by parentheses as a type, and does nothing if what
 		// follows is not a type.
-		return skipType (token);
+		return skipType (token, collector);
 	}
 
 	return false;
@@ -630,14 +675,14 @@ static void parseFunctionOrMethod (tokenInfo *const token, const int scope)
 		copyToken (functionToken, token);
 
 		// Start recording signature
-		signature = vStringNew ();
+		vString *signature = vStringNew ();
+		collector collector = { .str = signature, .last_len = 0, };
 
 		// Skip over parameters.
-		readToken (token);
-		skipToMatchedNoRead (token);
+		readTokenFull (token, &collector);
+		skipToMatchedNoRead (token, &collector);
 
-		vStringStripLeading (signature);
-		vStringStripTrailing (signature);
+		collectorTruncate (&collector, false);
 		if (receiver_type_token)
 			func_scope = makeTag(receiver_type_token, GOTAG_UNKNOWN,
 								 scope, NULL, NULL);
@@ -648,21 +693,29 @@ static void parseFunctionOrMethod (tokenInfo *const token, const int scope)
 		deleteToken (functionToken);
 		vStringDelete(signature);
 
-		// Stop recording signature
-		signature = NULL;
-
 		readToken (token);
 
 		// Skip over result.
-		skipType (token);
+		skipType (token, NULL);
 
 		// Skip over function body.
 		if (isType (token, TOKEN_OPEN_CURLY))
-			skipToMatched (token);
+			skipToMatched (token, NULL);
 	}
 
 	if (receiver_type_token)
 		deleteToken(receiver_type_token);
+}
+
+static void attachTypeRefField (intArray *corks, const char *const type)
+{
+	for (int i = 0; i < intArrayCount (corks); i++)
+	{
+		int cork = intArrayItem (corks, i);
+		tagEntryInfo *e = getEntryInCorkQueue (cork);
+		e->extensionFields.typeRef [0] = eStrdup ("typename");
+		e->extensionFields.typeRef [1] = eStrdup (type);
+	}
 }
 
 static void parseStructMembers (tokenInfo *const token, const int scope)
@@ -677,6 +730,7 @@ static void parseStructMembers (tokenInfo *const token, const int scope)
 		return;
 
 	vString *typeForAnonMember = vStringNew ();
+	intArray *corkForFields = intArrayNew ();
 
 	readToken (token);
 	while (!isType (token, TOKEN_EOF) && !isType (token, TOKEN_CLOSE_CURLY))
@@ -697,14 +751,17 @@ static void parseStructMembers (tokenInfo *const token, const int scope)
 				}
 				else
 				{
+					int cork;
 					if (memberCandidate)
 					{
 						// if we are here, there was a comma and memberCandidate isn't an anonymous field
-						makeTag (memberCandidate, GOTAG_MEMBER, scope, NULL, NULL);
+						cork = makeTag (memberCandidate, GOTAG_MEMBER, scope, NULL, NULL);
 						deleteToken (memberCandidate);
 						memberCandidate = NULL;
+						intArrayAdd (corkForFields, cork);
 					}
-					makeTag (token, GOTAG_MEMBER, scope, NULL, NULL);
+					cork = makeTag (token, GOTAG_MEMBER, scope, NULL, NULL);
+					intArrayAdd (corkForFields, cork);
 				}
 				readToken (token);
 			}
@@ -766,11 +823,22 @@ static void parseStructMembers (tokenInfo *const token, const int scope)
 				deleteToken (anonMember);
 			}
 		}
-		else if (memberCandidate)
+		else
 		{
-			// memberCandidate is a non-anonymous member
-			makeTag (memberCandidate, GOTAG_MEMBER, scope, NULL, NULL);
-			skipType (token);
+			vString *typeForMember = vStringNew ();
+			collector collector = { .str = typeForMember, .last_len = 0, };
+
+			appendTokenToVString (token, &collector);
+			skipType (token, &collector);
+			collectorTruncate (&collector, true);
+
+			if (memberCandidate)
+				makeTag (memberCandidate, GOTAG_MEMBER, scope, NULL,
+						 vStringValue (typeForMember));
+
+			attachTypeRefField (corkForFields, vStringValue (typeForMember));
+			intArrayClear (corkForFields);
+			vStringDelete (typeForMember);
 		}
 
 		if (memberCandidate)
@@ -782,7 +850,7 @@ static void parseStructMembers (tokenInfo *const token, const int scope)
 				&& !isType (token, TOKEN_EOF))
 		{
 			readToken (token);
-			skipToMatched (token);
+			skipToMatched (token, NULL);
 		}
 
 		if (!isType (token, TOKEN_CLOSE_CURLY))
@@ -792,6 +860,7 @@ static void parseStructMembers (tokenInfo *const token, const int scope)
 		}
 	}
 
+	intArrayDelete (corkForFields);
 	vStringDelete (typeForAnonMember);
 }
 
@@ -854,17 +923,17 @@ static void parseConstTypeVar (tokenInfo *const token, goKind kind, const int sc
 			if (isKeyword (token, KEYWORD_struct))
 				parseStructMembers (token, member_scope);
 			else
-				skipType (token);
+				skipType (token, NULL);
 			deleteToken (typeToken);
 		}
 		else
-			skipType (token);
+			skipType (token, NULL);
 
 		while (!isType (token, TOKEN_SEMICOLON) && !isType (token, TOKEN_CLOSE_PAREN)
 				&& !isType (token, TOKEN_EOF))
 		{
 			readToken (token);
-			skipToMatched (token);
+			skipToMatched (token, NULL);
 		}
 
 		if (usesParens && !isType (token, TOKEN_CLOSE_PAREN))
@@ -910,7 +979,7 @@ static void parseGoFile (tokenInfo *const token)
 		else if (isType (token, TOKEN_OPEN_PAREN) || isType (token, TOKEN_OPEN_CURLY) ||
 			isType (token, TOKEN_OPEN_SQUARE))
 		{
-			skipToMatched (token);
+			skipToMatched (token, NULL);
 		}
 	} while (token->type != TOKEN_EOF);
 }
